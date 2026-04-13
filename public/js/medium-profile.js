@@ -1,0 +1,73 @@
+import { api } from "./api.js";
+
+function esc(s) {
+  return String(s)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function parseTimeHM(s) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(s || "").trim());
+  if (!m) return null;
+  const h = Number(m[1]);
+  const mi = Number(m[2]);
+  if (h < 0 || h > 23 || mi < 0 || mi > 59) return null;
+  return h * 60 + mi;
+}
+
+function availabilityForCharacter(c) {
+  const from = parseTimeHM(c.typical_hours_from);
+  const to = parseTimeHM(c.typical_hours_to);
+  if (from == null || to == null) {
+    return {
+      badgeClass: "avail-badge avail-badge--unknown",
+      badgeText: "Status: do potwierdzenia",
+      line: "Godziny orientacyjne nie zostały ustawione.",
+    };
+  }
+  const now = new Date();
+  const mins = now.getHours() * 60 + now.getMinutes();
+  const inWin = from <= to ? mins >= from && mins <= to : mins >= from || mins <= to;
+  return {
+    badgeClass: inWin ? "avail-badge avail-badge--on" : "avail-badge avail-badge--off",
+    badgeText: inWin ? "Status: online" : "Status: offline",
+    line: `Najczęściej online: ${c.typical_hours_from} - ${c.typical_hours_to}. Odpowiedź może przyjść również poza tymi godzinami.`,
+  };
+}
+
+const root = document.getElementById("medium-profile-card");
+const id = new URLSearchParams(window.location.search).get("id");
+
+if (!id) {
+  root.innerHTML = `<p class="form-error">Brak identyfikatora medium.</p>`;
+} else {
+  try {
+    const { character: c } = await api(`/api/characters/${encodeURIComponent(id)}`);
+    const av = availabilityForCharacter(c);
+    const regHref = `/rejestracja.html?medium=${encodeURIComponent(c.id)}`;
+    const panelHref = `/panel.html?open=${encodeURIComponent(c.id)}`;
+    root.innerHTML = `
+      <div class="medium-profile-top">
+        <img src="${esc(c.portrait_url || "")}" alt="${esc(c.name)}" width="240" height="280" />
+        <div>
+          <h1>${esc(c.name)}</h1>
+          <p class="sub">${esc(c.tagline || "")}</p>
+          <p class="sub"><strong>Kategoria:</strong> ${esc(c.category || "—")}</p>
+          ${c.gender ? `<p class="sub"><strong>Postać:</strong> ${esc(c.gender)}</p>` : ""}
+          <p class="sub"><span class="${esc(av.badgeClass)}">${esc(av.badgeText)}</span></p>
+          <p class="sub">${esc(av.line)}</p>
+        </div>
+      </div>
+      ${c.skills ? `<h2 class="legal-h2">Talenty i styl pracy</h2><p class="sub">${esc(c.skills)}</p>` : ""}
+      ${c.about ? `<h2 class="legal-h2">Jak się opisuje</h2><p class="sub">${esc(c.about)}</p>` : ""}
+      <div class="medium-profile-actions">
+        <a class="btn btn-gold" href="${regHref}">Konsultacja z tym medium</a>
+        <a class="btn btn-outline" href="${panelHref}">Otwórz rozmowę w panelu</a>
+      </div>
+    `;
+  } catch (e) {
+    root.innerHTML = `<p class="form-error">${esc(e.message || "Nie udało się załadować profilu medium.")}</p>`;
+  }
+}

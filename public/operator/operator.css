@@ -179,6 +179,27 @@ a {
   border-bottom: 1px solid #0f172a;
 }
 
+.owner-advanced-toggle-wrap {
+  padding: 0.35rem 0.75rem 0;
+  background: #0f172a;
+}
+
+.owner-advanced-toggle {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0.32rem 0.6rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(15, 23, 42, 0.6);
+  color: #e2e8f0;
+  cursor: pointer;
+}
+
+.owner-advanced-toggle:hover {
+  background: rgba(30, 41, 59, 0.95);
+}
+
 .owner-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -963,6 +984,26 @@ a {
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+.client-admin-actions {
+  margin-top: 0.75rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+}
+
+.client-admin-actions-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.btn-primary-sm--link {
+  display: block;
+  text-align: center;
+  text-decoration: none;
 }
 
 .fact-empty {
@@ -2759,4 +2800,58 @@ kbd {
   background: #0f0f10;
   border-color: #2e2e32;
   color: #e8e6e3;
+}
+
+.op-email-dialog {
+  max-width: min(520px, 96vw);
+  padding: 1.25rem 1.5rem;
+  border: 1px solid #d4d4d8;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+}
+
+.op-email-dialog::backdrop {
+  background: rgba(15, 15, 18, 0.45);
+}
+
+.op-email-dialog-title {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+}
+
+.op-email-dialog-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.op-email-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.op-email-input,
+.op-email-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.45rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid #c4c4cc;
+  font: inherit;
+}
+
+.op-email-textarea {
+  resize: vertical;
+  min-height: 140px;
+}
+
+.op-email-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.op-email-dlg-err {
+  margin: 0.25rem 0 0;
 }

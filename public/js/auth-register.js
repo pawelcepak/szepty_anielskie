@@ -39,7 +39,7 @@ if (mediumId && loginLink) {
     const c = characters.find((x) => x.id === mediumId);
     if (!c) return;
     banner.hidden = false;
-    banner.innerHTML = `<p class="chosen-medium-text">Wybrałeś rozmowę z: <strong>${esc(c.name)}</strong>. Po rejestracji otworzymy od razu ten wątek w panelu.</p>`;
+    banner.innerHTML = `<p class="chosen-medium-text">Wybrałeś rozmowę z: <strong>${esc(c.name)}</strong>. Po potwierdzeniu adresu e-mail otworzymy ten wątek w panelu.</p>`;
   } catch {
     /* ignore */
   }
@@ -102,6 +102,7 @@ document.getElementById("form").addEventListener("submit", async (e) => {
     err.hidden = false;
     return;
   }
+  const mediumParam = new URLSearchParams(window.location.search).get("medium");
   try {
     await api("/api/auth/register", {
       method: "POST",
@@ -115,12 +116,10 @@ document.getElementById("form").addEventListener("submit", async (e) => {
         accept_terms: acceptTerms,
         accept_privacy: acceptPrivacy,
         avatar_url: avatarDataUrl || null,
+        medium: mediumParam || null,
       }),
     });
-    const med = new URLSearchParams(window.location.search).get("medium");
-    window.location.href = med
-      ? `/panel.html?open=${encodeURIComponent(med)}`
-      : "/panel.html";
+    window.location.href = "/logowanie.html?registered=1";
   } catch (x) {
     err.textContent = x.message;
     err.hidden = false;

@@ -42,17 +42,22 @@
 
     <div id="view-app" class="hidden">
       <p class="owner-mode-banner hidden" id="owner-mode-banner">Tryb administratora — pełny podgląd, edycja i monitor.</p>
+      <div class="owner-advanced-toggle-wrap hidden" id="owner-advanced-toggle-wrap">
+        <button type="button" class="owner-advanced-toggle" id="owner-advanced-toggle">
+          Pokaż ukryte narzędzia właściciela
+        </button>
+      </div>
       <nav class="owner-tabs hidden" id="owner-tabs" aria-label="Sekcje administratora">
         <button type="button" class="owner-tab owner-tab--active" data-owner-tab="inbox">Rozmowy</button>
         <button type="button" class="owner-tab" data-owner-tab="monitor">Monitor i sesje</button>
-        <button type="button" class="owner-tab" data-owner-tab="reports">
+        <button type="button" class="owner-tab owner-tab--advanced hidden" data-owner-tab="reports">
           Zgłoszenia <span class="owner-tab-badge hidden" id="owner-tab-reports-badge" aria-live="polite"></span>
         </button>
-        <button type="button" class="owner-tab" data-owner-tab="team">Zespół</button>
-        <button type="button" class="owner-tab" data-owner-tab="insights">Audyt i premie</button>
-        <button type="button" class="owner-tab" data-owner-tab="hr">Obsługa pracowników</button>
-        <button type="button" class="owner-tab" data-owner-tab="kyc">Weryfikacja tożsamości</button>
-        <button type="button" class="owner-tab" data-owner-tab="clients">Klienci</button>
+        <button type="button" class="owner-tab owner-tab--advanced hidden" data-owner-tab="team">Zespół</button>
+        <button type="button" class="owner-tab owner-tab--advanced hidden" data-owner-tab="insights">Audyt i premie</button>
+        <button type="button" class="owner-tab owner-tab--advanced hidden" data-owner-tab="hr">Obsługa pracowników</button>
+        <button type="button" class="owner-tab owner-tab--advanced hidden" data-owner-tab="kyc">Weryfikacja tożsamości</button>
+        <button type="button" class="owner-tab owner-tab--advanced hidden" data-owner-tab="clients">Klienci</button>
       </nav>
       <header class="op-header op-header--main">
         <a class="op-logo" href="/operator/" id="op-logo-main" title="Panel pracy — Szept Kart">Szept</a>
@@ -357,9 +362,34 @@
               <p class="err" id="fk-err" hidden></p>
             </div>
             <div class="fact-list" id="fk-list"></div>
+            <div class="client-admin-actions hidden" id="client-admin-actions">
+              <h3 class="fact-block-title">Obsługa klienta</h3>
+              <p class="side-hint" id="client-admin-status"></p>
+              <div class="client-admin-actions-row">
+                <button type="button" class="btn-primary-sm" id="btn-client-block">Zablokuj klienta</button>
+                <button type="button" class="btn-primary-sm hidden" id="btn-client-unblock">Odblokuj klienta</button>
+                <button type="button" class="btn-primary-sm" id="btn-client-email">Wyślij e-mail</button>
+              </div>
+              <p class="err" id="client-admin-err" hidden></p>
+            </div>
           </aside>
         </div>
       </div>
+
+      <dialog class="op-email-dialog" id="client-email-dialog">
+        <form id="client-email-form" class="op-email-dialog-form">
+          <h3 class="op-email-dialog-title">Wiadomość do klienta</h3>
+          <label class="op-email-label" for="client-email-subject">Temat</label>
+          <input id="client-email-subject" class="op-email-input" name="subject" type="text" maxlength="200" required autocomplete="off" />
+          <label class="op-email-label" for="client-email-text">Treść</label>
+          <textarea id="client-email-text" class="op-email-textarea" name="text" rows="8" maxlength="12000" required></textarea>
+          <p class="err op-email-dlg-err" id="client-email-dlg-err" hidden></p>
+          <div class="op-email-dialog-actions">
+            <button type="button" class="btn-primary-sm" id="client-email-cancel">Anuluj</button>
+            <button type="submit" class="btn-primary-sm">Wyślij</button>
+          </div>
+        </form>
+      </dialog>
 
       <dialog class="audit-dialog" id="audit-dialog">
         <form method="dialog" class="audit-dialog-form">

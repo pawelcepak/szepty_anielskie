@@ -344,6 +344,7 @@ function renderBrowseCatalog() {
       const sk = c.skills ? `<p class="browse-card-skills">${esc(c.skills)}</p>` : "";
       const about = c.about ? `<p class="browse-card-about">${esc(c.about)}</p>` : "";
       const gender = c.gender ? `<p class="browse-card-gender">${esc(c.gender)}</p>` : "";
+      const profileHref = `/medium.html?id=${encodeURIComponent(c.id)}`;
       card.innerHTML = `
         <div class="browse-card-top">
           <div class="browse-card-photo"><img src="${src}" alt="" width="120" height="140" loading="lazy" decoding="async" /></div>
@@ -357,7 +358,10 @@ function renderBrowseCatalog() {
         ${sk}
         ${about}
         <p class="browse-card-hours">${esc(av.line)}</p>
-        <button type="button" class="btn btn-primary browse-card-cta">Otwórz rozmowę</button>`;
+        <div class="browse-card-actions">
+          <button type="button" class="btn btn-primary browse-card-cta">Otwórz rozmowę</button>
+          <a class="btn btn-outline browse-card-cta-secondary" href="${profileHref}">Profil medium</a>
+        </div>`;
       card.querySelector(".browse-card-cta").addEventListener("click", () => {
         switchView("chat");
         openCharacter(c.id);
@@ -386,6 +390,9 @@ async function openCharacter(id) {
   const hoursBlock = `<p class="panel-head-hours"><span class="${esc(av.badgeClass)}">${esc(av.badgeText)}</span> ${esc(
     av.line
   )}</p>`;
+  const profileLink = `<p class="panel-head-meta"><a class="composer-foot-link" href="/medium.html?id=${encodeURIComponent(
+    c.id
+  )}">Zobacz pełny profil medium</a></p>`;
   chatHead.innerHTML = `<div class="panel-head-inner">
       <div class="panel-head-avatar"><img src="${src}" alt="" width="112" height="112" loading="lazy" /></div>
       <div class="panel-head-copy">
@@ -395,6 +402,7 @@ async function openCharacter(id) {
         ${skills}
         ${about}
         ${hoursBlock}
+        ${profileLink}
       </div>
     </div>`;
   const data = await api(`/api/threads/${encodeURIComponent(id)}/messages`);

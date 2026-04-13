@@ -36,6 +36,12 @@ import {
   tryClaimThread,
 } from "./assignment.js";
 import { APP_CONFIG } from "./app-config.js";
+import {
+  isMailConfigured,
+  publicBaseUrl,
+  sendOperatorEmailToUser,
+  sendVerificationEmail,
+} from "./mail.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const db = getDb();
@@ -146,6 +152,7 @@ function requireCustomer(req, res, next) {
   const row = db
     .prepare(
       `SELECT s.id AS session_id, u.id, u.email, u.display_name, u.username, u.first_name, u.birth_date, u.city, u.avatar_url
+              , u.blocked_at, u.email_verified_at
        FROM customer_sessions s
        JOIN users u ON u.id = s.user_id
        WHERE s.token = ? AND datetime(s.expires_at) > datetime('now')`
@@ -156,6 +163,14 @@ function requireCustomer(req, res, next) {
     return res.status(401).json({
       error: `Sesja wygasła po ${CUSTOMER_SESSION_IDLE_MINUTES} min bezczynności. Zaloguj się ponownie.`,
     });
+  }
+  if (row.blocked_at) {
+    clearCustomerSession(req, res);
+    return res.status(403).json({ error: "Twoje konto zostało zablokowane. Skontaktuj się z obsługą." });
+  }
+  if (!row.email_verified_at) {
+    clearCustomerSession(req, res);
+    return res.status(403).json({ error: "Potwierdź adres e-mail (link w wiadomości rejestracyjnej)." });
   }
   extendCustomerSession(res, row.session_id, token);
   req.customer = {
@@ -264,6 +279,7 @@ app.get("/api/auth/status", (req, res) => {
   const row = db
     .prepare(
       `SELECT s.id AS session_id, u.id, u.email, u.display_name, u.username, u.first_name, u.city
+              , u.blocked_at, u.email_verified_at
        FROM customer_sessions s
        JOIN users u ON u.id = s.user_id
        WHERE s.token = ? AND datetime(s.expires_at) > datetime('now')`
@@ -272,6 +288,14 @@ app.get("/api/auth/status", (req, res) => {
   if (!row) {
     res.clearCookie(COOKIE_CUSTOMER, sessionCookieClearOpts());
     return res.json({ logged_in: false });
+  }
+  if (row.blocked_at) {
+    clearCustomerSession(req, res);
+    return res.json({ logged_in: false });
+  }
+  if (!row.email_verified_at) {
+    clearCustomerSession(req, res);
+    return res.json({ logged_in: false, email_verification_pending: true });
   }
   extendCustomerSession(res, row.session_id, token);
   res.json({
@@ -288,7 +312,13 @@ app.get("/api/auth/status", (req, res) => {
   });
 });
 
-app.post("/api/auth/register", registerJsonParser, (req, res) => {
+app.post("/api/auth/register", registerJsonParser, async (req, res, next) => {
+  try {
+  const acceptTerms = req.body?.accept_terms === true || req.body?.accept_terms === "true";
+  const acceptPrivacy = req.body?.accept_privacy === true || req.body?.accept_privacy === "true";
+  if (!acceptTerms || !acceptPrivacy) {
+    return res.status(400).json({ error: "Zaakceptuj regulamin i politykę prywatności." });
+  }
   const email = String(req.body?.email || "").trim().toLowerCase();
   const password = String(req.body?.password || "");
   const username = String(req.body?.username || "").trim().toLowerCase();
@@ -296,6 +326,11 @@ app.post("/api/auth/register", registerJsonParser, (req, res) => {
   const birth_date = String(req.body?.birth_date || "").trim();
   const city = String(req.body?.city || "").trim();
   const avatar_url = String(req.body?.avatar_url || "").trim() || null;
+  let pending_open_character_id = String(req.body?.medium || "").trim() || null;
+  if (pending_open_character_id) {
+    const ch = db.prepare("SELECT id FROM characters WHERE id = ?").get(pending_open_character_id);
+    if (!ch) pending_open_character_id = null;
+  }
   if (!emailOk(email)) return res.status(400).json({ error: "Podaj poprawny adres e-mail." });
   if (password.length < 8) {
     return res.status(400).json({ error: "Hasło musi mieć co najmniej 8 znaków." });
@@ -332,28 +367,80 @@ app.post("/api/auth/register", registerJsonParser, (req, res) => {
   if (db.prepare("SELECT id FROM users WHERE lower(username) = lower(?)").get(username)) {
     return res.status(409).json({ error: "Ta nazwa użytkownika jest już zajęta." });
   }
+  if (!isMailConfigured()) {
+    return res.status(503).json({
+      error:
+        "Rejestracja wymaga skonfigurowanej wysyłki e-mail (SMTP). Ustaw SMTP_USER i SMTP_PASS w środowisku serwera.",
+    });
+  }
   const id = uuidv4();
   const hash = bcrypt.hashSync(password, 12);
   const display_name = first_name;
+  const verifyToken = tokenBytes();
+  const verifyExpires = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
   db.prepare(
-    `INSERT INTO users (id, email, password_hash, display_name, username, first_name, birth_date, city, avatar_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(id, email, hash, display_name, username, first_name, birth_date, city, avatar_url);
-  setCustomerSession(res, id);
+    `INSERT INTO users (id, email, password_hash, display_name, username, first_name, birth_date, city, avatar_url,
+        email_verified_at, email_verification_token, email_verification_expires_at, pending_open_character_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`
+  ).run(
+    id,
+    email,
+    hash,
+    display_name,
+    username,
+    first_name,
+    birth_date,
+    city,
+    avatar_url,
+    verifyToken,
+    verifyExpires,
+    pending_open_character_id
+  );
+  const verifyUrl = `${publicBaseUrl()}/api/auth/verify-email?token=${encodeURIComponent(verifyToken)}`;
+  try {
+    await sendVerificationEmail({ to: email, verifyUrl, displayName: display_name });
+  } catch (err) {
+    db.prepare("DELETE FROM users WHERE id = ?").run(id);
+    console.error("[mail] verification send failed:", err?.message || err);
+    return res.status(502).json({
+      error: "Nie udało się wysłać wiadomości z linkiem potwierdzającym. Spróbuj ponownie za chwilę.",
+    });
+  }
   res.status(201).json({
-    user: {
-      id,
-      email,
-      display_name,
-      username,
-      first_name,
-      birth_date,
-      city,
-      avatar_url,
-    },
-    messages_remaining: messagesBalance(id),
-    fake_purchase_enabled: ALLOW_FAKE_PURCHASE,
-    packages_pln: pricingPackagesForClient(),
+    ok: true,
+    email_verification_sent: true,
+    email,
   });
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.get("/api/auth/verify-email", (req, res) => {
+  const token = String(req.query.token || "").trim();
+  if (!token) {
+    return res.redirect(302, "/logowanie.html?verify_error=missing_token");
+  }
+  const row = db
+    .prepare(
+      `SELECT id, email_verification_expires_at, pending_open_character_id FROM users WHERE email_verification_token = ?`
+    )
+    .get(token);
+  if (!row) {
+    return res.redirect(302, "/logowanie.html?verify_error=invalid");
+  }
+  const exp = row.email_verification_expires_at ? new Date(row.email_verification_expires_at).getTime() : 0;
+  if (!exp || Number.isNaN(exp) || exp < Date.now()) {
+    return res.redirect(302, "/logowanie.html?verify_error=expired");
+  }
+  const openId = row.pending_open_character_id ? String(row.pending_open_character_id) : "";
+  db.prepare(
+    `UPDATE users SET email_verified_at = datetime('now'), email_verification_token = NULL,
+        email_verification_expires_at = NULL, pending_open_character_id = NULL WHERE id = ?`
+  ).run(row.id);
+  setCustomerSession(res, row.id);
+  const q = openId ? `verified=1&open=${encodeURIComponent(openId)}` : "verified=1";
+  res.redirect(302, `/panel.html?${q}`);
 });
 
 app.post("/api/auth/login", (req, res) => {
@@ -361,12 +448,18 @@ app.post("/api/auth/login", (req, res) => {
   const password = String(req.body?.password || "");
   const row = db
     .prepare(
-      `SELECT id, email, display_name, password_hash, username, first_name, birth_date, city, avatar_url
+      `SELECT id, email, display_name, password_hash, username, first_name, birth_date, city, avatar_url, blocked_at, email_verified_at
        FROM users WHERE email = ?`
     )
     .get(email);
   if (!row || !bcrypt.compareSync(password, row.password_hash)) {
     return res.status(401).json({ error: "Nieprawidłowy e-mail lub hasło." });
+  }
+  if (row.blocked_at) {
+    return res.status(403).json({ error: "To konto jest zablokowane. Napisz do obsługi serwisu." });
+  }
+  if (!row.email_verified_at) {
+    return res.status(403).json({ error: "Potwierdź adres e-mail — otwórz link w wiadomości wysłanej po rejestracji." });
   }
   setCustomerSession(res, row.id);
   res.json({
@@ -478,6 +571,18 @@ app.get("/api/characters", (_req, res) => {
     )
     .all();
   res.json({ characters: rows });
+});
+
+app.get("/api/characters/:id", (req, res) => {
+  const id = String(req.params.id || "").trim();
+  const row = db
+    .prepare(
+      `SELECT id, name, tagline, category, sort_order, portrait_url, gender, skills, about, typical_hours_from, typical_hours_to
+       FROM characters WHERE id = ?`
+    )
+    .get(id);
+  if (!row) return res.status(404).json({ error: "Nie znaleziono konsultanta." });
+  res.json({ character: row });
 });
 
 app.get("/api/threads", requireCustomer, (req, res) => {
@@ -950,7 +1055,7 @@ app.get("/api/op/inbox", requireOperator, (req, res) => {
 app.get("/api/op/clients", requireOperator, requireOwner, (_req, res) => {
   const rows = db
     .prepare(
-      `SELECT u.id, u.email, u.username, u.first_name, u.display_name, u.birth_date, u.city,
+      `SELECT u.id, u.email, u.username, u.first_name, u.display_name, u.birth_date, u.city, u.blocked_at,
               datetime(u.created_at) AS created_at,
               (SELECT COUNT(*) FROM threads t WHERE t.user_id = u.id) AS thread_count,
               (SELECT COALESCE(SUM(delta), 0) FROM ledger l WHERE l.user_id = u.id) AS messages_balance
@@ -959,6 +1064,45 @@ app.get("/api/op/clients", requireOperator, requireOwner, (_req, res) => {
     )
     .all();
   res.json({ clients: rows });
+});
+
+app.patch("/api/op/clients/:clientId/block", requireOperator, requireOwner, (req, res) => {
+  const clientId = String(req.params.clientId || "").trim();
+  const blocked = !!req.body?.blocked;
+  const row = db.prepare("SELECT id, email, blocked_at FROM users WHERE id = ?").get(clientId);
+  if (!row) return res.status(404).json({ error: "Nie znaleziono klienta." });
+  const value = blocked ? dtNowIso() : null;
+  db.prepare("UPDATE users SET blocked_at = ? WHERE id = ?").run(value, clientId);
+  if (blocked) {
+    db.prepare("DELETE FROM customer_sessions WHERE user_id = ?").run(clientId);
+  }
+  res.json({ ok: true, client_id: clientId, blocked_at: value, email: row.email });
+});
+
+app.post("/api/op/clients/:clientId/email", requireOperator, requireOwner, async (req, res) => {
+  if (!isMailConfigured()) {
+    return res.status(503).json({
+      error: "Brak konfiguracji SMTP (SMTP_USER / SMTP_PASS). Skonfiguruj serwer pocztowy.",
+    });
+  }
+  const clientId = String(req.params.clientId || "").trim();
+  const subject = String(req.body?.subject || "").trim();
+  const text = String(req.body?.text || "").trim();
+  if (subject.length < 1 || subject.length > 200) {
+    return res.status(400).json({ error: "Temat: 1–200 znaków." });
+  }
+  if (text.length < 1 || text.length > 12000) {
+    return res.status(400).json({ error: "Treść wiadomości: 1–12 000 znaków." });
+  }
+  const row = db.prepare("SELECT id, email FROM users WHERE id = ?").get(clientId);
+  if (!row) return res.status(404).json({ error: "Nie znaleziono klienta." });
+  try {
+    await sendOperatorEmailToUser({ to: row.email, subject, text });
+  } catch (e) {
+    console.error("[mail] operator to client:", e?.message || e);
+    return res.status(502).json({ error: "Nie udało się wysłać wiadomości e-mail." });
+  }
+  res.json({ ok: true });
 });
 
 app.get("/api/op/facts-schema", requireOperator, (_req, res) => {
@@ -1065,9 +1209,9 @@ app.get("/api/op/inbox/:threadId/messages", requireOperator, (req, res) => {
   }
   const raw = db
     .prepare(
-      `SELECT t.id, u.email AS user_email, u.display_name AS user_display_name,
+      `SELECT t.id, u.id AS user_id, u.email AS user_email, u.display_name AS user_display_name,
               u.username AS client_username, u.first_name AS client_first_name,
-              u.birth_date AS client_birth_date, u.city AS client_city, u.avatar_url AS client_avatar_url,
+              u.birth_date AS client_birth_date, u.city AS client_city, u.avatar_url AS client_avatar_url, u.blocked_at AS client_blocked_at,
               c.name AS character_name, c.id AS character_id,
               c.tagline AS character_tagline, c.portrait_url AS character_portrait_url,
               c.gender AS character_gender, c.skills AS character_skills, c.about AS character_about,
@@ -1084,6 +1228,7 @@ app.get("/api/op/inbox/:threadId/messages", requireOperator, (req, res) => {
   if (!raw) return res.status(404).json({ error: "Nie znaleziono wątku." });
   const meta = {
     id: raw.id,
+    user_id: raw.user_id,
     user_email: raw.user_email,
     user_display_name: raw.user_display_name,
     character_name: raw.character_name,
@@ -1095,11 +1240,13 @@ app.get("/api/op/inbox/:threadId/messages", requireOperator, (req, res) => {
     client_hidden_at: raw.client_hidden_at,
     message_count: raw.message_count,
     client_profile: {
+      id: raw.user_id,
       username: raw.client_username,
       first_name: raw.client_first_name,
       birth_date: raw.client_birth_date,
       city: raw.client_city || "",
       avatar_url: raw.client_avatar_url,
+      blocked_at: raw.client_blocked_at,
     },
     medium_profile: {
       name: raw.character_name,

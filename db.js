@@ -270,6 +270,28 @@ const userCols2 = new Set(db.prepare("PRAGMA table_info(users)").all().map((c) =
 if (!userCols2.has("city")) {
   db.exec("ALTER TABLE users ADD COLUMN city TEXT");
 }
+if (!userCols2.has("blocked_at")) {
+  db.exec("ALTER TABLE users ADD COLUMN blocked_at TEXT");
+}
+
+const userCols3 = new Set(db.prepare("PRAGMA table_info(users)").all().map((c) => c.name));
+for (const [col, sqlt] of [
+  ["email_verified_at", "TEXT"],
+  ["email_verification_token", "TEXT"],
+  ["email_verification_expires_at", "TEXT"],
+  ["pending_open_character_id", "TEXT"],
+]) {
+  if (!userCols3.has(col)) {
+    db.exec(`ALTER TABLE users ADD COLUMN ${col} ${sqlt}`);
+  }
+}
+db.exec(
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_verification_token ON users(email_verification_token) WHERE email_verification_token IS NOT NULL`
+);
+/** Istniejące konta (bez tokenu weryfikacji) uznajemy za zweryfikowane. */
+db.prepare(
+  `UPDATE users SET email_verified_at = datetime('now') WHERE email_verified_at IS NULL AND email_verification_token IS NULL`
+).run();
 
 /** Jednorazowa migracja starych kluczy notatek klienta → nowe kategorie. */
 if (!db.prepare("SELECT 1 FROM app_kv WHERE key = ?").get("facts_schema_v2_migrated")) {
@@ -335,6 +357,10 @@ const DEFAULT_TYPICAL_HOURS = {
   pendulum: ["12:00", "15:00"],
   fusy: ["16:00", "20:00"],
   anioly: ["10:00", "12:00"],
+  "sny-znaczenie": ["20:00", "23:00"],
+  "astrologia-karmiczna": ["09:30", "13:30"],
+  "karty-cygańskie": ["13:00", "17:00"],
+  "energia-aury": ["18:00", "22:00"],
 };
 
 db.exec(`
@@ -395,6 +421,14 @@ const CHARACTER_PORTRAITS = {
   fusy: "https://images.unsplash.com/photo-1589156280159-27698a70f29e?w=400&h=500&fit=crop&q=80",
   anioly:
     "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&h=500&fit=crop&q=80",
+  "sny-znaczenie":
+    "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=400&h=500&fit=crop&q=80",
+  "astrologia-karmiczna":
+    "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&h=500&fit=crop&q=80",
+  "karty-cygańskie":
+    "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&h=500&fit=crop&q=80",
+  "energia-aury":
+    "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=500&fit=crop&q=80",
 };
 
 const charColNames = new Set(
@@ -468,6 +502,30 @@ const CHAR_ABOUT = {
     about:
       "Stawiam na pocieszenie i perspektywę. Jeśli czujesz stres albo niepewność co do przyszłości, mogę pomóc złapać oddech i zobaczyć rzeczy łagodniej.",
   },
+  "sny-znaczenie": {
+    gender: "kobieta",
+    skills: "Symbolika snów, powtarzalne motywy, emocje ukryte pod obrazem snu.",
+    about:
+      "Pomagam rozkodować sny, które wracają noc po nocy. Łączę symbole z Twoją codziennością i podpowiadam, co może wołać o uwagę.",
+  },
+  "astrologia-karmiczna": {
+    gender: "mężczyzna",
+    skills: "Węzły księżycowe, lekcje karmiczne, cykle przełomów życiowych.",
+    about:
+      "Patrzę szerzej niż horoskop dnia. Jeśli czujesz, że powtarzasz te same scenariusze, przeanalizujemy je przez karmiczne osie mapy.",
+  },
+  "karty-cygańskie": {
+    gender: "kobieta",
+    skills: "Tradycyjny rozkład kart cygańskich, pytania relacyjne i domowe.",
+    about:
+      "Pracuję klasycznie i spokojnie. Dobrze prowadzę tematy sercowe oraz rodzinne, gdzie potrzeba ciepłego, ale konkretnego spojrzenia.",
+  },
+  "energia-aury": {
+    gender: "kobieta",
+    skills: "Czytanie energii aury, oczyszczanie intencji i kierunek na najbliższy czas.",
+    about:
+      "Skupiam się na tym, co wzmacnia, a co osłabia Twoją energię. Rozmowa jest łagodna, ale praktyczna: dostajesz jasne kroki na dziś.",
+  },
 };
 
 const updCharMeta = db.prepare(
@@ -504,6 +562,10 @@ if (countChars.get().c === 0) {
     ["pendulum", "Karolina P. — wahadło", "Krótkie pytania, wybór z kilku opcji", "Inne techniki", 70],
     ["fusy", "Bożena T. — wróżba z fusów", "Symbolika kubka, domowy klimat", "Tradycyjne", 80],
     ["anioly", "Magdalena R. — karty anielskie", "Komunikat łagodny, wspierający", "Karty", 90],
+    ["sny-znaczenie", "Nina Ś. — znaczenie snów", "Sny, symbole i intuicyjne odczyty", "Sny", 100],
+    ["astrologia-karmiczna", "Oskar V. — astrologia karmiczna", "Węzły karmiczne i cykle życia", "Astrologia", 110],
+    ["karty-cygańskie", "Ewa C. — karty cygańskie", "Tradycyjne rozkłady relacyjne", "Karty", 120],
+    ["energia-aury", "Lena A. — odczyt aury", "Energia, blokady i kierunek", "Energetyka", 130],
   ];
   db.transaction(() => {
     for (const r of rows) {
@@ -514,6 +576,34 @@ if (countChars.get().c === 0) {
     }
   })();
 }
+
+const ensureCharRow = db.prepare(
+  `INSERT OR IGNORE INTO characters (id, name, tagline, category, sort_order, portrait_url, gender, skills, about, typical_hours_from, typical_hours_to)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+);
+const EXTRA_OR_BASE_ROWS = [
+  ["tarot-klasyczny", "Anna W. — tarot klasyczny", "Rider–Waite, układy na relacje i decyzje", "Tarot", 10],
+  ["tarot-intuicyjny", "Maja K. — tarot intuicyjny", "Karty jako punkt wyjścia do rozmowy", "Tarot", 20],
+  ["runy-skandynawskie", "Erik L. — runy", "Futhark, pytania proste / tak–nie", "Runy", 30],
+  ["horoskop-dzienny", "Dorota S. — horoskop osobisty", "Słońce, ascendent, przebiegi tygodnia", "Astrologia", 40],
+  ["synastria", "Piotr M. — analiza pary", "Porównanie map: dynamika związku", "Astrologia", 50],
+  ["numerologia", "Iza N. — numerologia imienia i daty", "Liczbę drogi życia, cykle roczne", "Numerologia", 60],
+  ["pendulum", "Karolina P. — wahadło", "Krótkie pytania, wybór z kilku opcji", "Inne techniki", 70],
+  ["fusy", "Bożena T. — wróżba z fusów", "Symbolika kubka, domowy klimat", "Tradycyjne", 80],
+  ["anioly", "Magdalena R. — karty anielskie", "Komunikat łagodny, wspierający", "Karty", 90],
+  ["sny-znaczenie", "Nina Ś. — znaczenie snów", "Sny, symbole i intuicyjne odczyty", "Sny", 100],
+  ["astrologia-karmiczna", "Oskar V. — astrologia karmiczna", "Węzły karmiczne i cykle życia", "Astrologia", 110],
+  ["karty-cygańskie", "Ewa C. — karty cygańskie", "Tradycyjne rozkłady relacyjne", "Karty", 120],
+  ["energia-aury", "Lena A. — odczyt aury", "Energia, blokady i kierunek", "Energetyka", 130],
+];
+db.transaction(() => {
+  for (const r of EXTRA_OR_BASE_ROWS) {
+    const url = CHARACTER_PORTRAITS[r[0]] || null;
+    const m = CHAR_ABOUT[r[0]] || { gender: "", skills: "", about: "" };
+    const hp = DEFAULT_TYPICAL_HOURS[r[0]] || [null, null];
+    ensureCharRow.run(...r, url, m.gender, m.skills, m.about, hp[0], hp[1]);
+  }
+})();
 
 export function getDb() {
   return db;

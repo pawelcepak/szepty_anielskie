@@ -105,6 +105,7 @@ const chatBody = document.getElementById("chat-body");
 let messagesHasMore = false;
 let messagesLoadingOlder = false;
 let opMessagesScrollRaf = 0;
+let ownerAdvancedTabsShown = false;
 
 function showLogin(on) {
   viewLogin.classList.toggle("hidden", !on);
@@ -426,6 +427,8 @@ function applyRoleChrome() {
   const linkClient = document.getElementById("header-link-client");
   const linkRecruit = document.getElementById("header-link-recruit");
   const staffSub = document.getElementById("staff-top-subnav");
+  const advWrap = document.getElementById("owner-advanced-toggle-wrap");
+  const advBtn = document.getElementById("owner-advanced-toggle");
   inboxBucket = opRole === "owner" ? "all" : "mine";
   layoutWork?.classList.remove("layout-work--sidebar-hidden");
   setInboxOpen(false);
@@ -443,6 +446,10 @@ function applyRoleChrome() {
     sub.classList.add("hidden");
     bucketTabs?.classList.remove("hidden");
     ownerTabsEl?.classList.remove("hidden");
+    advWrap?.classList.remove("hidden");
+    ownerAdvancedTabsShown = false;
+    document.querySelectorAll(".owner-tab--advanced").forEach((el) => el.classList.add("hidden"));
+    if (advBtn) advBtn.textContent = "Pokaż ukryte narzędzia właściciela";
     ob?.classList.remove("hidden");
     linkClient?.classList.remove("hidden");
     linkRecruit?.classList.remove("hidden");
@@ -459,6 +466,7 @@ function applyRoleChrome() {
     sub.classList.add("hidden");
     bucketTabs?.classList.add("hidden");
     ownerTabsEl?.classList.add("hidden");
+    advWrap?.classList.add("hidden");
     ob?.classList.add("hidden");
     linkClient?.classList.add("hidden");
     linkRecruit?.classList.add("hidden");
@@ -482,6 +490,90 @@ function applyRoleChrome() {
       document.getElementById(id)?.classList.add("hidden");
     });
   }
+}
+
+function setClientAdminActions(meta) {
+  const box = document.getElementById("client-admin-actions");
+  const st = document.getElementById("client-admin-status");
+  const btnBlock = document.getElementById("btn-client-block");
+  const btnUnblock = document.getElementById("btn-client-unblock");
+  const btnEmail = document.getElementById("btn-client-email");
+  const err = document.getElementById("client-admin-err");
+  if (!box || !st || !btnBlock || !btnUnblock || !btnEmail || !err) return;
+  if (opRole !== "owner" || !meta?.user_id) {
+    box.classList.add("hidden");
+    return;
+  }
+  box.classList.remove("hidden");
+  err.hidden = true;
+  err.textContent = "";
+  const blocked = !!meta.client_profile.blocked_at;
+  st.textContent = blocked
+    ? `Status konta: zablokowane (${formatOpPlTime(meta.client_profile.blocked_at)})`
+    : "Status konta: aktywne";
+  btnBlock.classList.toggle("hidden", blocked);
+  btnUnblock.classList.toggle("hidden", !blocked);
+  const dlg = document.getElementById("client-email-dialog");
+  const subj = document.getElementById("client-email-subject");
+  const txt = document.getElementById("client-email-text");
+  const dlgErr = document.getElementById("client-email-dlg-err");
+  const emailForm = document.getElementById("client-email-form");
+  const btnCancel = document.getElementById("client-email-cancel");
+  btnEmail.onclick = () => {
+    if (!dlg || !subj || !txt || !dlgErr) return;
+    subj.value = "";
+    txt.value = "";
+    dlgErr.hidden = true;
+    dlgErr.textContent = "";
+    dlg.showModal();
+  };
+  btnCancel.onclick = () => dlg?.close();
+  if (emailForm) {
+    emailForm.onsubmit = async (ev) => {
+      ev.preventDefault();
+      if (!meta?.user_id || !subj || !txt || !dlgErr) return;
+      dlgErr.hidden = true;
+      try {
+        await api(`/api/op/clients/${encodeURIComponent(meta.user_id)}/email`, {
+          method: "POST",
+          body: JSON.stringify({
+            subject: subj.value.trim(),
+            text: txt.value.trim(),
+          }),
+        });
+        dlg?.close();
+      } catch (e) {
+        dlgErr.textContent = e.message || String(e);
+        dlgErr.hidden = false;
+      }
+    };
+  }
+  btnBlock.onclick = async () => {
+    if (!window.confirm("Na pewno zablokować to konto klienta?")) return;
+    try {
+      await api(`/api/op/clients/${encodeURIComponent(meta.user_id || "")}/block`, {
+        method: "PATCH",
+        body: JSON.stringify({ blocked: true }),
+      });
+      await reloadThreadData();
+    } catch (e) {
+      err.textContent = e.message || String(e);
+      err.hidden = false;
+    }
+  };
+  btnUnblock.onclick = async () => {
+    if (!window.confirm("Odblokować to konto klienta?")) return;
+    try {
+      await api(`/api/op/clients/${encodeURIComponent(meta.user_id || "")}/block`, {
+        method: "PATCH",
+        body: JSON.stringify({ blocked: false }),
+      });
+      await reloadThreadData();
+    } catch (e) {
+      err.textContent = e.message || String(e);
+      err.hidden = false;
+    }
+  };
 }
 
 function initTheme() {
@@ -1565,6 +1657,18 @@ async function trySession() {
         if (!b || !ownerTabsEl.contains(b)) return;
         setOwnerTab(b.getAttribute("data-owner-tab") || "inbox");
       });
+      document.getElementById("owner-advanced-toggle")?.addEventListener("click", () => {
+        ownerAdvancedTabsShown = !ownerAdvancedTabsShown;
+        document
+          .querySelectorAll(".owner-tab--advanced")
+          .forEach((el) => el.classList.toggle("hidden", !ownerAdvancedTabsShown));
+        const b = document.getElementById("owner-advanced-toggle");
+        if (b) {
+          b.textContent = ownerAdvancedTabsShown
+            ? "Ukryj narzędzia właściciela"
+            : "Pokaż ukryte narzędzia właściciela";
+        }
+      });
       document.getElementById("btn-save-payout")?.addEventListener("click", async () => {
         const err = document.getElementById("payout-err");
         if (err) {
@@ -1900,6 +2004,8 @@ async function openThread(id) {
       clEmail.hidden = true;
     }
   }
+
+  setClientAdminActions(m);
 
   renderMediumSidebar(m);
 

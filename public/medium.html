@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Profil medium — Szept Kart</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,600&family=Source+Sans+3:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/css/client.css" />
+  </head>
+  <body class="page-auth page-auth--tarot">
+    <header class="site-top">
+      <div class="site-top-inner">
+        <a class="logo" href="/">Szept Kart</a>
+        <nav class="nav-actions nav-actions--stack">
+          <div class="auth-banner-wrap" data-auth-banner></div>
+          <div class="nav-actions-links">
+            <a href="/">Strona główna</a>
+            <a href="/panel.html">Panel klienta</a>
+          </div>
+        </nav>
+      </div>
+    </header>
+    <main class="auth-main">
+      <div class="auth-card auth-card--wide medium-profile-card" id="medium-profile-card">
+        <p class="sub">Ładowanie profilu medium...</p>
+      </div>
+    </main>
+    <script type="module" src="/js/medium-profile.js"></script>
+    <script type="module" src="/js/client-auth-banner.js"></script>
+  </body>
+</html>

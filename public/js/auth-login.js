@@ -1,6 +1,24 @@
 import { api } from "./api.js";
 
 const err = document.getElementById("err");
+const info = document.getElementById("auth-info");
+const qp = new URLSearchParams(window.location.search);
+if (info) {
+  if (qp.get("registered") === "1") {
+    info.className = "form-info form-info--ok";
+    info.textContent =
+      "Konto zostało utworzone. Sprawdź skrzynkę pocztową i kliknij link potwierdzający — dopiero potem możesz się zalogować.";
+    info.hidden = false;
+  } else if (qp.get("verify_error") === "expired") {
+    info.className = "form-info form-info--warn";
+    info.textContent = "Link potwierdzający wygasł. Zarejestruj się ponownie lub skontaktuj się z obsługą.";
+    info.hidden = false;
+  } else if (qp.get("verify_error")) {
+    info.className = "form-info form-info--warn";
+    info.textContent = "Nie udało się potwierdzić adresu (nieprawidłowy lub już użyty link).";
+    info.hidden = false;
+  }
+}
 
 document.getElementById("form").addEventListener("submit", async (e) => {
   e.preventDefault();
