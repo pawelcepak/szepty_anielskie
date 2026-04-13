@@ -398,7 +398,13 @@ app.post("/api/auth/register", registerJsonParser, async (req, res, next) => {
   );
   const verifyUrl = `${publicBaseUrl()}/api/auth/verify-email?token=${encodeURIComponent(verifyToken)}`;
   try {
-    await sendVerificationEmail({ to: email, verifyUrl, displayName: display_name });
+    const mailInfo = await sendVerificationEmail({ to: email, verifyUrl, displayName: display_name });
+    console.log("[mail][verify][register]", {
+      to: email,
+      message_id: mailInfo.messageId,
+      accepted: mailInfo.accepted,
+      rejected: mailInfo.rejected,
+    });
   } catch (err) {
     db.prepare("DELETE FROM users WHERE id = ?").run(id);
     console.error("[mail] verification send failed:", err?.message || err);
@@ -441,6 +447,53 @@ app.get("/api/auth/verify-email", (req, res) => {
   setCustomerSession(res, row.id);
   const q = openId ? `verified=1&open=${encodeURIComponent(openId)}` : "verified=1";
   res.redirect(302, `/panel.html?${q}`);
+});
+
+app.post("/api/auth/resend-verification", registerJsonParser, async (req, res) => {
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  if (!emailOk(email)) return res.status(400).json({ error: "Podaj poprawny adres e-mail." });
+  if (!isMailConfigured()) {
+    return res.status(503).json({
+      error: "Brak konfiguracji SMTP na serwerze. Ustaw SMTP_USER i SMTP_PASS.",
+    });
+  }
+  const row = db
+    .prepare(
+      `SELECT id, email, display_name, email_verified_at
+       FROM users WHERE lower(email) = lower(?)`
+    )
+    .get(email);
+  if (!row) {
+    return res.json({ ok: true, sent: false });
+  }
+  if (row.email_verified_at) {
+    return res.json({ ok: true, sent: false, already_verified: true });
+  }
+  const verifyToken = tokenBytes();
+  const verifyExpires = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+  db.prepare(
+    `UPDATE users
+     SET email_verification_token = ?, email_verification_expires_at = ?
+     WHERE id = ?`
+  ).run(verifyToken, verifyExpires, row.id);
+  const verifyUrl = `${publicBaseUrl()}/api/auth/verify-email?token=${encodeURIComponent(verifyToken)}`;
+  try {
+    const mailInfo = await sendVerificationEmail({
+      to: row.email,
+      verifyUrl,
+      displayName: row.display_name || "użytkowniku",
+    });
+    console.log("[mail][verify][resend]", {
+      to: row.email,
+      message_id: mailInfo.messageId,
+      accepted: mailInfo.accepted,
+      rejected: mailInfo.rejected,
+    });
+  } catch (e) {
+    console.error("[mail][verify][resend] failed:", e?.message || e);
+    return res.status(502).json({ error: "Nie udało się ponownie wysłać linku aktywacyjnego." });
+  }
+  res.json({ ok: true, sent: true });
 });
 
 app.post("/api/auth/login", (req, res) => {
@@ -1083,6 +1136,8 @@ app.get("/api/op/clients", requireOperator, requireOwner, (_req, res) => {
   const rows = db
     .prepare(
       `SELECT u.id, u.email, u.username, u.first_name, u.display_name, u.birth_date, u.city, u.blocked_at,
+              u.email_verified_at,
+              u.email_verification_token,
               datetime(u.created_at) AS created_at,
               (SELECT COUNT(*) FROM threads t WHERE t.user_id = u.id) AS thread_count,
               (SELECT COALESCE(SUM(delta), 0) FROM ledger l WHERE l.user_id = u.id) AS messages_balance
@@ -1124,7 +1179,13 @@ app.post("/api/op/clients/:clientId/email", requireOperator, requireOwner, async
   const row = db.prepare("SELECT id, email FROM users WHERE id = ?").get(clientId);
   if (!row) return res.status(404).json({ error: "Nie znaleziono klienta." });
   try {
-    await sendOperatorEmailToUser({ to: row.email, subject, text });
+    const mailInfo = await sendOperatorEmailToUser({ to: row.email, subject, text });
+    console.log("[mail][operator]", {
+      to: row.email,
+      message_id: mailInfo.messageId,
+      accepted: mailInfo.accepted,
+      rejected: mailInfo.rejected,
+    });
   } catch (e) {
     console.error("[mail] operator to client:", e?.message || e);
     return res.status(502).json({ error: "Nie udało się wysłać wiadomości e-mail." });

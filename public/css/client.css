@@ -1014,6 +1014,16 @@ body.page-auth .form-info--warn {
   color: #b45309;
 }
 
+.btn-linklike {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 /* ——— Panel klienta ——— */
 body.page-panel {
   background: #ede6dc;

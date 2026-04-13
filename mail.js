@@ -46,13 +46,23 @@ export async function sendVerificationEmail({ to, verifyUrl, displayName }) {
   const t = createMailTransporter();
   if (!t) throw new Error("Brak konfiguracji SMTP (SMTP_USER / SMTP_PASS).");
   const name = displayName || "użytkowniku";
-  await t.sendMail({
+  const info = await t.sendMail({
     from: mailFrom(),
     to,
     subject: "Potwierdź adres e-mail — Szept Kart",
     text: `Cześć ${name},\n\nOtwórz link, aby potwierdzić konto:\n${verifyUrl}\n\nLink jest ważny 48 godzin.\n`,
     html: `<p>Cześć ${escapeHtml(name)},</p><p><a href="${verifyUrl}">Potwierdź adres e-mail</a></p><p>Link jest ważny 48 godzin.</p>`,
   });
+  const accepted = Array.isArray(info?.accepted) ? info.accepted : [];
+  if (accepted.length === 0) {
+    const rejected = Array.isArray(info?.rejected) ? info.rejected.join(", ") : "";
+    throw new Error(`SMTP nie potwierdził odbiorcy. Rejected: ${rejected || "brak danych"}`);
+  }
+  return {
+    messageId: String(info?.messageId || ""),
+    accepted,
+    rejected: Array.isArray(info?.rejected) ? info.rejected : [],
+  };
 }
 
 export async function sendOperatorEmailToUser({ to, subject, text, html }) {
@@ -61,11 +71,21 @@ export async function sendOperatorEmailToUser({ to, subject, text, html }) {
   const subj = String(subject || "").trim();
   const bodyText = String(text || "").trim();
   const bodyHtml = html != null && String(html).trim() !== "" ? String(html) : undefined;
-  await t.sendMail({
+  const info = await t.sendMail({
     from: mailFrom(),
     to,
     subject: subj,
     text: bodyText,
     ...(bodyHtml ? { html: bodyHtml } : {}),
   });
+  const accepted = Array.isArray(info?.accepted) ? info.accepted : [];
+  if (accepted.length === 0) {
+    const rejected = Array.isArray(info?.rejected) ? info.rejected.join(", ") : "";
+    throw new Error(`SMTP nie potwierdził odbiorcy. Rejected: ${rejected || "brak danych"}`);
+  }
+  return {
+    messageId: String(info?.messageId || ""),
+    accepted,
+    rejected: Array.isArray(info?.rejected) ? info.rejected : [],
+  };
 }

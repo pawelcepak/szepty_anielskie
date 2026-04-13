@@ -825,15 +825,23 @@ async function refreshOwnerClients() {
     const data = await api("/api/op/clients");
     const rows = (data.clients || [])
       .map(
-        (c) =>
+        (c) => {
+          const verifyStatus = c.email_verified_at
+            ? `zweryfikowany (${formatOpPlTime(c.email_verified_at)})`
+            : c.email_verification_token
+              ? "oczekuje na kliknięcie linku"
+              : "bez tokenu (stare konto)";
+          return (
           `<tr><td>${esc(c.username || "—")}</td><td>${esc(c.first_name || c.display_name || "—")}</td><td>${esc(
             c.city || "—"
           )}</td><td>${esc(c.email)}</td><td>${esc(String(c.birth_date || "").slice(0, 10))}</td><td>${esc(
             formatOpPlTime(c.created_at)
-          )}</td><td>${c.thread_count ?? 0}</td><td>${c.messages_balance ?? 0}</td></tr>`
+          )}</td><td>${esc(verifyStatus)}</td><td>${c.thread_count ?? 0}</td><td>${c.messages_balance ?? 0}</td></tr>`
+          );
+        }
       )
       .join("");
-    body.innerHTML = `<table class="mon-table"><thead><tr><th>Nick</th><th>Imię</th><th>Miasto</th><th>E-mail</th><th>Ur.</th><th>Rejestracja</th><th>Wątki</th><th>Saldo</th></tr></thead><tbody>${
+    body.innerHTML = `<table class="mon-table"><thead><tr><th>Nick</th><th>Imię</th><th>Miasto</th><th>E-mail</th><th>Ur.</th><th>Rejestracja</th><th>Status e-mail</th><th>Wątki</th><th>Saldo</th></tr></thead><tbody>${
       rows || ""
     }</tbody></table>`;
   } catch {
