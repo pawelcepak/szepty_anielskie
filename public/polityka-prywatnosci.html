@@ -32,43 +32,70 @@
 
     <main class="auth-main">
       <div class="auth-card auth-card--wide">
-        <h1>Polityka prywatności</h1>
+        <h1>POLITYKA PRYWATNOŚCI SERWISU <span data-config="brandName">Szepty Anielskie</span></h1>
+
+        <h2 class="legal-h2">1. Administrator danych</h2>
         <p class="sub">
-          Niniejszy dokument opisuje zasady przetwarzania danych osobowych w serwisie
-          <strong>Szepty Anielskie</strong>.
+          Administratorem danych osobowych jest <span data-config="ownerFullName">[Imię Nazwisko]</span>, prowadzący
+          działalność gospodarczą pod firmą <span data-config="businessName">[Nazwa]</span>, NIP:
+          <span data-config="nip">[NIP]</span>, adres: <span data-config="address">[adres]</span>, email:
+          <a data-support-email-link href="mailto:[email]"><span data-config="email">[email]</span></a>.
         </p>
 
-        <h2 class="legal-h2">Administrator danych</h2>
-        <p class="sub">
-          Administratorem danych jest właściciel serwisu prowadzący działalność gospodarczą. Dane kontaktowe i firmowe
-          administratora należy uzupełnić przed uruchomieniem wersji produkcyjnej.
-        </p>
-
-        <h2 class="legal-h2">Zakres zbieranych danych</h2>
-        <p class="sub">Podczas rejestracji i korzystania z serwisu zbieramy następujące dane użytkownika:</p>
-        <ul class="sub">
+        <h2 class="legal-h2">2. Zakres zbieranych danych</h2>
+        <p class="sub">Podczas rejestracji zbieramy:</p>
+        <ul class="sub" id="privacy-registration-fields">
           <li>imię,</li>
           <li>adres e-mail,</li>
           <li>miasto.</li>
         </ul>
+        <p class="sub">Podczas korzystania z serwisu automatycznie zbieramy:</p>
+        <ul class="sub" id="privacy-automatic-fields">
+          <li>adres IP,</li>
+          <li>dane o sesjach i aktywności w serwisie.</li>
+        </ul>
 
-        <h2 class="legal-h2">Płatności</h2>
+        <h2 class="legal-h2">3. Cele i podstawy przetwarzania</h2>
+        <ul class="sub">
+          <li>Realizacja umowy (art. 6 ust. 1 lit. b RODO) - obsługa konta i świadczenie usług.</li>
+          <li>Obowiązek prawny (art. 6 ust. 1 lit. c RODO) - rozliczenia, faktury, wymogi podatkowe.</li>
+          <li>Prawnie uzasadniony interes (art. 6 ust. 1 lit. f RODO) - bezpieczeństwo serwisu.</li>
+        </ul>
+
+        <h2 class="legal-h2">4. Płatności</h2>
         <p class="sub">
-          Serwis korzysta z obsługi płatności online, w tym z operatora <strong>Przelewy24</strong>. Dane niezbędne do
-          realizacji płatności są przetwarzane zgodnie z wymaganiami prawnymi i zasadami bezpieczeństwa operatora
-          płatności.
+          Płatności obsługuje <span data-config="paymentOperator">Przelewy24 (DialCom24 Sp. z o.o.)</span>. Dane płatnicze
+          przekazywane są bezpośrednio do operatora płatności i nie są przechowywane przez serwis.
         </p>
 
-        <h2 class="legal-h2">Cele i podstawa przetwarzania</h2>
+        <h2 class="legal-h2">5. Okres przechowywania danych</h2>
         <p class="sub">
-          Dane przetwarzamy w celu utworzenia i obsługi konta, realizacji usługi, rozliczeń oraz kontaktu technicznego.
-          Podstawą przetwarzania jest realizacja umowy oraz obowiązki prawne ciążące na administratorze.
+          Dane przechowywane są przez czas trwania umowy oraz przez okres wymagany przepisami podatkowymi
+          (<span data-config="taxYears">5</span> lat od końca roku podatkowego).
         </p>
 
-        <h2 class="legal-h2">Prawa użytkownika</h2>
+        <h2 class="legal-h2">6. Prawa użytkownika</h2>
+        <p class="sub">Użytkownik ma prawo do:</p>
+        <ul class="sub">
+          <li>dostępu do swoich danych,</li>
+          <li>sprostowania danych,</li>
+          <li>usunięcia danych (prawo do bycia zapomnianym),</li>
+          <li>ograniczenia przetwarzania,</li>
+          <li>przenoszenia danych,</li>
+          <li>wniesienia sprzeciwu,</li>
+          <li>wniesienia skargi do Prezesa UODO (uodo.gov.pl).</li>
+        </ul>
+
+        <h2 class="legal-h2">7. Kontakt w sprawie danych osobowych</h2>
         <p class="sub">
-          Użytkownik ma prawo do dostępu do danych, sprostowania, usunięcia, ograniczenia przetwarzania, przenoszenia
-          danych oraz wniesienia skargi do Prezesa UODO.
+          W sprawach dotyczących danych osobowych kontaktuj się pod adresem:
+          <a data-support-email-link href="mailto:[email]"><span data-config="email">[email]</span></a>.
+        </p>
+
+        <h2 class="legal-h2">8. Pliki cookies</h2>
+        <p class="sub">
+          Serwis używa plików cookies w celu utrzymania sesji użytkownika. Użytkownik może wyłączyć cookies w ustawieniach
+          przeglądarki.
         </p>
 
         <p class="sub" style="margin-top: 1.5rem; margin-bottom: 0">
@@ -76,6 +103,7 @@
         </p>
       </div>
     </main>
+    <script type="module" src="/js/legal-pages.js"></script>
     <script type="module" src="/js/client-auth-banner.js"></script>
   </body>
 </html>

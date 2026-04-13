@@ -35,6 +35,7 @@ import {
   tryClaimStoppedThread,
   tryClaimThread,
 } from "./assignment.js";
+import { APP_CONFIG } from "./app-config.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const db = getDb();
@@ -45,7 +46,7 @@ const ALLOW_FAKE_PURCHASE =
 
 const COOKIE_CUSTOMER = "customer_session";
 const COOKIE_OPERATOR = "operator_session";
-const PKG_AMOUNTS = new Set([10, 20, 50, 100]);
+const PKG_AMOUNTS = new Set(APP_CONFIG.pricing.clientPackages.map((pkg) => Number(pkg.amount)));
 const CUSTOMER_SESSION_IDLE_MINUTES = Math.min(
   24 * 60,
   Math.max(1, Number(process.env.CUSTOMER_SESSION_IDLE_MINUTES || 10))
@@ -53,18 +54,17 @@ const CUSTOMER_SESSION_IDLE_MINUTES = Math.min(
 const CUSTOMER_SESSION_IDLE_MS = CUSTOMER_SESSION_IDLE_MINUTES * 60 * 1000;
 
 function defaultClientPkgPln(amount) {
-  const d = { 10: 35, 20: 62, 50: 139, 100: 249 };
-  return d[amount] ?? 0;
+  const pkg = APP_CONFIG.pricing.clientPackages.find((item) => Number(item.amount) === Number(amount));
+  return pkg ? Number(pkg.price_pln) : 0;
 }
 
 function pricingPackagesForClient() {
-  return [10, 20, 50, 100].map((amount) => {
+  return APP_CONFIG.pricing.clientPackages.map((pkg) => {
+    const amount = Number(pkg.amount);
     const envKey = `CLIENT_PKG_${amount}_PLN`;
     const raw = process.env[envKey];
-    const price_pln =
-      raw != null && String(raw).trim() !== ""
-        ? Number(raw)
-        : defaultClientPkgPln(amount);
+    const fromConfig = Number(pkg.price_pln);
+    const price_pln = raw != null && String(raw).trim() !== "" ? Number(raw) : fromConfig;
     const n = Number(price_pln);
     return { amount, price_pln: Number.isFinite(n) ? Math.round(n * 100) / 100 : defaultClientPkgPln(amount) };
   });
@@ -432,7 +432,22 @@ app.patch("/api/me", requireCustomer, (req, res) => {
 });
 
 app.get("/api/public/pricing", (_req, res) => {
-  res.json({ packages: pricingPackagesForClient(), currency: "PLN" });
+  res.json({ packages: pricingPackagesForClient(), currency: APP_CONFIG.pricing.currency });
+});
+
+app.get("/api/public/site-config", (_req, res) => {
+  res.json({
+    brandName: APP_CONFIG.brandName,
+    domain: APP_CONFIG.domain,
+    company: APP_CONFIG.company,
+    pricing: {
+      currency: APP_CONFIG.pricing.currency,
+      paymentOperator: APP_CONFIG.pricing.paymentOperator,
+      clientPackages: pricingPackagesForClient(),
+    },
+    legal: APP_CONFIG.legal,
+    privacy: APP_CONFIG.privacy,
+  });
 });
 
 app.post("/api/test/purchase", requireCustomer, (req, res) => {
