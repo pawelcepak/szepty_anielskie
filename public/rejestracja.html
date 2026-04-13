@@ -94,6 +94,34 @@
             <img id="avatar-preview" alt="Podgląd zdjęcia" width="96" height="96" />
           </div>
 
+          <div class="legal-consent-wrap" aria-label="Zgody formalne">
+            <p class="legal-consent-title">Zgody wymagane do założenia konta</p>
+
+            <label class="legal-consent-row" for="accept-terms">
+              <input id="accept-terms" name="accept_terms" type="checkbox" required />
+              <span>Akceptuję <strong>Regulamin</strong> serwisu.</span>
+            </label>
+            <a
+              class="btn btn-outline legal-open-btn"
+              href="/regulamin.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Otwórz regulamin (nowa karta)</a
+            >
+
+            <label class="legal-consent-row" for="accept-privacy">
+              <input id="accept-privacy" name="accept_privacy" type="checkbox" required />
+              <span>Akceptuję <strong>Politykę prywatności</strong>.</span>
+            </label>
+            <a
+              class="btn btn-outline legal-open-btn"
+              href="/polityka-prywatnosci.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Otwórz politykę prywatności (nowa karta)</a
+            >
+          </div>
+
           <p class="form-error" id="err" hidden></p>
           <button class="btn btn-primary" type="submit">Załóż konto i przejdź do panelu</button>
         </form>

@@ -832,6 +832,48 @@ body.page-auth .auth-card--wide {
   margin-top: 1rem;
 }
 
+.legal-consent-wrap {
+  margin-top: 1rem;
+  padding: 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fcfaf6;
+}
+
+.legal-consent-title {
+  margin: 0 0 0.65rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.legal-consent-row {
+  margin-top: 0.45rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  font-size: 0.9rem;
+  font-weight: 400;
+  line-height: 1.45;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink);
+}
+
+.legal-consent-row input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  margin: 0.14rem 0 0;
+  flex: 0 0 auto;
+  accent-color: var(--accent);
+}
+
+.legal-open-btn {
+  margin-top: 0.55rem;
+  width: 100%;
+  font-size: 0.86rem;
+}
+
 .chosen-medium-banner {
   margin: 0 0 1rem;
   padding: 0.75rem 1rem;

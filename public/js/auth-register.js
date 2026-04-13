@@ -75,6 +75,16 @@ avatarInput?.addEventListener("change", async () => {
   }
 });
 
+for (const link of document.querySelectorAll(".legal-open-btn")) {
+  link.addEventListener("click", (event) => {
+    event.preventDefault();
+    const href = link.getAttribute("href");
+    if (!href) return;
+    const opened = window.open(href, "_blank", "noopener,noreferrer");
+    opened?.focus();
+  });
+}
+
 document.getElementById("form").addEventListener("submit", async (e) => {
   e.preventDefault();
   err.hidden = true;
@@ -85,6 +95,13 @@ document.getElementById("form").addEventListener("submit", async (e) => {
   const birth_date = String(fd.get("birth_date") || "").trim();
   const email = String(fd.get("email") || "").trim();
   const password = String(fd.get("password") || "");
+  const acceptTerms = fd.get("accept_terms") === "on";
+  const acceptPrivacy = fd.get("accept_privacy") === "on";
+  if (!acceptTerms || !acceptPrivacy) {
+    err.textContent = "Aby kontynuować, zaakceptuj regulamin i politykę prywatności.";
+    err.hidden = false;
+    return;
+  }
   try {
     await api("/api/auth/register", {
       method: "POST",
@@ -95,6 +112,8 @@ document.getElementById("form").addEventListener("submit", async (e) => {
         birth_date,
         email,
         password,
+        accept_terms: acceptTerms,
+        accept_privacy: acceptPrivacy,
         avatar_url: avatarDataUrl || null,
       }),
     });
