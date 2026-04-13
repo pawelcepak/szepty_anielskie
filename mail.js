@@ -20,8 +20,12 @@ export function isMailConfigured() {
 
 export function createMailTransporter() {
   if (!isMailConfigured()) return null;
-  const host = String(process.env.SMTP_HOST || "smtp.gmail.com").trim();
-  const port = Number(process.env.SMTP_PORT || 465);
+  const provider = String(process.env.SMTP_PROVIDER || "").trim().toLowerCase();
+  const defaults = provider === "brevo"
+    ? { host: "smtp-relay.brevo.com", port: 587 }
+    : { host: "smtp.gmail.com", port: 465 };
+  const host = String(process.env.SMTP_HOST || defaults.host).trim();
+  const port = Number(process.env.SMTP_PORT || defaults.port);
   const secure =
     String(process.env.SMTP_SECURE || "").toLowerCase() === "true" ||
     String(process.env.SMTP_SECURE || "").toLowerCase() === "1" ||

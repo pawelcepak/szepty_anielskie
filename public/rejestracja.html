@@ -33,8 +33,9 @@
         <p class="sub">
           E-mail tylko do logowania — zespół go nie widzi. Przy rozmowie konsultanci widzą: nick, imię,
           <strong>miasto</strong> i datę urodzenia. Miasto jest wymagane. Zdjęcie profilowe opcjonalne.
-          Na tym etapie nie wysyłamy jeszcze maili weryfikacyjnych.
+          Po rejestracji wyślemy link aktywacyjny na podany adres e-mail.
         </p>
+        <p class="form-info form-info--ok" id="register-success" hidden></p>
         <form id="form">
           <label for="username">Nazwa użytkownika (widoczna dla zespołu)</label>
           <input
@@ -123,7 +124,7 @@
           </div>
 
           <p class="form-error" id="err" hidden></p>
-          <button class="btn btn-primary" type="submit">Załóż konto i przejdź do panelu</button>
+          <button class="btn btn-primary" id="register-submit" type="submit">Załóż konto</button>
         </form>
         <p class="sub" style="margin-top: 1.25rem; margin-bottom: 0">
           Masz już konto? <a href="/logowanie.html" id="register-login-link">Zaloguj się</a>

@@ -7,7 +7,10 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "db:reset": "node scripts/reset-db.mjs"
+    "db:reset": "node scripts/reset-db.mjs",
+    "pg:init": "node scripts/postgres-init.mjs",
+    "pg:migrate-from-sqlite": "node scripts/migrate-sqlite-to-postgres.mjs",
+    "pg:check": "node scripts/check-postgres.mjs"
   },
   "engines": {
     "node": ">=18"
@@ -20,6 +23,7 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "nodemailer": "^6.9.16",
+    "pg": "^8.13.1",
     "uuid": "^11.0.5"
   }
 }

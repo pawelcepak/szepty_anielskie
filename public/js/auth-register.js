@@ -9,6 +9,7 @@ function esc(s) {
 }
 
 const err = document.getElementById("err");
+const success = document.getElementById("register-success");
 const avatarInput = document.getElementById("avatar");
 const previewWrap = document.getElementById("avatar-preview-wrap");
 const previewImg = document.getElementById("avatar-preview");
@@ -88,6 +89,9 @@ for (const link of document.querySelectorAll(".legal-open-btn")) {
 document.getElementById("form").addEventListener("submit", async (e) => {
   e.preventDefault();
   err.hidden = true;
+  if (success) success.hidden = true;
+  const submitBtn = document.getElementById("register-submit");
+  if (submitBtn) submitBtn.disabled = true;
   const fd = new FormData(e.target);
   const username = String(fd.get("username") || "").trim().toLowerCase();
   const first_name = String(fd.get("first_name") || "").trim();
@@ -119,9 +123,19 @@ document.getElementById("form").addEventListener("submit", async (e) => {
         medium: mediumParam || null,
       }),
     });
-    window.location.href = "/logowanie.html?registered=1";
+    if (success) {
+      success.textContent =
+        "Konto utworzone. Wysłaliśmy link aktywacyjny na podany e-mail. Za chwilę przeniesiemy Cię do logowania.";
+      success.hidden = false;
+    }
+    setTimeout(() => {
+      window.location.href = "/logowanie.html?registered=1";
+    }, 1200);
   } catch (x) {
     err.textContent = x.message;
     err.hidden = false;
+    if (submitBtn) submitBtn.disabled = false;
+    return;
   }
+  if (submitBtn) submitBtn.disabled = false;
 });
