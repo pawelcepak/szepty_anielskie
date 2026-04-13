@@ -1399,6 +1399,7 @@ app.post("/api/op/inbox/:threadId/reply", requireOperator, (req, res) => {
   });
 });
 
+app.use("/operator", express.static(path.join(__dirname, "public", "operator")));
 app.use(express.static(path.join(__dirname, "public")));
 
 ensureBootstrapOperator();
