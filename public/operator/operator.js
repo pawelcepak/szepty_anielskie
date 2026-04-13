@@ -106,6 +106,7 @@ let messagesHasMore = false;
 let messagesLoadingOlder = false;
 let opMessagesScrollRaf = 0;
 let ownerAdvancedTabsShown = false;
+let ownerClientsActionsBound = false;
 
 function showLogin(on) {
   viewLogin.classList.toggle("hidden", !on);
@@ -821,6 +822,34 @@ async function refreshOwnerClients() {
   if (opRole !== "owner") return;
   const body = document.getElementById("owner-clients-body");
   if (!body) return;
+  if (!ownerClientsActionsBound) {
+    ownerClientsActionsBound = true;
+    body.addEventListener("click", async (ev) => {
+      const btn = ev.target.closest("[data-client-verify-link]");
+      if (!btn) return;
+      const clientId = btn.getAttribute("data-client-id");
+      if (!clientId) return;
+      btn.disabled = true;
+      try {
+        const data = await api(`/api/op/clients/${encodeURIComponent(clientId)}/verification-link`, {
+          method: "POST",
+          body: JSON.stringify({ regenerate: false }),
+        });
+        const u = String(data.verify_url || "");
+        if (!u) throw new Error("Brak linku aktywacyjnego.");
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(u);
+          alert("Link aktywacyjny skopiowany do schowka.");
+        } else {
+          window.prompt("Skopiuj link aktywacyjny:", u);
+        }
+      } catch (e) {
+        alert(e.message || String(e));
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
   try {
     const data = await api("/api/op/clients");
     const rows = (data.clients || [])
@@ -831,17 +860,22 @@ async function refreshOwnerClients() {
             : c.email_verification_token
               ? "oczekuje na kliknięcie linku"
               : "bez tokenu (stare konto)";
+          const verifyAction = c.email_verified_at
+            ? "—"
+            : `<button type="button" class="btn-mon" data-client-verify-link data-client-id="${esc(
+                c.id
+              )}">Link aktywacyjny</button>`;
           return (
           `<tr><td>${esc(c.username || "—")}</td><td>${esc(c.first_name || c.display_name || "—")}</td><td>${esc(
             c.city || "—"
           )}</td><td>${esc(c.email)}</td><td>${esc(String(c.birth_date || "").slice(0, 10))}</td><td>${esc(
             formatOpPlTime(c.created_at)
-          )}</td><td>${esc(verifyStatus)}</td><td>${c.thread_count ?? 0}</td><td>${c.messages_balance ?? 0}</td></tr>`
+          )}</td><td>${esc(verifyStatus)}</td><td>${verifyAction}</td><td>${c.thread_count ?? 0}</td><td>${c.messages_balance ?? 0}</td></tr>`
           );
         }
       )
       .join("");
-    body.innerHTML = `<table class="mon-table"><thead><tr><th>Nick</th><th>Imię</th><th>Miasto</th><th>E-mail</th><th>Ur.</th><th>Rejestracja</th><th>Status e-mail</th><th>Wątki</th><th>Saldo</th></tr></thead><tbody>${
+    body.innerHTML = `<table class="mon-table"><thead><tr><th>Nick</th><th>Imię</th><th>Miasto</th><th>E-mail</th><th>Ur.</th><th>Rejestracja</th><th>Status e-mail</th><th>Akcja</th><th>Wątki</th><th>Saldo</th></tr></thead><tbody>${
       rows || ""
     }</tbody></table>`;
   } catch {

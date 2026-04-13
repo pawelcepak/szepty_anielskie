@@ -86,6 +86,7 @@ const app = express();
 if (["1", "true", "yes"].includes(String(process.env.TRUST_PROXY || "").toLowerCase())) {
   app.set("trust proxy", 1);
 }
+app.get("/favicon.ico", (_req, res) => res.status(204).end());
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: "512kb" }));
 app.use(cookieParser());
@@ -1152,6 +1153,37 @@ app.get("/api/op/clients", requireOperator, requireOwner, (_req, res) => {
     )
     .all();
   res.json({ clients: rows });
+});
+
+app.post("/api/op/clients/:clientId/verification-link", requireOperator, requireOwner, (req, res) => {
+  const clientId = String(req.params.clientId || "").trim();
+  const regenerate = !!req.body?.regenerate;
+  const row = db
+    .prepare(
+      `SELECT id, email, email_verified_at, email_verification_token, email_verification_expires_at
+       FROM users WHERE id = ?`
+    )
+    .get(clientId);
+  if (!row) return res.status(404).json({ error: "Nie znaleziono klienta." });
+  if (row.email_verified_at) {
+    return res.status(400).json({ error: "To konto jest już zweryfikowane." });
+  }
+  let token = row.email_verification_token;
+  let expiresAt = row.email_verification_expires_at;
+  if (!token || regenerate) {
+    token = tokenBytes();
+    expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+    db.prepare(
+      `UPDATE users SET email_verification_token = ?, email_verification_expires_at = ? WHERE id = ?`
+    ).run(token, expiresAt, clientId);
+  }
+  const verifyUrl = `${publicBaseUrl()}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
+  res.json({
+    ok: true,
+    email: row.email,
+    verify_url: verifyUrl,
+    expires_at: expiresAt || null,
+  });
 });
 
 app.patch("/api/op/clients/:clientId/block", requireOperator, requireOwner, (req, res) => {
