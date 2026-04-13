@@ -2855,3 +2855,51 @@ kbd {
 .op-email-dlg-err {
   margin: 0.25rem 0 0;
 }
+
+.op-pass-dialog {
+  max-width: min(460px, 96vw);
+  padding: 1.15rem 1.35rem;
+  border: 1px solid #d4d4d8;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+}
+
+.op-pass-dialog::backdrop {
+  background: rgba(15, 15, 18, 0.45);
+}
+
+.op-pass-dialog-title {
+  margin: 0 0 0.9rem;
+  font-size: 1.05rem;
+}
+
+.op-pass-dialog-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.op-pass-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.op-pass-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.45rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid #c4c4cc;
+  font: inherit;
+}
+
+.op-pass-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.op-pass-dlg-err {
+  margin: 0.25rem 0 0;
+}

@@ -775,6 +775,33 @@ app.get("/api/op/me", requireOperator, (req, res) => {
   res.json(out);
 });
 
+app.patch("/api/op/me/password", requireOperator, (req, res) => {
+  const current_password = String(req.body?.current_password || "");
+  const new_password = String(req.body?.new_password || "");
+  if (new_password.length < 8) {
+    return res.status(400).json({ error: "Nowe hasło musi mieć co najmniej 8 znaków." });
+  }
+  const row = db
+    .prepare("SELECT id, password_hash FROM operators WHERE id = ?")
+    .get(req.operator.id);
+  if (!row) {
+    return res.status(404).json({ error: "Nie znaleziono konta operatora." });
+  }
+  if (!bcrypt.compareSync(current_password, row.password_hash)) {
+    return res.status(401).json({ error: "Aktualne hasło jest nieprawidłowe." });
+  }
+  if (bcrypt.compareSync(new_password, row.password_hash)) {
+    return res.status(400).json({ error: "Nowe hasło musi różnić się od obecnego." });
+  }
+  const nextHash = bcrypt.hashSync(new_password, 12);
+  db.prepare("UPDATE operators SET password_hash = ? WHERE id = ?").run(nextHash, req.operator.id);
+  db.prepare("DELETE FROM operator_sessions WHERE operator_id = ? AND token <> ?").run(
+    req.operator.id,
+    String(req.cookies[COOKIE_OPERATOR] || "")
+  );
+  res.json({ ok: true });
+});
+
 app.patch("/api/op/me/payout", requireOperator, (req, res) => {
   if (req.operator.role === "owner") {
     return res.status(403).json({ error: "Ten formularz dotyczy tylko pracowników." });

@@ -81,6 +81,7 @@
           <span class="op-who" id="op-who"></span>
           <button type="button" class="btn-ghost" id="btn-theme-toggle" title="Tryb jasny / ciemny">Motyw</button>
           <button type="button" class="btn-ghost" id="btn-refresh">Odśwież</button>
+          <button type="button" class="btn-ghost" id="btn-change-password">Zmień hasło</button>
           <button type="button" class="btn-ghost" id="btn-logout">Wyloguj</button>
           <a class="linkbtn hidden" href="/rekrutacja.html" id="header-link-recruit">Praca / FAQ</a>
           <a class="linkbtn hidden" href="/" id="header-link-client">Witryna klienta</a>
@@ -387,6 +388,21 @@
           <div class="op-email-dialog-actions">
             <button type="button" class="btn-primary-sm" id="client-email-cancel">Anuluj</button>
             <button type="submit" class="btn-primary-sm">Wyślij</button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog class="op-pass-dialog" id="change-password-dialog">
+        <form id="change-password-form" class="op-pass-dialog-form">
+          <h3 class="op-pass-dialog-title">Zmień hasło operatora</h3>
+          <label class="op-pass-label" for="op-pass-current">Aktualne hasło</label>
+          <input id="op-pass-current" class="op-pass-input" name="current_password" type="password" required autocomplete="current-password" />
+          <label class="op-pass-label" for="op-pass-new">Nowe hasło (min. 8 znaków)</label>
+          <input id="op-pass-new" class="op-pass-input" name="new_password" type="password" minlength="8" required autocomplete="new-password" />
+          <p class="err op-pass-dlg-err" id="op-pass-dlg-err" hidden></p>
+          <div class="op-pass-dialog-actions">
+            <button type="button" class="btn-primary-sm" id="op-pass-cancel">Anuluj</button>
+            <button type="submit" class="btn-primary-sm">Zapisz hasło</button>
           </div>
         </form>
       </dialog>

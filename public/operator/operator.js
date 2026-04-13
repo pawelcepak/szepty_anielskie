@@ -1669,6 +1669,45 @@ async function trySession() {
             : "Pokaż ukryte narzędzia właściciela";
         }
       });
+      document.getElementById("btn-change-password")?.addEventListener("click", () => {
+        const dlg = document.getElementById("change-password-dialog");
+        const err = document.getElementById("op-pass-dlg-err");
+        const cur = document.getElementById("op-pass-current");
+        const next = document.getElementById("op-pass-new");
+        if (err) {
+          err.hidden = true;
+          err.textContent = "";
+        }
+        if (cur) cur.value = "";
+        if (next) next.value = "";
+        dlg?.showModal();
+      });
+      document.getElementById("op-pass-cancel")?.addEventListener("click", () => {
+        document.getElementById("change-password-dialog")?.close();
+      });
+      document.getElementById("change-password-form")?.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const err = document.getElementById("op-pass-dlg-err");
+        if (err) {
+          err.hidden = true;
+          err.textContent = "";
+        }
+        const current_password = String(document.getElementById("op-pass-current")?.value || "");
+        const new_password = String(document.getElementById("op-pass-new")?.value || "");
+        try {
+          await api("/api/op/me/password", {
+            method: "PATCH",
+            body: JSON.stringify({ current_password, new_password }),
+          });
+          document.getElementById("change-password-dialog")?.close();
+          alert("Hasło zostało zmienione.");
+        } catch (e) {
+          if (err) {
+            err.textContent = e.message || String(e);
+            err.hidden = false;
+          }
+        }
+      });
       document.getElementById("btn-save-payout")?.addEventListener("click", async () => {
         const err = document.getElementById("payout-err");
         if (err) {
