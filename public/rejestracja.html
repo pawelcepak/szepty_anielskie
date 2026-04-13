@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Rejestracja — Szept Kart</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,600&family=Source+Sans+3:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/css/client.css" />
+  </head>
+  <body class="page-auth">
+    <header class="site-top">
+      <div class="site-top-inner">
+        <a class="logo" href="/">Szept Kart</a>
+        <nav class="nav-actions nav-actions--stack">
+          <div class="auth-banner-wrap" data-auth-banner></div>
+          <div class="nav-actions-links">
+            <a href="/logowanie.html">Logowanie</a>
+            <a class="btn btn-gold" href="/panel.html">Panel</a>
+          </div>
+        </nav>
+      </div>
+    </header>
+
+    <main class="auth-main">
+      <div class="auth-card">
+        <h1>Nowe konto</h1>
+        <div id="chosen-medium-banner" class="chosen-medium-banner hidden" role="status" aria-live="polite"></div>
+        <p class="sub">
+          E-mail tylko do logowania — zespół go nie widzi. Przy rozmowie konsultanci widzą: nick, imię,
+          <strong>miasto</strong> i datę urodzenia. Miasto jest wymagane. Zdjęcie profilowe opcjonalne.
+          Na tym etapie nie wysyłamy jeszcze maili weryfikacyjnych.
+        </p>
+        <form id="form">
+          <label for="username">Nazwa użytkownika (widoczna dla zespołu)</label>
+          <input
+            id="username"
+            name="username"
+            type="text"
+            autocomplete="username"
+            pattern="[a-z0-9_]{3,24}"
+            minlength="3"
+            maxlength="24"
+            required
+            title="3–24 znaki: litery, cyfry, podkreślenie"
+          />
+
+          <label for="first_name">Imię</label>
+          <input
+            id="first_name"
+            name="first_name"
+            type="text"
+            autocomplete="given-name"
+            minlength="2"
+            maxlength="60"
+            required
+          />
+
+          <label for="city">Miasto (wymagane — orientacja dla zespołu, np. Kraków)</label>
+          <input
+            id="city"
+            name="city"
+            type="text"
+            autocomplete="address-level2"
+            minlength="2"
+            maxlength="80"
+            required
+            placeholder="Np. Warszawa"
+          />
+
+          <label for="birth_date">Data urodzenia (wymagane ukończone 18 lat względem dzisiejszej daty)</label>
+          <input id="birth_date" name="birth_date" type="date" required />
+
+          <label for="email">E-mail (logowanie)</label>
+          <input id="email" name="email" type="email" autocomplete="email" required />
+
+          <label for="password">Hasło (min. 8 znaków)</label>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            autocomplete="new-password"
+            minlength="8"
+            required
+          />
+
+          <label for="avatar">Zdjęcie profilowe (opcjonalnie, JPG/PNG, max ok. 400 KB)</label>
+          <input id="avatar" name="avatar" type="file" accept="image/jpeg,image/png,image/webp" />
+          <div class="avatar-preview-wrap hidden" id="avatar-preview-wrap">
+            <img id="avatar-preview" alt="Podgląd zdjęcia" width="96" height="96" />
+          </div>
+
+          <p class="form-error" id="err" hidden></p>
+          <button class="btn btn-primary" type="submit">Załóż konto i przejdź do panelu</button>
+        </form>
+        <p class="sub" style="margin-top: 1.25rem; margin-bottom: 0">
+          Masz już konto? <a href="/logowanie.html" id="register-login-link">Zaloguj się</a>
+        </p>
+      </div>
+    </main>
+    <script type="module" src="/js/auth-register.js"></script>
+    <script type="module" src="/js/client-auth-banner.js"></script>
+  </body>
+</html>

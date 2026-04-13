@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Logowanie — Szept Kart</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,600&family=Source+Sans+3:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/css/client.css" />
+  </head>
+  <body class="page-auth">
+    <header class="site-top">
+      <div class="site-top-inner">
+        <a class="logo" href="/">Szept Kart</a>
+        <nav class="nav-actions nav-actions--stack">
+          <div class="auth-banner-wrap" data-auth-banner></div>
+          <div class="nav-actions-links">
+            <a href="/rejestracja.html">Rejestracja</a>
+            <a class="btn btn-gold" href="/panel.html">Panel</a>
+          </div>
+        </nav>
+      </div>
+    </header>
+
+    <main class="auth-main">
+      <div class="auth-card">
+        <h1>Logowanie</h1>
+        <p class="sub">Użyj adresu e-mail i hasła ustawionego przy rejestracji.</p>
+        <form id="form">
+          <label for="email">E-mail</label>
+          <input id="email" name="email" type="email" autocomplete="email" required />
+
+          <label for="password">Hasło</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required />
+
+          <p class="form-error" id="err" hidden></p>
+          <button class="btn btn-primary" type="submit">Zaloguj</button>
+        </form>
+        <p class="sub" style="margin-top: 1.25rem; margin-bottom: 0">
+          Nie masz konta? <a href="/rejestracja.html">Załóż je</a>
+        </p>
+      </div>
+    </main>
+    <script type="module" src="/js/auth-login.js"></script>
+    <script type="module" src="/js/client-auth-banner.js"></script>
+  </body>
+</html>

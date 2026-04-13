@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Panel klienta — Szept Kart</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://images.unsplash.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,600&family=Source+Sans+3:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/css/client.css" />
+  </head>
+  <body class="page-panel">
+    <header class="site-top">
+      <div class="site-top-inner">
+        <a class="logo" href="/">Szept Kart</a>
+        <nav class="nav-actions nav-actions--panel">
+          <div class="panel-nav-status">
+            <span class="top-meta top-meta--strong" id="who"></span>
+            <span class="top-meta" id="session-hint"></span>
+          </div>
+          <a class="link-panel-topup" href="/panel-doladowanie.html">Pakiet / doładowanie</a>
+          <span class="top-meta" id="bal"></span>
+          <button type="button" class="btn btn-outline" id="logout">Wyloguj</button>
+        </nav>
+      </div>
+    </header>
+
+    <div id="panel-live-region" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
+    <div id="client-toast" class="client-toast hidden" role="status"></div>
+
+    <div class="panel-app">
+      <section class="panel-profile-strip" id="panel-profile-strip" aria-label="Twój profil w skrócie">
+        <p class="panel-profile-line" id="panel-profile-line"></p>
+        <form id="panel-city-form" class="panel-city-form hidden">
+          <label class="panel-city-label" for="panel-city-input">Uzupełnij miasto (wymagane przy rozmowie)</label>
+          <div class="panel-city-row">
+            <input
+              id="panel-city-input"
+              type="text"
+              maxlength="80"
+              minlength="2"
+              autocomplete="address-level2"
+              placeholder="Np. Gdańsk"
+            />
+            <button type="submit" class="btn btn-outline btn-sm">Zapisz</button>
+          </div>
+          <p class="form-error" id="panel-city-err" hidden></p>
+        </form>
+      </section>
+      <nav class="panel-view-tabs" aria-label="Widok panelu">
+        <button type="button" class="panel-tab panel-tab--active" id="tab-browse" data-view="browse">
+          Konsultanci
+        </button>
+        <button type="button" class="panel-tab" id="tab-chat" data-view="chat">Moje rozmowy</button>
+      </nav>
+
+      <div id="view-browse" class="panel-view panel-view--browse">
+        <div class="browse-inner">
+          <header class="browse-header">
+            <h1 class="browse-title">Konsultanci</h1>
+            <p class="browse-lead">
+              Kliknij <strong>Otwórz rozmowę</strong> przy wybranej osobie. Zakładka
+              <strong>Moje rozmowy</strong> pokazuje tylko wątki, które już zacząłeś.
+            </p>
+            <p class="browse-disclaimer">
+              <strong>Godziny przy profilu</strong> — to orientacja (kiedy zwykle bywa przy komputerze), nie
+              gwarancja minuty co minuty. Odpowiedź może przyjść także wcześniej lub później.
+            </p>
+          </header>
+          <div id="browse-catalog" class="browse-catalog"></div>
+        </div>
+      </div>
+
+      <div id="view-chat" class="panel-view panel-view--chat hidden">
+        <div class="panel-layout panel-layout--chat">
+          <aside class="panel-side panel-side--threads" aria-label="Aktywne rozmowy">
+            <div class="my-threads-wrap">
+              <h2>Twoje rozmowy</h2>
+              <p class="my-threads-hint">Tylko rozpoczęte wątki. Gdy konsultant odpisze — zobaczysz „Nowa odpowiedź”.</p>
+              <div id="my-threads" class="my-threads"></div>
+            </div>
+            <button type="button" class="btn btn-outline btn-block" id="btn-to-browse">
+              ← Przeglądaj wszystkich konsultantów
+            </button>
+          </aside>
+          <div class="panel-main">
+            <div class="panel-head" id="chat-head">
+              <h1>Twój panel</h1>
+              <p>Wybierz rozmowę z lewej albo przejdź do katalogu konsultantów.</p>
+              <div class="panel-head-actions hidden" id="thread-visibility-row">
+                <button type="button" class="btn btn-outline btn-sm" id="btn-hide-thread">Schowaj wątek w panelu</button>
+                <button type="button" class="btn btn-outline btn-sm" id="btn-show-thread">Pokaż wątek na liście</button>
+                <span class="thread-vis-note" id="thread-vis-note" aria-live="polite"></span>
+              </div>
+            </div>
+            <div class="messages" id="messages"></div>
+            <form class="composer hidden" id="composer">
+              <textarea id="body" maxlength="4000" placeholder="Twoja wiadomość…"></textarea>
+              <div class="composer-foot">
+                <span class="top-meta"
+                  >Jedna wysłana wiadomość = jeden kredyt.
+                  <a href="/panel-doladowanie.html" class="composer-foot-link">Doładuj konto</a></span>
+                <button type="submit" class="btn btn-primary">Wyślij</button>
+              </div>
+            </form>
+            <p class="form-error" id="send-err" hidden style="padding: 0 1.25rem 1rem; margin: 0"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/js/panel.js"></script>
+  </body>
+</html>

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Moje konto — panel pracy</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/operator/operator.css" />
+  </head>
+  <body>
+    <header class="op-header op-header--main">
+      <a class="op-logo" href="/operator/">← Panel pracy</a>
+      <span></span>
+      <div class="op-header-actions">
+        <button type="button" class="btn-ghost" id="btn-theme-toggle" title="Motyw">Motyw</button>
+      </div>
+    </header>
+    <main class="moje-wrap">
+      <h1 class="moje-title">Moje konto pracownicze</h1>
+      <p class="moje-lead" id="moje-who"></p>
+
+      <section class="moje-card">
+        <h2>Kontakt z obsługą i właścicielem</h2>
+        <dl class="moje-dl" id="moje-contacts"></dl>
+      </section>
+
+      <section class="moje-card">
+        <h2>Historia wypłat (zaksięgowane)</h2>
+        <p class="moje-hint">Wpisy dodaje właściciel portalu lub automat z rozliczeń — tu tylko podgląd.</p>
+        <div id="moje-ledger" class="moje-ledger"></div>
+      </section>
+
+      <section class="moje-card">
+        <h2>Skrót statystyk</h2>
+        <div id="moje-dash" class="moje-dash"></div>
+        <p class="moje-hint"><a href="/operator/">Wróć do pulpitu</a>, aby zobaczyć pulę i szczegółowe okna czasowe.</p>
+      </section>
+    </main>
+    <script type="module">
+      async function api(path, opts = {}) {
+        const r = await fetch(path, {
+          credentials: "include",
+          headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
+          ...opts,
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.error || `Błąd ${r.status}`);
+        return data;
+      }
+      function esc(s) {
+        return String(s)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;");
+      }
+      function initTheme() {
+        const t = localStorage.getItem("op-theme") || "light";
+        document.documentElement.dataset.theme = t;
+        const bt = document.getElementById("btn-theme-toggle");
+        if (bt) bt.textContent = t === "dark" ? "Jasny motyw" : "Ciemny motyw";
+      }
+      initTheme();
+      document.getElementById("btn-theme-toggle")?.addEventListener("click", () => {
+        const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+        localStorage.setItem("op-theme", next);
+        document.documentElement.dataset.theme = next;
+        initTheme();
+      });
+      try {
+        const me = await api("/api/op/me");
+        if (me.operator.role === "owner") {
+          window.location.href = "/operator/";
+          throw new Error("redirect");
+        }
+        document.getElementById("moje-who").textContent = `${me.operator.display_name} · ${me.operator.email}`;
+        const [contacts, ledger, dash] = await Promise.all([
+          api("/api/op/me/contacts"),
+          api("/api/op/me/payout-ledger"),
+          api("/api/op/staff-dashboard"),
+        ]);
+        const dl = document.getElementById("moje-contacts");
+        const c = contacts;
+        const rows = [
+          ["E-mail właściciela portalu", c.owner_contact_email],
+          ["Obsługa pracowników (e-mail)", c.staff_support_email],
+          ["Teams / czat zespołu (link)", c.staff_support_teams_url],
+        ];
+        dl.innerHTML = rows
+          .map(
+            ([k, v]) =>
+              `<div><dt>${esc(k)}</dt><dd>${
+                v && String(v).startsWith("http")
+                  ? `<a href="${esc(v)}" rel="noopener noreferrer">${esc(v)}</a>`
+                  : esc(v || "— ustaw w .env —")
+              }</dd></div>`
+          )
+          .join("");
+        const leg = document.getElementById("moje-ledger");
+        const entries = ledger.entries || [];
+        if (!entries.length) {
+          leg.innerHTML = "<p class=\"moje-hint\">Brak zaksięgowanych wypłat.</p>";
+        } else {
+          leg.innerHTML = `<table class="mon-table"><thead><tr><th>Data</th><th>Kwota</th><th>Opis</th><th>Okres</th></tr></thead><tbody>${entries
+            .map(
+              (e) =>
+                `<tr><td>${esc(e.created_at)}</td><td>${esc(String(e.amount_pln))} zł</td><td>${esc(
+                  e.label || ""
+                )}</td><td>${esc(e.period_label || "—")}</td></tr>`
+            )
+            .join("")}</tbody></table>`;
+        }
+        const d = dash.dashboard;
+        document.getElementById("moje-dash").innerHTML = `<ul class="moje-stat-list">
+          <li>Wysłane wiadomości (łącznie): <strong>${d.messages_sent_total}</strong></li>
+          <li>Aktywne wątki: <strong>${d.active_waiting_threads}</strong></li>
+          <li>Stawka szacunkowa: <strong>${d.rate_pln_per_reply} zł</strong> / odpowiedź</li>
+          <li>Szacowany zarobek łącznie: <strong>~${d.estimated_earnings_pln_total} zł</strong></li>
+          <li>Dziś: ${d.messages_today} wiad. · ~${d.estimated_earnings_today_pln} zł</li>
+          <li>Ostatnie 7 dni: ${d.messages_last_7_days} wiad. · ~${d.estimated_earnings_last_7_days_pln} zł</li>
+          <li>Poprzednie 7 dni: ${d.messages_prev_7_days} wiad. · ~${d.estimated_earnings_prev_7_days_pln} zł</li>
+        </ul>`;
+      } catch (e) {
+        if (e.message !== "redirect") window.location.href = "/operator/";
+      }
+    </script>
+  </body>
+</html>

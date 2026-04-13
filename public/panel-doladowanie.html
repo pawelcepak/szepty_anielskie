@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pakiet i doładowanie — Szept Kart</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,600&family=Source+Sans+3:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/css/client.css" />
+  </head>
+  <body class="page-panel page-panel--simple">
+    <header class="site-top">
+      <div class="site-top-inner">
+        <a class="logo" href="/panel.html">Szept Kart</a>
+        <nav class="nav-actions nav-actions--panel">
+          <a class="link-panel-topup-back" href="/panel.html">← Wróć do rozmów</a>
+          <span class="top-meta top-meta--strong" id="who"></span>
+          <span class="top-meta" id="bal-line"></span>
+          <button type="button" class="btn btn-outline" id="logout">Wyloguj</button>
+        </nav>
+      </div>
+    </header>
+
+    <main class="panel-simple-main">
+      <div class="panel-simple-card">
+        <h1>Pakiet wiadomości i doładowanie</h1>
+        <p class="panel-simple-lead">
+          Tu doładowujesz konto testowe. Na produkcji podłączysz płatności i regulamin — ta strona jest schowana z
+          głównego panelu rozmów, żeby skupić się na czacie.
+        </p>
+        <p class="top-meta" id="pkg-note"></p>
+        <div class="pkg-buttons" id="pkg"></div>
+        <p class="form-error" id="pkg-err" hidden></p>
+        <p class="top-meta" style="margin-top: 1.25rem">
+          <a href="/informacje-ceny.html">Informacje o cenach (dla gości)</a>
+        </p>
+      </div>
+    </main>
+
+    <script type="module" src="/js/panel-doladowanie.js"></script>
+  </body>
+</html>

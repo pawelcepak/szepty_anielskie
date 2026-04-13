@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Panel pracy — konsultacje</title>
+    <link rel="preconnect" href="https://ui-avatars.com" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/operator/operator.css" />
+  </head>
+  <body>
+    <div id="view-login">
+      <header class="op-header">
+        <span class="op-logo op-logo--text">Portal pracy</span>
+        <span></span>
+        <span class="op-login-hint">Logowanie tylko dla zespołu — bez przekierowania na witryny klienckie.</span>
+      </header>
+      <div class="login-wrap">
+        <div class="login-card">
+          <h1>Logowanie operatora</h1>
+          <p>
+            Konto z pliku <code>.env</code>:
+            <code>OPERATOR_BOOTSTRAP_EMAIL</code>,
+            <code>OPERATOR_BOOTSTRAP_PASSWORD</code>.
+          </p>
+          <form id="login-form">
+            <label for="em">E-mail</label>
+            <input id="em" name="email" type="email" autocomplete="username" required />
+            <label for="pw">Hasło</label>
+            <input id="pw" name="password" type="password" autocomplete="current-password" required />
+            <p class="err" id="login-err" hidden></p>
+            <button type="submit">Zaloguj</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-app" class="hidden">
+      <p class="owner-mode-banner hidden" id="owner-mode-banner">Tryb administratora — pełny podgląd, edycja i monitor.</p>
+      <nav class="owner-tabs hidden" id="owner-tabs" aria-label="Sekcje administratora">
+        <button type="button" class="owner-tab owner-tab--active" data-owner-tab="inbox">Rozmowy</button>
+        <button type="button" class="owner-tab" data-owner-tab="monitor">Monitor i sesje</button>
+        <button type="button" class="owner-tab" data-owner-tab="reports">
+          Zgłoszenia <span class="owner-tab-badge hidden" id="owner-tab-reports-badge" aria-live="polite"></span>
+        </button>
+        <button type="button" class="owner-tab" data-owner-tab="team">Zespół</button>
+        <button type="button" class="owner-tab" data-owner-tab="insights">Audyt i premie</button>
+        <button type="button" class="owner-tab" data-owner-tab="hr">Obsługa pracowników</button>
+        <button type="button" class="owner-tab" data-owner-tab="kyc">Weryfikacja tożsamości</button>
+        <button type="button" class="owner-tab" data-owner-tab="clients">Klienci</button>
+      </nav>
+      <header class="op-header op-header--main">
+        <a class="op-logo" href="/operator/" id="op-logo-main" title="Panel pracy — Szept Kart">Szept</a>
+        <div class="op-header-center">
+          <button type="button" class="btn-inbox-toggle" id="btn-toggle-inbox" aria-expanded="false">
+            Panel boczny
+          </button>
+          <button type="button" class="btn-inbox-toggle btn-rozmowy-toggle" id="btn-rozmowy">
+            Rozmowy
+          </button>
+        </div>
+        <div class="op-header-actions">
+          <nav class="staff-top-subnav hidden" id="staff-top-subnav" aria-label="Pracownik — skróty">
+            <a class="linkbtn linkbtn--subtle" href="/operator/moje.html" id="link-staff-moje">Moje konto</a>
+            <button type="button" class="btn-ghost btn-ghost--tab" id="btn-staff-tab-main">Pulpit</button>
+            <button type="button" class="btn-ghost btn-ghost--tab" id="btn-staff-tab-conv">
+              Rozmowy <span class="staff-tab-count" id="staff-conv-tab-count">(0)</span>
+            </button>
+            <button type="button" class="btn-ghost btn-ghost--tab" id="btn-staff-tab-payout">Wypłaty</button>
+          </nav>
+          <span class="op-who" id="op-who"></span>
+          <button type="button" class="btn-ghost" id="btn-theme-toggle" title="Tryb jasny / ciemny">Motyw</button>
+          <button type="button" class="btn-ghost" id="btn-refresh">Odśwież</button>
+          <button type="button" class="btn-ghost" id="btn-logout">Wyloguj</button>
+          <a class="linkbtn hidden" href="/rekrutacja.html" id="header-link-recruit">Praca / FAQ</a>
+          <a class="linkbtn hidden" href="/" id="header-link-client">Witryna klienta</a>
+        </div>
+      </header>
+
+      <div class="inbox-backdrop" id="inbox-backdrop" hidden></div>
+
+      <div id="owner-page-monitor" class="owner-full-page hidden" aria-label="Monitor administratora">
+        <div class="owner-full-inner">
+          <div id="owner-monitor" class="owner-monitor">
+            <h2 class="owner-page-title">Monitor pracy</h2>
+            <p class="owner-monitor-hint">
+              Sesje = zalogowane przeglądarki. Dla pracowników: przejęte wątki, terminy odpowiedzi, aktywność w czacie i
+              w notatkach (7 dni) — poniżej też dziennik audytu.
+            </p>
+            <div id="owner-monitor-body" class="owner-monitor-body"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="owner-page-reports" class="owner-full-page hidden" aria-label="Zgłoszenia wiadomości">
+        <div class="owner-full-inner">
+          <h2 class="owner-page-title">Zgłoszenia od pracowników</h2>
+          <p class="owner-monitor-hint">
+            Pracownik może zgłosić dowolną wiadomość z czatu (klient lub zespół). Treść widzisz tutaj w pełnej formie —
+            traktuj jak dane wrażliwe.
+          </p>
+          <div id="owner-reports-toolbar" class="owner-reports-toolbar" aria-label="Filtr zgłoszeń"></div>
+          <div id="owner-reports-body" class="owner-reports-body"></div>
+        </div>
+      </div>
+
+      <div id="owner-page-insights" class="owner-full-page hidden" aria-label="Audyt zespołu i premie">
+        <div class="owner-full-inner">
+          <h2 class="owner-page-title">Audyt zespołu</h2>
+          <p class="owner-monitor-hint" id="owner-insights-period"></p>
+          <div id="owner-insights-cards" class="owner-insights-cards"></div>
+          <h3 class="owner-subtitle">Ranking — wiadomości do klienta (ostatnie 7 dni)</h3>
+          <div id="owner-insights-ranking" class="owner-insights-block"></div>
+          <h3 class="owner-subtitle">Odpowiedzi pracowników (pełny podgląd)</h3>
+          <div id="owner-insights-feed" class="owner-insights-feed" aria-label="Lista odpowiedzi zespołu"></div>
+        </div>
+      </div>
+
+      <div id="owner-page-team" class="owner-full-page hidden" aria-label="Zespół">
+        <div class="owner-full-inner">
+          <h2 class="owner-page-title">Zespół</h2>
+          <div class="owner-tools owner-tools--page" id="owner-tools">
+            <ul class="staff-list" id="staff-list"></ul>
+            <div class="add-staff">
+              <input id="ns-email" type="email" placeholder="E-mail pracownika" />
+              <input id="ns-name" type="text" placeholder="Imię na stronie" />
+              <input id="ns-pass" type="password" placeholder="Hasło (min. 8 znaków)" />
+              <button type="button" class="btn-primary-sm" id="btn-add-staff">Dodaj pracownika</button>
+              <p class="err" id="ns-err" hidden></p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="owner-page-hr" class="owner-full-page hidden" aria-label="Obsługa pracowników">
+        <div class="owner-full-inner owner-prose">
+          <h2 class="owner-page-title">Obsługa pracowników (plan)</h2>
+          <p id="owner-hr-dynamic" class="owner-prose-lead"></p>
+          <p>
+            Docelowo możesz zatrudnić osoby tylko do <strong>wewnętrznej obsługi zespołu</strong> (pytania o wypłaty,
+            techniczne problemy z panelem, eskalacje) — <em>bez</em> dostępu do treści rozmów z klientami, jeśli tak
+            skonfigurujesz role. Ten moduł zostanie podłączony pod osobne logowanie i uprawnienia.
+          </p>
+        </div>
+      </div>
+
+      <div id="owner-page-clients" class="owner-full-page hidden" aria-label="Klienci">
+        <div class="owner-full-inner">
+          <h2 class="owner-page-title">Zarejestrowani klienci</h2>
+          <p class="owner-monitor-hint">E-maile i salda kredytów wiadomości — tylko dla właściciela.</p>
+          <div id="owner-clients-body" class="owner-monitor-body"></div>
+        </div>
+      </div>
+
+      <div id="owner-page-kyc" class="owner-full-page hidden" aria-label="Weryfikacja tożsamości">
+        <div class="owner-full-inner owner-prose">
+          <h2 class="owner-page-title">Weryfikacja pracowników (KYC) — integracja zewnętrzna</h2>
+          <p id="owner-kyc-dynamic" class="owner-prose-lead"></p>
+          <p>
+            Pracownik będzie mógł przesłać <strong>zdjęcie dokumentu</strong> i <strong>selfie z dokumentem</strong> —
+            decyzję podejmie <strong>zewnętrzny dostawca weryfikacji</strong> (np. usługa ogólnopolska lub europejska), a
+            nie Ty ręcznie. W bazie trzymane są już pola statusu (<code>kyc_status</code>, <code>kyc_provider_ref</code>)
+            pod przyszłą integrację API (webhook od dostawcy).
+          </p>
+          <ul class="owner-prose-list">
+            <li>Statusy: <code>unverified</code> → <code>pending</code> → <code>verified</code> / <code>rejected</code></li>
+            <li>Panel pracownika może w przyszłości pokazywać „czekamy na dostawcę” zamiast Twojej decyzji.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="layout-work" id="layout-work">
+        <aside class="col-inbox" id="col-inbox" aria-label="Lista rozmów">
+          <h2 class="col-title" id="inbox-main-title">Skrzynka</h2>
+          <nav class="inbox-bucket-tabs hidden" id="inbox-bucket-tabs" aria-label="Widok listy rozmów"></nav>
+          <h3 class="col-title col-title--sub hidden" id="inbox-subtitle">Moje przypisane rozmowy</h3>
+          <div id="inbox"></div>
+        </aside>
+
+        <div class="layout-thread-pack" id="layout-thread-pack">
+          <aside class="col-consultant" aria-label="Medium">
+            <div class="side-card side-card--accent">
+              <div class="side-avatar-wrap">
+                <img id="ch-portrait" src="" alt="" width="120" height="120" />
+              </div>
+              <h2 class="side-name" id="ch-name"></h2>
+              <p class="side-meta" id="ch-tag"></p>
+              <div id="ch-profile-detail" class="ch-profile-detail" hidden aria-label="Opis postaci"></div>
+              <p class="side-hint">Z kim klient pisze w tym wątku.</p>
+            </div>
+            <div class="fact-block">
+              <h3 class="fact-block-title">Notatki (medium)</h3>
+              <label class="inline-label" for="fc-cat">Kategoria</label>
+              <select id="fc-cat" class="sel"></select>
+              <label class="inline-label" for="fc-field">Pole</label>
+              <select id="fc-field" class="sel"></select>
+              <label class="inline-label" for="fc-val">Wartość</label>
+              <textarea id="fc-val" class="fact-value" rows="2" maxlength="150" placeholder="Maks. 150 znaków"></textarea>
+              <p class="fact-char-count" id="fc-char-count" aria-live="polite">0/150</p>
+              <button type="button" class="btn-primary-sm" id="fc-save">Zapisz</button>
+              <p class="err" id="fc-err" hidden></p>
+            </div>
+            <div class="fact-list" id="fc-list"></div>
+          </aside>
+
+          <section class="col-chat" aria-label="Czat i odpowiedź">
+            <div id="staff-hub-panel" class="staff-hub-panel hidden">
+              <div id="staff-hub-main-view">
+                <p class="dash-lead">
+                  <strong>Pulpit pracownika</strong> — skrót statystyk. Szczegółowe konto i historia wypłat:
+                  <a href="/operator/moje.html">Moje konto</a>.
+                </p>
+                <p class="err" id="staff-open-err" hidden></p>
+                <dl class="stat-grid stat-grid--wide">
+                  <div>
+                    <dt>Wysłane (łącznie)</dt>
+                    <dd id="dash-sent">—</dd>
+                  </div>
+                  <div>
+                    <dt>Aktywne wątki</dt>
+                    <dd id="dash-active">—</dd>
+                  </div>
+                  <div>
+                    <dt>Stawka (szac.)</dt>
+                    <dd id="dash-rate">—</dd>
+                  </div>
+                  <div>
+                    <dt>Szac. zarobek łącznie</dt>
+                    <dd id="dash-earn-total">—</dd>
+                  </div>
+                </dl>
+                <section class="staff-period-stats" id="staff-period-stats" aria-labelledby="staff-period-h">
+                  <h3 class="col-title" id="staff-period-h">Szczegóły (dziś / 7 dni / poprzednie 7 dni)</h3>
+                  <div class="period-stats-grid" id="period-stats-grid"></div>
+                </section>
+                <details class="staff-practices">
+                  <summary>Dobre praktyki przy konsultacjach (kliknij, aby rozwinąć)</summary>
+                  <ul>
+                    <li>Odpowiadaj w ramach platformy — bez kontaktu poza serwisem.</li>
+                    <li>Szanuj granice tematu; przy trudnych treściach psychicznych kieruj delikatnie na wsparcie specjalistów.</li>
+                    <li>Przy przycisku „Wyślij” widać odliczanie czasu na odpowiedź i bezczynność — po przekroczeniu wątek wraca do puli.</li>
+                    <li>Notatki do każdego pola: max. 150 znaków; kolejne „Zapisz” dodaje nowy wpis (nie zastępuje poprzedniego).</li>
+                    <li>Notatki „Inne” służą rzeczom, które nie pasują do pozostałych pól — ułatwiają późniejszą pracę zespołu.</li>
+                    <li>Listę rozmów (pula, przypisane, zatrzymane) otwierasz zakładką <strong>Rozmowy</strong> — odpowiadasz dopiero po wejściu w wątek.</li>
+                  </ul>
+                </details>
+              </div>
+              <div id="staff-hub-conv-view" class="staff-hub-conv-view hidden" aria-label="Lista rozmów pracownika">
+                <p class="dash-lead staff-conv-lead">
+                  Skrót wątków — <strong>bez czatu</strong>. Aby odpisać, wybierz „Wejdź w rozmowę” / „Otwórz rozmowę”.
+                </p>
+                <p class="err queue-err" id="queue-err" hidden></p>
+                <section class="staff-conv-block" aria-labelledby="staff-conv-q-h">
+                  <h3 class="col-title" id="staff-conv-q-h">Pula</h3>
+                  <div id="staff-conv-queue-slots" class="queue-slots"></div>
+                </section>
+                <section class="staff-conv-block" aria-labelledby="staff-conv-m-h">
+                  <h3 class="col-title" id="staff-conv-m-h">Twoje przypisane</h3>
+                  <div id="staff-conv-mine-slots" class="queue-slots"></div>
+                </section>
+                <section class="staff-conv-block" aria-labelledby="staff-conv-s-h">
+                  <h3 class="col-title" id="staff-conv-s-h">Zatrzymane (48 h)</h3>
+                  <div id="staff-conv-stopped-slots" class="queue-slots"></div>
+                </section>
+                <section class="staff-conv-block staff-conv-block--demo" aria-labelledby="staff-conv-d-h">
+                  <h3 class="col-title" id="staff-conv-d-h">Przykłady layoutu (statyczne)</h3>
+                  <p class="queue-note">Trzy fikcyjne karty — tylko podgląd wyglądu, bez wątku w bazie i bez odpowiedzi.</p>
+                  <div id="staff-conv-demo-slots" class="queue-slots"></div>
+                </section>
+              </div>
+              <div id="staff-hub-payout-view" class="hidden">
+                <p class="dash-lead">Dane rozliczeniowe — widzi też właściciel portalu. Pełna historia wypłat na stronie <a href="/operator/moje.html">Moje konto</a>.</p>
+                <section class="staff-payout-block staff-payout-block--solo" id="staff-payout-block" aria-labelledby="payout-heading">
+                  <h3 class="col-title" id="payout-heading">Dane do wypłaty</h3>
+                  <p class="staff-payout-note">
+                    Na produkcji część pól może pochodzić z rejestracji.
+                  </p>
+                  <div class="payout-grid">
+                    <label>Imię <input type="text" id="pay-fn" maxlength="80" autocomplete="given-name" /></label>
+                    <label>Nazwisko <input type="text" id="pay-ln" maxlength="80" autocomplete="family-name" /></label>
+                    <label class="payout-span-2">Adres (ulica, nr) <input type="text" id="pay-addr" maxlength="200" autocomplete="street-address" /></label>
+                    <label>Kod pocztowy <input type="text" id="pay-post" maxlength="20" autocomplete="postal-code" /></label>
+                    <label>Miejscowość <input type="text" id="pay-city" maxlength="80" autocomplete="address-level2" /></label>
+                    <label class="payout-span-2">Kraj <input type="text" id="pay-country" maxlength="80" autocomplete="country-name" /></label>
+                    <label class="payout-span-2">IBAN <input type="text" id="pay-iban" maxlength="42" spellcheck="false" autocomplete="off" /></label>
+                    <label class="payout-span-2">Częstotliwość wypłaty
+                      <select id="pay-freq">
+                        <option value="">— wybierz —</option>
+                        <option value="weekly">Co tydzień</option>
+                        <option value="biweekly">Co dwa tygodnie</option>
+                        <option value="monthly">Co miesiąc</option>
+                      </select>
+                    </label>
+                  </div>
+                  <p class="kyc-mini" id="kyc-mini" aria-live="polite"></p>
+                  <button type="button" class="btn-primary-sm" id="btn-save-payout">Zapisz dane wypłaty</button>
+                  <p class="err" id="payout-err" hidden></p>
+                </section>
+              </div>
+            </div>
+            <div class="chat-empty" id="chat-empty">
+              <p id="chat-empty-line1">Wybierz rozmowę z listy po lewej.</p>
+              <p class="chat-empty-tip" id="chat-empty-tip">
+                Na węższym ekranie otwórz panel przyciskiem <strong>Panel boczny</strong>.
+              </p>
+            </div>
+            <div class="chat-body hidden" id="chat-body">
+              <div class="reply-box">
+                <div class="reply-label-row">
+                  <label for="reply">Odpowiedź do klienta</label>
+                  <span class="reply-banned-wrap hidden" id="reply-banned-wrap">
+                    <button type="button" class="reply-banned-help" id="reply-banned-help" aria-label="Zakazane słowa i frazy">?</button>
+                    <div class="reply-banned-popover" id="reply-banned-popover" role="tooltip"></div>
+                  </span>
+                </div>
+                <textarea id="reply" maxlength="8000" rows="4" placeholder="Treść wiadomości…"></textarea>
+                <p class="reply-meta" id="reply-meta" aria-live="polite"></p>
+                <div class="reply-actions">
+                  <span class="reply-deadline-chip hidden" id="reply-deadline-chip" aria-live="polite"></span>
+                  <button type="button" class="btn-send" id="btn-send">Wyślij <span class="btn-send-kbd">(Ctrl+Enter)</span></button>
+                </div>
+                <p class="err" id="reply-err" hidden></p>
+              </div>
+              <p class="timeline-hint">Najnowsze u góry — starsza historia dołącza automatycznie, gdy przewijasz w dół.</p>
+              <div class="messages messages--newest-first" id="op-messages"></div>
+            </div>
+          </section>
+
+          <aside class="col-client" aria-label="Klient">
+            <div class="side-card side-card--client-profile">
+              <div class="side-avatar-wrap side-avatar-wrap--client">
+                <img id="cl-portrait" src="" alt="" width="120" height="120" />
+              </div>
+              <div class="client-profile-text">
+                <h2 class="side-name" id="cl-name"></h2>
+                <p class="side-meta" id="cl-city" hidden></p>
+                <p class="side-meta" id="cl-birth" hidden></p>
+                <p class="side-meta" id="cl-email"></p>
+                <p class="side-thread-start hidden" id="side-thread-start" aria-live="polite"></p>
+              </div>
+            </div>
+            <div class="fact-block">
+              <h3 class="fact-block-title">Notatki (klient)</h3>
+              <label class="inline-label" for="fk-cat">Kategoria</label>
+              <select id="fk-cat" class="sel"></select>
+              <label class="inline-label" for="fk-field">Pole</label>
+              <select id="fk-field" class="sel"></select>
+              <label class="inline-label" for="fk-val">Wartość</label>
+              <textarea id="fk-val" class="fact-value" rows="2" maxlength="150" placeholder="Maks. 150 znaków"></textarea>
+              <p class="fact-char-count" id="fk-char-count" aria-live="polite">0/150</p>
+              <button type="button" class="btn-primary-sm" id="fk-save">Zapisz</button>
+              <p class="err" id="fk-err" hidden></p>
+            </div>
+            <div class="fact-list" id="fk-list"></div>
+          </aside>
+        </div>
+      </div>
+
+      <dialog class="audit-dialog" id="audit-dialog">
+        <form method="dialog" class="audit-dialog-form">
+          <h3 class="audit-dialog-title">Wpis dziennika</h3>
+          <pre class="audit-dialog-pre" id="audit-dialog-body"></pre>
+          <menu class="audit-dialog-menu">
+            <button type="submit" class="btn-primary-sm">Zamknij</button>
+          </menu>
+        </form>
+      </dialog>
+    </div>
+
+    <script type="module" src="/operator/operator.js"></script>
+  </body>
+</html>
