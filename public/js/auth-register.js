@@ -104,6 +104,7 @@ document.getElementById("form").addEventListener("submit", async (e) => {
   if (!acceptTerms || !acceptPrivacy) {
     err.textContent = "Aby kontynuować, zaakceptuj regulamin i politykę prywatności.";
     err.hidden = false;
+    if (submitBtn) submitBtn.disabled = false;
     return;
   }
   const mediumParam = new URLSearchParams(window.location.search).get("medium");
