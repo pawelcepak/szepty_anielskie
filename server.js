@@ -7,7 +7,7 @@ import { fileURLToPath } from "url";
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
-import { getDb, ensureBootstrapOperator } from "./db.js";
+import { initDatabase, ensureBootstrapOperator } from "./db.js";
 import { flattenSchemaForApi, isValidFactKey, FACT_VALUE_MAX_LEN } from "./facts-schema.js";
 import { maskClientNumbersForOperator } from "./masking.js";
 import {
@@ -44,7 +44,8 @@ import {
 } from "./mail.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const db = getDb();
+const db = await initDatabase();
+await ensureBootstrapOperator(db);
 
 const PORT = Number(process.env.PORT) || 3000;
 const DATABASE_URL = String(process.env.DATABASE_URL || "").trim();
@@ -138,25 +139,31 @@ function customerSessionExpiresAt() {
   return new Date(Date.now() + CUSTOMER_SESSION_IDLE_MS).toISOString();
 }
 
-function extendCustomerSession(res, sessionId, token) {
+function asyncRoute(fn) {
+  return (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+}
+
+async function extendCustomerSession(res, sessionId, token) {
   const exp = customerSessionExpiresAt();
-  db.prepare(`UPDATE customer_sessions SET expires_at = ? WHERE id = ?`).run(exp, sessionId);
+  await db.prepare(`UPDATE customer_sessions SET expires_at = ? WHERE id = ?`).run(exp, sessionId);
   res.cookie(COOKIE_CUSTOMER, token, customerCookieOpts());
 }
 
-function messagesBalance(userId) {
-  const r = db.prepare("SELECT COALESCE(SUM(delta), 0) AS bal FROM ledger WHERE user_id = ?").get(
+async function messagesBalance(userId) {
+  const r = await db.prepare("SELECT COALESCE(SUM(delta), 0) AS bal FROM ledger WHERE user_id = ?").get(
     userId
   );
   return r.bal;
 }
 
-function requireCustomer(req, res, next) {
+const requireCustomer = asyncRoute(async (req, res, next) => {
   const token = req.cookies[COOKIE_CUSTOMER];
   if (!token) {
     return res.status(401).json({ error: "Zaloguj się, aby kontynuować." });
   }
-  const row = db
+  const row = await db
     .prepare(
       `SELECT s.id AS session_id, u.id, u.email, u.display_name, u.username, u.first_name, u.birth_date, u.city, u.avatar_url
               , u.blocked_at, u.email_verified_at
@@ -172,14 +179,14 @@ function requireCustomer(req, res, next) {
     });
   }
   if (row.blocked_at) {
-    clearCustomerSession(req, res);
+    await clearCustomerSession(req, res);
     return res.status(403).json({ error: "Twoje konto zostało zablokowane. Skontaktuj się z obsługą." });
   }
   if (!row.email_verified_at) {
-    clearCustomerSession(req, res);
+    await clearCustomerSession(req, res);
     return res.status(403).json({ error: "Potwierdź adres e-mail (link w wiadomości rejestracyjnej)." });
   }
-  extendCustomerSession(res, row.session_id, token);
+  await extendCustomerSession(res, row.session_id, token);
   req.customer = {
     id: row.id,
     email: row.email,
@@ -191,14 +198,14 @@ function requireCustomer(req, res, next) {
     avatar_url: row.avatar_url,
   };
   next();
-}
+});
 
-function requireOperator(req, res, next) {
+const requireOperator = asyncRoute(async (req, res, next) => {
   const token = req.cookies[COOKIE_OPERATOR];
   if (!token) {
     return res.status(401).json({ error: "Zaloguj się do panelu pracy." });
   }
-  const row = db
+  const row = await db
     .prepare(
       `SELECT o.id, o.email, o.display_name, COALESCE(o.role, 'staff') AS role
        FROM operator_sessions s
@@ -213,38 +220,42 @@ function requireOperator(req, res, next) {
   }
   req.operator = row;
   next();
-}
+});
 
-function setCustomerSession(res, userId) {
+async function setCustomerSession(res, userId) {
   const token = tokenBytes();
   const id = uuidv4();
   const exp = customerSessionExpiresAt();
-  db.prepare(
-    `INSERT INTO customer_sessions (id, user_id, token, expires_at) VALUES (?, ?, ?, ?)`
-  ).run(id, userId, token, exp);
+  await db
+    .prepare(
+      `INSERT INTO customer_sessions (id, user_id, token, expires_at) VALUES (?, ?, ?, ?)`
+    )
+    .run(id, userId, token, exp);
   res.cookie(COOKIE_CUSTOMER, token, customerCookieOpts());
   return token;
 }
 
-function clearCustomerSession(req, res) {
+async function clearCustomerSession(req, res) {
   const token = req.cookies[COOKIE_CUSTOMER];
-  if (token) db.prepare("DELETE FROM customer_sessions WHERE token = ?").run(token);
+  if (token) await db.prepare("DELETE FROM customer_sessions WHERE token = ?").run(token);
   res.clearCookie(COOKIE_CUSTOMER, sessionCookieClearOpts());
 }
 
-function setOperatorSession(res, operatorId) {
+async function setOperatorSession(res, operatorId) {
   const token = tokenBytes();
   const id = uuidv4();
   const exp = sessionExpires(14);
-  db.prepare(
-    `INSERT INTO operator_sessions (id, operator_id, token, expires_at) VALUES (?, ?, ?, ?)`
-  ).run(id, operatorId, token, exp);
+  await db
+    .prepare(
+      `INSERT INTO operator_sessions (id, operator_id, token, expires_at) VALUES (?, ?, ?, ?)`
+    )
+    .run(id, operatorId, token, exp);
   res.cookie(COOKIE_OPERATOR, token, operatorCookieOpts());
 }
 
-function clearOperatorSession(req, res) {
+async function clearOperatorSession(req, res) {
   const token = req.cookies[COOKIE_OPERATOR];
-  if (token) db.prepare("DELETE FROM operator_sessions WHERE token = ?").run(token);
+  if (token) await db.prepare("DELETE FROM operator_sessions WHERE token = ?").run(token);
   res.clearCookie(COOKIE_OPERATOR, sessionCookieClearOpts());
 }
 
@@ -280,44 +291,47 @@ function birthDateAllowed(d) {
 
 /** --- Klient: rejestracja / logowanie --- */
 
-app.get("/api/auth/status", (req, res) => {
-  const token = req.cookies[COOKIE_CUSTOMER];
-  if (!token) return res.json({ logged_in: false });
-  const row = db
-    .prepare(
-      `SELECT s.id AS session_id, u.id, u.email, u.display_name, u.username, u.first_name, u.city
+app.get(
+  "/api/auth/status",
+  asyncRoute(async (req, res) => {
+    const token = req.cookies[COOKIE_CUSTOMER];
+    if (!token) return res.json({ logged_in: false });
+    const row = await db
+      .prepare(
+        `SELECT s.id AS session_id, u.id, u.email, u.display_name, u.username, u.first_name, u.city
               , u.blocked_at, u.email_verified_at
        FROM customer_sessions s
        JOIN users u ON u.id = s.user_id
        WHERE s.token = ? AND datetime(s.expires_at) > datetime('now')`
-    )
-    .get(token);
-  if (!row) {
-    res.clearCookie(COOKIE_CUSTOMER, sessionCookieClearOpts());
-    return res.json({ logged_in: false });
-  }
-  if (row.blocked_at) {
-    clearCustomerSession(req, res);
-    return res.json({ logged_in: false });
-  }
-  if (!row.email_verified_at) {
-    clearCustomerSession(req, res);
-    return res.json({ logged_in: false, email_verification_pending: true });
-  }
-  extendCustomerSession(res, row.session_id, token);
-  res.json({
-    logged_in: true,
-    session_idle_minutes: CUSTOMER_SESSION_IDLE_MINUTES,
-    user: {
-      id: row.id,
-      email: row.email,
-      display_name: row.display_name || row.first_name,
-      username: row.username,
-      first_name: row.first_name,
-      city: row.city || "",
-    },
-  });
-});
+      )
+      .get(token);
+    if (!row) {
+      res.clearCookie(COOKIE_CUSTOMER, sessionCookieClearOpts());
+      return res.json({ logged_in: false });
+    }
+    if (row.blocked_at) {
+      await clearCustomerSession(req, res);
+      return res.json({ logged_in: false });
+    }
+    if (!row.email_verified_at) {
+      await clearCustomerSession(req, res);
+      return res.json({ logged_in: false, email_verification_pending: true });
+    }
+    await extendCustomerSession(res, row.session_id, token);
+    res.json({
+      logged_in: true,
+      session_idle_minutes: CUSTOMER_SESSION_IDLE_MINUTES,
+      user: {
+        id: row.id,
+        email: row.email,
+        display_name: row.display_name || row.first_name,
+        username: row.username,
+        first_name: row.first_name,
+        city: row.city || "",
+      },
+    });
+  })
+);
 
 app.post("/api/auth/register", registerJsonParser, async (req, res, next) => {
   try {
@@ -335,7 +349,7 @@ app.post("/api/auth/register", registerJsonParser, async (req, res, next) => {
   const avatar_url = String(req.body?.avatar_url || "").trim() || null;
   let pending_open_character_id = String(req.body?.medium || "").trim() || null;
   if (pending_open_character_id) {
-    const ch = db.prepare("SELECT id FROM characters WHERE id = ?").get(pending_open_character_id);
+    const ch = await db.prepare("SELECT id FROM characters WHERE id = ?").get(pending_open_character_id);
     if (!ch) pending_open_character_id = null;
   }
   if (!emailOk(email)) return res.status(400).json({ error: "Podaj poprawny adres e-mail." });
@@ -369,9 +383,9 @@ app.post("/api/auth/register", registerJsonParser, async (req, res, next) => {
       return res.status(400).json({ error: "Nieprawidłowy adres zdjęcia." });
     }
   }
-  const exists = db.prepare("SELECT id FROM users WHERE email = ?").get(email);
+  const exists = await db.prepare("SELECT id FROM users WHERE email = ?").get(email);
   if (exists) return res.status(409).json({ error: "Ten adres e-mail jest już zarejestrowany." });
-  if (db.prepare("SELECT id FROM users WHERE lower(username) = lower(?)").get(username)) {
+  if (await db.prepare("SELECT id FROM users WHERE lower(username) = lower(?)").get(username)) {
     return res.status(409).json({ error: "Ta nazwa użytkownika jest już zajęta." });
   }
   if (!isMailConfigured()) {
@@ -385,7 +399,7 @@ app.post("/api/auth/register", registerJsonParser, async (req, res, next) => {
   const display_name = first_name;
   const verifyToken = tokenBytes();
   const verifyExpires = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
-  db.prepare(
+  await db.prepare(
     `INSERT INTO users (id, email, password_hash, display_name, username, first_name, birth_date, city, avatar_url,
         email_verified_at, email_verification_token, email_verification_expires_at, pending_open_character_id)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`
@@ -413,7 +427,7 @@ app.post("/api/auth/register", registerJsonParser, async (req, res, next) => {
       rejected: mailInfo.rejected,
     });
   } catch (err) {
-    db.prepare("DELETE FROM users WHERE id = ?").run(id);
+    await db.prepare("DELETE FROM users WHERE id = ?").run(id);
     console.error("[mail] verification send failed:", err?.message || err);
     return res.status(502).json({
       error: "Nie udało się wysłać wiadomości z linkiem potwierdzającym. Spróbuj ponownie za chwilę.",
@@ -429,32 +443,37 @@ app.post("/api/auth/register", registerJsonParser, async (req, res, next) => {
   }
 });
 
-app.get("/api/auth/verify-email", (req, res) => {
-  const token = String(req.query.token || "").trim();
-  if (!token) {
-    return res.redirect(302, "/logowanie.html?verify_error=missing_token");
-  }
-  const row = db
-    .prepare(
-      `SELECT id, email_verification_expires_at, pending_open_character_id FROM users WHERE email_verification_token = ?`
-    )
-    .get(token);
-  if (!row) {
-    return res.redirect(302, "/logowanie.html?verify_error=invalid");
-  }
-  const exp = row.email_verification_expires_at ? new Date(row.email_verification_expires_at).getTime() : 0;
-  if (!exp || Number.isNaN(exp) || exp < Date.now()) {
-    return res.redirect(302, "/logowanie.html?verify_error=expired");
-  }
-  const openId = row.pending_open_character_id ? String(row.pending_open_character_id) : "";
-  db.prepare(
-    `UPDATE users SET email_verified_at = datetime('now'), email_verification_token = NULL,
+app.get(
+  "/api/auth/verify-email",
+  asyncRoute(async (req, res) => {
+    const token = String(req.query.token || "").trim();
+    if (!token) {
+      return res.redirect(302, "/logowanie.html?verify_error=missing_token");
+    }
+    const row = await db
+      .prepare(
+        `SELECT id, email_verification_expires_at, pending_open_character_id FROM users WHERE email_verification_token = ?`
+      )
+      .get(token);
+    if (!row) {
+      return res.redirect(302, "/logowanie.html?verify_error=invalid");
+    }
+    const exp = row.email_verification_expires_at ? new Date(row.email_verification_expires_at).getTime() : 0;
+    if (!exp || Number.isNaN(exp) || exp < Date.now()) {
+      return res.redirect(302, "/logowanie.html?verify_error=expired");
+    }
+    const openId = row.pending_open_character_id ? String(row.pending_open_character_id) : "";
+    await db
+      .prepare(
+        `UPDATE users SET email_verified_at = datetime('now'), email_verification_token = NULL,
         email_verification_expires_at = NULL, pending_open_character_id = NULL WHERE id = ?`
-  ).run(row.id);
-  setCustomerSession(res, row.id);
-  const q = openId ? `verified=1&open=${encodeURIComponent(openId)}` : "verified=1";
-  res.redirect(302, `/panel.html?${q}`);
-});
+      )
+      .run(row.id);
+    await setCustomerSession(res, row.id);
+    const q = openId ? `verified=1&open=${encodeURIComponent(openId)}` : "verified=1";
+    res.redirect(302, `/panel.html?${q}`);
+  })
+);
 
 app.post("/api/auth/resend-verification", registerJsonParser, async (req, res) => {
   const email = String(req.body?.email || "").trim().toLowerCase();
@@ -464,8 +483,7 @@ app.post("/api/auth/resend-verification", registerJsonParser, async (req, res) =
       error: "Brak konfiguracji SMTP na serwerze. Ustaw SMTP_USER i SMTP_PASS.",
     });
   }
-  const row = db
-    .prepare(
+  const row = await db.prepare(
       `SELECT id, email, display_name, email_verified_at
        FROM users WHERE lower(email) = lower(?)`
     )
@@ -478,7 +496,7 @@ app.post("/api/auth/resend-verification", registerJsonParser, async (req, res) =
   }
   const verifyToken = tokenBytes();
   const verifyExpires = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
-  db.prepare(
+  await db.prepare(
     `UPDATE users
      SET email_verification_token = ?, email_verification_expires_at = ?
      WHERE id = ?`
@@ -503,86 +521,100 @@ app.post("/api/auth/resend-verification", registerJsonParser, async (req, res) =
   res.json({ ok: true, sent: true });
 });
 
-app.post("/api/auth/login", (req, res) => {
-  const email = String(req.body?.email || "").trim().toLowerCase();
-  const password = String(req.body?.password || "");
-  const row = db
-    .prepare(
-      `SELECT id, email, display_name, password_hash, username, first_name, birth_date, city, avatar_url, blocked_at, email_verified_at
+app.post(
+  "/api/auth/login",
+  asyncRoute(async (req, res) => {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const password = String(req.body?.password || "");
+    const row = await db
+      .prepare(
+        `SELECT id, email, display_name, password_hash, username, first_name, birth_date, city, avatar_url, blocked_at, email_verified_at
        FROM users WHERE email = ?`
-    )
-    .get(email);
-  if (!row || !bcrypt.compareSync(password, row.password_hash)) {
-    return res.status(401).json({ error: "Nieprawidłowy e-mail lub hasło." });
-  }
-  if (row.blocked_at) {
-    return res.status(403).json({ error: "To konto jest zablokowane. Napisz do obsługi serwisu." });
-  }
-  if (!row.email_verified_at) {
-    return res.status(403).json({ error: "Potwierdź adres e-mail — otwórz link w wiadomości wysłanej po rejestracji." });
-  }
-  setCustomerSession(res, row.id);
-  res.json({
-    user: {
-      id: row.id,
-      email: row.email,
-      display_name: row.display_name,
-      username: row.username,
-      first_name: row.first_name,
-      birth_date: row.birth_date,
-      city: row.city || "",
-      avatar_url: row.avatar_url,
-    },
-    messages_remaining: messagesBalance(row.id),
-    fake_purchase_enabled: ALLOW_FAKE_PURCHASE,
-    packages_pln: pricingPackagesForClient(),
-  });
-});
+      )
+      .get(email);
+    if (!row || !bcrypt.compareSync(password, row.password_hash)) {
+      return res.status(401).json({ error: "Nieprawidłowy e-mail lub hasło." });
+    }
+    if (row.blocked_at) {
+      return res.status(403).json({ error: "To konto jest zablokowane. Napisz do obsługi serwisu." });
+    }
+    if (!row.email_verified_at) {
+      return res.status(403).json({ error: "Potwierdź adres e-mail — otwórz link w wiadomości wysłanej po rejestracji." });
+    }
+    await setCustomerSession(res, row.id);
+    res.json({
+      user: {
+        id: row.id,
+        email: row.email,
+        display_name: row.display_name,
+        username: row.username,
+        first_name: row.first_name,
+        birth_date: row.birth_date,
+        city: row.city || "",
+        avatar_url: row.avatar_url,
+      },
+      messages_remaining: await messagesBalance(row.id),
+      fake_purchase_enabled: ALLOW_FAKE_PURCHASE,
+      packages_pln: pricingPackagesForClient(),
+    });
+  })
+);
 
-app.post("/api/auth/logout", (req, res) => {
-  clearCustomerSession(req, res);
-  res.json({ ok: true });
-});
+app.post(
+  "/api/auth/logout",
+  asyncRoute(async (req, res) => {
+    await clearCustomerSession(req, res);
+    res.json({ ok: true });
+  })
+);
 
-app.get("/api/me", requireCustomer, (req, res) => {
-  res.json({
-    user: {
-      id: req.customer.id,
-      email: req.customer.email,
-      display_name: req.customer.display_name,
-      username: req.customer.username,
-      first_name: req.customer.first_name,
-      birth_date: req.customer.birth_date,
-      city: req.customer.city || "",
-      avatar_url: req.customer.avatar_url,
-    },
-    messages_remaining: messagesBalance(req.customer.id),
-    fake_purchase_enabled: ALLOW_FAKE_PURCHASE,
-    packages_pln: pricingPackagesForClient(),
-    session_idle_minutes: CUSTOMER_SESSION_IDLE_MINUTES,
-  });
-});
+app.get(
+  "/api/me",
+  requireCustomer,
+  asyncRoute(async (req, res) => {
+    res.json({
+      user: {
+        id: req.customer.id,
+        email: req.customer.email,
+        display_name: req.customer.display_name,
+        username: req.customer.username,
+        first_name: req.customer.first_name,
+        birth_date: req.customer.birth_date,
+        city: req.customer.city || "",
+        avatar_url: req.customer.avatar_url,
+      },
+      messages_remaining: await messagesBalance(req.customer.id),
+      fake_purchase_enabled: ALLOW_FAKE_PURCHASE,
+      packages_pln: pricingPackagesForClient(),
+      session_idle_minutes: CUSTOMER_SESSION_IDLE_MINUTES,
+    });
+  })
+);
 
-app.patch("/api/me", requireCustomer, (req, res) => {
-  const city = String(req.body?.city ?? "").trim();
-  if (city.length < 2 || city.length > 80) {
-    return res.status(400).json({ error: "Miasto: 2–80 znaków." });
-  }
-  db.prepare(`UPDATE users SET city = ? WHERE id = ?`).run(city, req.customer.id);
-  req.customer.city = city;
-  res.json({
-    user: {
-      id: req.customer.id,
-      email: req.customer.email,
-      display_name: req.customer.display_name,
-      username: req.customer.username,
-      first_name: req.customer.first_name,
-      birth_date: req.customer.birth_date,
-      city,
-      avatar_url: req.customer.avatar_url,
-    },
-  });
-});
+app.patch(
+  "/api/me",
+  requireCustomer,
+  asyncRoute(async (req, res) => {
+    const city = String(req.body?.city ?? "").trim();
+    if (city.length < 2 || city.length > 80) {
+      return res.status(400).json({ error: "Miasto: 2–80 znaków." });
+    }
+    await db.prepare(`UPDATE users SET city = ? WHERE id = ?`).run(city, req.customer.id);
+    req.customer.city = city;
+    res.json({
+      user: {
+        id: req.customer.id,
+        email: req.customer.email,
+        display_name: req.customer.display_name,
+        username: req.customer.username,
+        first_name: req.customer.first_name,
+        birth_date: req.customer.birth_date,
+        city,
+        avatar_url: req.customer.avatar_url,
+      },
+    });
+  })
+);
 
 app.get("/api/public/pricing", (_req, res) => {
   res.json({ packages: pricingPackagesForClient(), currency: APP_CONFIG.pricing.currency });
@@ -603,52 +635,67 @@ app.get("/api/public/site-config", (_req, res) => {
   });
 });
 
-app.post("/api/test/purchase", requireCustomer, (req, res) => {
-  if (!ALLOW_FAKE_PURCHASE) {
-    return res.status(403).json({ error: "Tryb testowego zakupu jest wyłączony." });
-  }
-  const amount = Number(req.body?.amount);
-  if (!PKG_AMOUNTS.has(amount)) {
-    return res.status(400).json({ error: "Dozwolone pakiety: 10, 20, 50 lub 100 wiadomości." });
-  }
-  const id = uuidv4();
-  db.prepare(
-    "INSERT INTO ledger (id, user_id, delta, reason) VALUES (?, ?, ?, ?)"
-  ).run(id, req.customer.id, amount, `fake_purchase:${amount}`);
-  res.json({
-    ok: true,
-    added: amount,
-    messages_remaining: messagesBalance(req.customer.id),
-  });
-});
+app.post(
+  "/api/test/purchase",
+  requireCustomer,
+  asyncRoute(async (req, res) => {
+    if (!ALLOW_FAKE_PURCHASE) {
+      return res.status(403).json({ error: "Tryb testowego zakupu jest wyłączony." });
+    }
+    const amount = Number(req.body?.amount);
+    if (!PKG_AMOUNTS.has(amount)) {
+      return res.status(400).json({ error: "Dozwolone pakiety: 10, 20, 50 lub 100 wiadomości." });
+    }
+    const id = uuidv4();
+    await db
+      .prepare(
+        "INSERT INTO ledger (id, user_id, delta, reason) VALUES (?, ?, ?, ?)"
+      )
+      .run(id, req.customer.id, amount, `fake_purchase:${amount}`);
+    res.json({
+      ok: true,
+      added: amount,
+      messages_remaining: await messagesBalance(req.customer.id),
+    });
+  })
+);
 
-app.get("/api/characters", (_req, res) => {
-  const rows = db
-    .prepare(
-      `SELECT id, name, tagline, category, portrait_url, gender, skills, about,
+app.get(
+  "/api/characters",
+  asyncRoute(async (_req, res) => {
+    const rows = await db
+      .prepare(
+        `SELECT id, name, tagline, category, portrait_url, gender, skills, about,
               typical_hours_from, typical_hours_to
        FROM characters ORDER BY sort_order ASC, name ASC`
-    )
-    .all();
-  res.json({ characters: rows });
-});
+      )
+      .all();
+    res.json({ characters: rows });
+  })
+);
 
-app.get("/api/characters/:id", (req, res) => {
-  const id = String(req.params.id || "").trim();
-  const row = db
-    .prepare(
-      `SELECT id, name, tagline, category, sort_order, portrait_url, gender, skills, about, typical_hours_from, typical_hours_to
+app.get(
+  "/api/characters/:id",
+  asyncRoute(async (req, res) => {
+    const id = String(req.params.id || "").trim();
+    const row = await db
+      .prepare(
+        `SELECT id, name, tagline, category, sort_order, portrait_url, gender, skills, about, typical_hours_from, typical_hours_to
        FROM characters WHERE id = ?`
-    )
-    .get(id);
-  if (!row) return res.status(404).json({ error: "Nie znaleziono konsultanta." });
-  res.json({ character: row });
-});
+      )
+      .get(id);
+    if (!row) return res.status(404).json({ error: "Nie znaleziono konsultanta." });
+    res.json({ character: row });
+  })
+);
 
-app.get("/api/threads", requireCustomer, (req, res) => {
-  const rows = db
-    .prepare(
-      `SELECT t.id AS thread_id, t.character_id, c.name AS character_name, c.category,
+app.get(
+  "/api/threads",
+  requireCustomer,
+  asyncRoute(async (req, res) => {
+    const rows = await db
+      .prepare(
+        `SELECT t.id AS thread_id, t.character_id, c.name AS character_name, c.category,
               datetime(t.created_at) AS thread_started_at,
               (SELECT COUNT(*) FROM messages m WHERE m.thread_id = t.id) AS message_count,
               (SELECT m.sender FROM messages m WHERE m.thread_id = t.id ORDER BY datetime(m.created_at) DESC LIMIT 1) AS last_sender,
@@ -658,35 +705,40 @@ app.get("/api/threads", requireCustomer, (req, res) => {
        JOIN characters c ON c.id = t.character_id
        WHERE t.user_id = ?
        ORDER BY datetime(COALESCE(last_at, t.created_at)) DESC`
-    )
-    .all(req.customer.id);
-  res.json({ threads: rows });
-});
+      )
+      .all(req.customer.id);
+    res.json({ threads: rows });
+  })
+);
 
-app.patch("/api/threads/:characterId/client-visibility", requireCustomer, (req, res) => {
-  const characterId = req.params.characterId;
-  const hidden = !!req.body?.hidden;
-  const row = db
-    .prepare(
-      `SELECT t.id FROM threads t
+app.patch(
+  "/api/threads/:characterId/client-visibility",
+  requireCustomer,
+  asyncRoute(async (req, res) => {
+    const characterId = req.params.characterId;
+    const hidden = !!req.body?.hidden;
+    const row = await db
+      .prepare(
+        `SELECT t.id FROM threads t
        WHERE t.user_id = ? AND t.character_id = ?`
-    )
-    .get(req.customer.id, characterId);
-  if (!row) return res.status(404).json({ error: "Nie znaleziono rozmowy." });
-  const ts = hidden ? new Date().toISOString() : null;
-  db.prepare(`UPDATE threads SET client_hidden_at = ? WHERE id = ?`).run(ts, row.id);
-  res.json({ ok: true, thread_id: row.id, client_hidden_at: ts });
-});
+      )
+      .get(req.customer.id, characterId);
+    if (!row) return res.status(404).json({ error: "Nie znaleziono rozmowy." });
+    const ts = hidden ? new Date().toISOString() : null;
+    await db.prepare(`UPDATE threads SET client_hidden_at = ? WHERE id = ?`).run(ts, row.id);
+    res.json({ ok: true, thread_id: row.id, client_hidden_at: ts });
+  })
+);
 
-function getOrCreateThread(userId, characterId) {
-  const ch = db.prepare("SELECT id FROM characters WHERE id = ?").get(characterId);
+async function getOrCreateThread(userId, characterId) {
+  const ch = await db.prepare("SELECT id FROM characters WHERE id = ?").get(characterId);
   if (!ch) return null;
-  let t = db
+  let t = await db
     .prepare("SELECT id FROM threads WHERE user_id = ? AND character_id = ?")
     .get(userId, characterId);
   if (!t) {
     const tid = uuidv4();
-    db.prepare("INSERT INTO threads (id, user_id, character_id) VALUES (?, ?, ?)").run(
+    await db.prepare("INSERT INTO threads (id, user_id, character_id) VALUES (?, ?, ?)").run(
       tid,
       userId,
       characterId
@@ -696,104 +748,125 @@ function getOrCreateThread(userId, characterId) {
   return t.id;
 }
 
-app.get("/api/threads/:characterId/messages", requireCustomer, (req, res) => {
-  const characterId = req.params.characterId;
-  const threadId = getOrCreateThread(req.customer.id, characterId);
-  if (!threadId) return res.status(404).json({ error: "Nie znaleziono tej osoby w katalogu." });
-  const msgs = db
-    .prepare(
-      `SELECT id, sender, body, created_at FROM messages WHERE thread_id = ? ORDER BY datetime(created_at) ASC`
-    )
-    .all(threadId);
-  res.json({
-    thread_id: threadId,
-    character_id: characterId,
-    messages: msgs,
-    messages_remaining: messagesBalance(req.customer.id),
-  });
-});
-
-app.post("/api/threads/:characterId/messages", requireCustomer, (req, res) => {
-  const characterId = req.params.characterId;
-  const body = String(req.body?.body || "").trim();
-  if (body.length < 1 || body.length > 4000) {
-    return res.status(400).json({ error: "Treść wiadomości: 1–4000 znaków." });
-  }
-  const bal = messagesBalance(req.customer.id);
-  if (bal < 1) {
-    return res.status(402).json({
-      error: "Nie masz dostępnych wiadomości. Wybierz pakiet w panelu.",
-      messages_remaining: bal,
+app.get(
+  "/api/threads/:characterId/messages",
+  requireCustomer,
+  asyncRoute(async (req, res) => {
+    const characterId = req.params.characterId;
+    const threadId = await getOrCreateThread(req.customer.id, characterId);
+    if (!threadId) return res.status(404).json({ error: "Nie znaleziono tej osoby w katalogu." });
+    const msgs = await db
+      .prepare(
+        `SELECT id, sender, body, created_at FROM messages WHERE thread_id = ? ORDER BY datetime(created_at) ASC`
+      )
+      .all(threadId);
+    res.json({
+      thread_id: threadId,
+      character_id: characterId,
+      messages: msgs,
+      messages_remaining: await messagesBalance(req.customer.id),
     });
-  }
-  const threadId = getOrCreateThread(req.customer.id, characterId);
-  if (!threadId) return res.status(404).json({ error: "Nie znaleziono tej osoby w katalogu." });
+  })
+);
 
-  const msgId = uuidv4();
-  const ledId = uuidv4();
-  db.transaction(() => {
-    db.prepare(
-      "INSERT INTO messages (id, thread_id, sender, body) VALUES (?, ?, 'user', ?)"
-    ).run(msgId, threadId, body);
-    db.prepare(
-      "INSERT INTO ledger (id, user_id, delta, reason) VALUES (?, ?, -1, ?)"
-    ).run(ledId, req.customer.id, `user_message:${threadId}`);
-  })();
+app.post(
+  "/api/threads/:characterId/messages",
+  requireCustomer,
+  asyncRoute(async (req, res) => {
+    const characterId = req.params.characterId;
+    const body = String(req.body?.body || "").trim();
+    if (body.length < 1 || body.length > 4000) {
+      return res.status(400).json({ error: "Treść wiadomości: 1–4000 znaków." });
+    }
+    const bal = await messagesBalance(req.customer.id);
+    if (bal < 1) {
+      return res.status(402).json({
+        error: "Nie masz dostępnych wiadomości. Wybierz pakiet w panelu.",
+        messages_remaining: bal,
+      });
+    }
+    const threadId = await getOrCreateThread(req.customer.id, characterId);
+    if (!threadId) return res.status(404).json({ error: "Nie znaleziono tej osoby w katalogu." });
 
-  onClientMessage(db, threadId);
+    const msgId = uuidv4();
+    const ledId = uuidv4();
+    await db.transaction(async (tx) => {
+      await tx
+        .prepare(
+          "INSERT INTO messages (id, thread_id, sender, body) VALUES (?, ?, 'user', ?)"
+        )
+        .run(msgId, threadId, body);
+      await tx
+        .prepare(
+          "INSERT INTO ledger (id, user_id, delta, reason) VALUES (?, ?, -1, ?)"
+        )
+        .run(ledId, req.customer.id, `user_message:${threadId}`);
+    });
 
-  res.json({
-    ok: true,
-    message: db.prepare("SELECT id, sender, body, created_at FROM messages WHERE id = ?").get(
-      msgId
-    ),
-    messages_remaining: messagesBalance(req.customer.id),
-  });
-});
+    await onClientMessage(db, threadId);
+
+    res.json({
+      ok: true,
+      message: await db
+        .prepare("SELECT id, sender, body, created_at FROM messages WHERE id = ?")
+        .get(msgId),
+      messages_remaining: await messagesBalance(req.customer.id),
+    });
+  })
+);
 
 /** --- Operator: logowanie i praca na wątkach --- */
 
-app.post("/api/op/auth/login", (req, res) => {
-  const email = String(req.body?.email || "").trim().toLowerCase();
-  const password = String(req.body?.password || "");
-  const row = db
-    .prepare(
-      `SELECT id, email, display_name, password_hash, COALESCE(role, 'staff') AS role, disabled_at
+app.post(
+  "/api/op/auth/login",
+  asyncRoute(async (req, res) => {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const password = String(req.body?.password || "");
+    const row = await db
+      .prepare(
+        `SELECT id, email, display_name, password_hash, COALESCE(role, 'staff') AS role, disabled_at
        FROM operators WHERE email = ?`
-    )
-    .get(email);
-  if (!row || !bcrypt.compareSync(password, row.password_hash)) {
-    return res.status(401).json({ error: "Nieprawidłowy e-mail lub hasło." });
-  }
-  if (row.disabled_at) {
-    return res.status(403).json({ error: "To konto zostało zablokowane. Skontaktuj się z administratorem." });
-  }
-  setOperatorSession(res, row.id);
-  res.json({
-    operator: {
-      id: row.id,
-      email: row.email,
-      display_name: row.display_name,
-      role: row.role,
-    },
-  });
-});
+      )
+      .get(email);
+    if (!row || !bcrypt.compareSync(password, row.password_hash)) {
+      return res.status(401).json({ error: "Nieprawidłowy e-mail lub hasło." });
+    }
+    if (row.disabled_at) {
+      return res.status(403).json({ error: "To konto zostało zablokowane. Skontaktuj się z administratorem." });
+    }
+    await setOperatorSession(res, row.id);
+    res.json({
+      operator: {
+        id: row.id,
+        email: row.email,
+        display_name: row.display_name,
+        role: row.role,
+      },
+    });
+  })
+);
 
-app.post("/api/op/auth/logout", (req, res) => {
-  clearOperatorSession(req, res);
-  res.json({ ok: true });
-});
+app.post(
+  "/api/op/auth/logout",
+  asyncRoute(async (req, res) => {
+    await clearOperatorSession(req, res);
+    res.json({ ok: true });
+  })
+);
 
-app.get("/api/op/me", requireOperator, (req, res) => {
-  const row = db
-    .prepare(
-      `SELECT id, email, display_name, role,
+app.get(
+  "/api/op/me",
+  requireOperator,
+  asyncRoute(async (req, res) => {
+    const row = await db
+      .prepare(
+        `SELECT id, email, display_name, role,
         payout_first_name, payout_last_name, payout_address_line, payout_city, payout_postal_code, payout_country,
         payout_iban, payout_frequency,
         COALESCE(kyc_status, 'unverified') AS kyc_status, kyc_provider_ref, kyc_updated_at
        FROM operators WHERE id = ?`
-    )
-    .get(req.operator.id);
+      )
+      .get(req.operator.id);
   if (!row) {
     return res.status(401).json({ error: "Sesja nieważna — zaloguj się ponownie." });
   }
@@ -806,7 +879,7 @@ app.get("/api/op/me", requireOperator, (req, res) => {
     },
   };
   if (row.role === "owner") {
-    const openRep = db.prepare(`SELECT COUNT(*) AS c FROM message_reports WHERE status = 'open'`).get();
+    const openRep = await db.prepare(`SELECT COUNT(*) AS c FROM message_reports WHERE status = 'open'`).get();
     out.open_message_reports = openRep?.c ?? 0;
   }
   if (row.role !== "owner") {
@@ -833,60 +906,69 @@ app.get("/api/op/me", requireOperator, (req, res) => {
     };
   }
   res.json(out);
-});
+  })
+);
 
-app.patch("/api/op/me/password", requireOperator, (req, res) => {
-  const current_password = String(req.body?.current_password || "");
-  const new_password = String(req.body?.new_password || "");
-  if (new_password.length < 8) {
-    return res.status(400).json({ error: "Nowe hasło musi mieć co najmniej 8 znaków." });
-  }
-  const row = db
-    .prepare("SELECT id, password_hash FROM operators WHERE id = ?")
-    .get(req.operator.id);
-  if (!row) {
-    return res.status(404).json({ error: "Nie znaleziono konta operatora." });
-  }
-  if (!bcrypt.compareSync(current_password, row.password_hash)) {
-    return res.status(401).json({ error: "Aktualne hasło jest nieprawidłowe." });
-  }
-  if (bcrypt.compareSync(new_password, row.password_hash)) {
-    return res.status(400).json({ error: "Nowe hasło musi różnić się od obecnego." });
-  }
-  const nextHash = bcrypt.hashSync(new_password, 12);
-  db.prepare("UPDATE operators SET password_hash = ? WHERE id = ?").run(nextHash, req.operator.id);
-  db.prepare("DELETE FROM operator_sessions WHERE operator_id = ? AND token <> ?").run(
-    req.operator.id,
-    String(req.cookies[COOKIE_OPERATOR] || "")
-  );
-  res.json({ ok: true });
-});
+app.patch(
+  "/api/op/me/password",
+  requireOperator,
+  asyncRoute(async (req, res) => {
+    const current_password = String(req.body?.current_password || "");
+    const new_password = String(req.body?.new_password || "");
+    if (new_password.length < 8) {
+      return res.status(400).json({ error: "Nowe hasło musi mieć co najmniej 8 znaków." });
+    }
+    const row = await db.prepare("SELECT id, password_hash FROM operators WHERE id = ?").get(req.operator.id);
+    if (!row) {
+      return res.status(404).json({ error: "Nie znaleziono konta operatora." });
+    }
+    if (!bcrypt.compareSync(current_password, row.password_hash)) {
+      return res.status(401).json({ error: "Aktualne hasło jest nieprawidłowe." });
+    }
+    if (bcrypt.compareSync(new_password, row.password_hash)) {
+      return res.status(400).json({ error: "Nowe hasło musi różnić się od obecnego." });
+    }
+    const nextHash = bcrypt.hashSync(new_password, 12);
+    await db.prepare("UPDATE operators SET password_hash = ? WHERE id = ?").run(nextHash, req.operator.id);
+    await db.prepare("DELETE FROM operator_sessions WHERE operator_id = ? AND token <> ?").run(
+      req.operator.id,
+      String(req.cookies[COOKIE_OPERATOR] || "")
+    );
+    res.json({ ok: true });
+  })
+);
 
-app.patch("/api/op/me/payout", requireOperator, (req, res) => {
-  if (req.operator.role === "owner") {
-    return res.status(403).json({ error: "Ten formularz dotyczy tylko pracowników." });
-  }
-  const trim = (v, max) => String(v ?? "").trim().slice(0, max);
-  const first_name = trim(req.body?.first_name, 80);
-  const last_name = trim(req.body?.last_name, 80);
-  const address_line = trim(req.body?.address_line, 200);
-  const city = trim(req.body?.city, 80);
-  const postal_code = trim(req.body?.postal_code, 20);
-  const country = trim(req.body?.country, 80);
-  const iban = trim(req.body?.iban, 42).replace(/\s+/g, " ");
-  const frequency = String(req.body?.frequency || "").trim();
-  const allowed = new Set(["weekly", "biweekly", "monthly", ""]);
-  if (!allowed.has(frequency)) {
-    return res.status(400).json({ error: "Częstotliwość wypłaty: weekly, biweekly, monthly lub pusto." });
-  }
-  db.prepare(
-    `UPDATE operators SET
+app.patch(
+  "/api/op/me/payout",
+  requireOperator,
+  asyncRoute(async (req, res) => {
+    if (req.operator.role === "owner") {
+      return res.status(403).json({ error: "Ten formularz dotyczy tylko pracowników." });
+    }
+    const trim = (v, max) => String(v ?? "").trim().slice(0, max);
+    const first_name = trim(req.body?.first_name, 80);
+    const last_name = trim(req.body?.last_name, 80);
+    const address_line = trim(req.body?.address_line, 200);
+    const city = trim(req.body?.city, 80);
+    const postal_code = trim(req.body?.postal_code, 20);
+    const country = trim(req.body?.country, 80);
+    const iban = trim(req.body?.iban, 42).replace(/\s+/g, " ");
+    const frequency = String(req.body?.frequency || "").trim();
+    const allowed = new Set(["weekly", "biweekly", "monthly", ""]);
+    if (!allowed.has(frequency)) {
+      return res.status(400).json({ error: "Częstotliwość wypłaty: weekly, biweekly, monthly lub pusto." });
+    }
+    await db
+      .prepare(
+        `UPDATE operators SET
       payout_first_name = ?, payout_last_name = ?, payout_address_line = ?, payout_city = ?,
       payout_postal_code = ?, payout_country = ?, payout_iban = ?, payout_frequency = ?
      WHERE id = ?`
-  ).run(first_name, last_name, address_line, city, postal_code, country, iban, frequency || null, req.operator.id);
-  res.json({ ok: true });
-});
+      )
+      .run(first_name, last_name, address_line, city, postal_code, country, iban, frequency || null, req.operator.id);
+    res.json({ ok: true });
+  })
+);
 
 app.get("/api/op/console/meta", requireOperator, requireOwner, (_req, res) => {
   res.json({
@@ -903,63 +985,89 @@ function requireOwner(req, res, next) {
   next();
 }
 
-app.get("/api/op/staff", requireOperator, requireOwner, (_req, res) => {
-  const rows = db
-    .prepare(
-      `SELECT id, email, display_name, role, datetime(created_at) AS created_at, disabled_at,
+app.get(
+  "/api/op/staff",
+  requireOperator,
+  requireOwner,
+  asyncRoute(async (_req, res) => {
+    const rows = await db
+      .prepare(
+        `SELECT id, email, display_name, role, datetime(created_at) AS created_at, disabled_at,
         COALESCE(kyc_status, 'unverified') AS kyc_status
        FROM operators ORDER BY datetime(created_at)`
-    )
-    .all();
-  res.json({ operators: rows });
-});
+      )
+      .all();
+    res.json({ operators: rows });
+  })
+);
 
-app.patch("/api/op/operators/:operatorId", requireOperator, requireOwner, (req, res) => {
-  const oid = req.params.operatorId;
-  if (oid === req.operator.id) {
-    return res.status(400).json({ error: "Nie możesz zablokować ani odblokować samego siebie." });
-  }
-  const target = db.prepare(`SELECT id, role FROM operators WHERE id = ?`).get(oid);
-  if (!target) return res.status(404).json({ error: "Nie znaleziono konta." });
-  if (target.role === "owner") {
-    return res.status(403).json({ error: "Nie można blokować konta właściciela." });
-  }
-  const dis = !!req.body?.disabled;
-  db.prepare(`UPDATE operators SET disabled_at = ? WHERE id = ?`).run(dis ? dtNowIso() : null, oid);
-  if (dis) db.prepare(`DELETE FROM operator_sessions WHERE operator_id = ?`).run(oid);
-  res.json({ ok: true, disabled: dis });
-});
+app.patch(
+  "/api/op/operators/:operatorId",
+  requireOperator,
+  requireOwner,
+  asyncRoute(async (req, res) => {
+    const oid = req.params.operatorId;
+    if (oid === req.operator.id) {
+      return res.status(400).json({ error: "Nie możesz zablokować ani odblokować samego siebie." });
+    }
+    const target = await db.prepare(`SELECT id, role FROM operators WHERE id = ?`).get(oid);
+    if (!target) return res.status(404).json({ error: "Nie znaleziono konta." });
+    if (target.role === "owner") {
+      return res.status(403).json({ error: "Nie można blokować konta właściciela." });
+    }
+    const dis = !!req.body?.disabled;
+    await db.prepare(`UPDATE operators SET disabled_at = ? WHERE id = ?`).run(dis ? dtNowIso() : null, oid);
+    if (dis) await db.prepare(`DELETE FROM operator_sessions WHERE operator_id = ?`).run(oid);
+    res.json({ ok: true, disabled: dis });
+  })
+);
 
-app.post("/api/op/operators/:operatorId/revoke-sessions", requireOperator, requireOwner, (req, res) => {
-  const oid = req.params.operatorId;
-  if (oid === req.operator.id) {
-    return res.status(400).json({ error: "Nie możesz wylogować własnej sesji tą ścieżką — użyj „Wyloguj”." });
-  }
-  if (!db.prepare(`SELECT id FROM operators WHERE id = ?`).get(oid)) {
-    return res.status(404).json({ error: "Nie znaleziono konta." });
-  }
-  const r = db.prepare(`DELETE FROM operator_sessions WHERE operator_id = ?`).run(oid);
-  res.json({ ok: true, deleted_sessions: r.changes });
-});
+app.post(
+  "/api/op/operators/:operatorId/revoke-sessions",
+  requireOperator,
+  requireOwner,
+  asyncRoute(async (req, res) => {
+    const oid = req.params.operatorId;
+    if (oid === req.operator.id) {
+      return res.status(400).json({ error: "Nie możesz wylogować własnej sesji tą ścieżką — użyj „Wyloguj”." });
+    }
+    if (!(await db.prepare(`SELECT id FROM operators WHERE id = ?`).get(oid))) {
+      return res.status(404).json({ error: "Nie znaleziono konta." });
+    }
+    const r = await db.prepare(`DELETE FROM operator_sessions WHERE operator_id = ?`).run(oid);
+    res.json({ ok: true, deleted_sessions: r.changes });
+  })
+);
 
 function dtNowIso() {
   return new Date().toISOString();
 }
 
-app.get("/api/op/monitor", requireOperator, requireOwner, (_req, res) => {
-  sweepAssignments(db);
-  res.json(getOperatorMonitorSnapshot(db));
-});
+app.get(
+  "/api/op/monitor",
+  requireOperator,
+  requireOwner,
+  asyncRoute(async (_req, res) => {
+    await sweepAssignments(db);
+    res.json(await getOperatorMonitorSnapshot(db));
+  })
+);
 
-app.get("/api/op/reports", requireOperator, requireOwner, (req, res) => {
-  const st = String(req.query.status || "open").trim().toLowerCase();
-  const where =
-    st === "resolved" ? `r.status = 'resolved'`
-    : st === "all" ? `1=1`
-    : `r.status = 'open'`;
-  const rows = db
-    .prepare(
-      `SELECT r.id, r.message_id, r.thread_id, r.reporter_operator_id, r.reason, r.status,
+app.get(
+  "/api/op/reports",
+  requireOperator,
+  requireOwner,
+  asyncRoute(async (req, res) => {
+    const st = String(req.query.status || "open").trim().toLowerCase();
+    const where =
+      st === "resolved"
+        ? `r.status = 'resolved'`
+        : st === "all"
+          ? `1=1`
+          : `r.status = 'open'`;
+    const rows = await db
+      .prepare(
+        `SELECT r.id, r.message_id, r.thread_id, r.reporter_operator_id, r.reason, r.status,
               r.owner_note, datetime(r.created_at) AS created_at, datetime(r.resolved_at) AS resolved_at,
               r.resolved_by_operator_id,
               rep.display_name AS reporter_display_name, rep.email AS reporter_email,
@@ -976,56 +1084,74 @@ app.get("/api/op/reports", requireOperator, requireOwner, (req, res) => {
        WHERE ${where}
        ORDER BY datetime(r.created_at) DESC
        LIMIT 200`
-    )
-    .all();
-  const openCount = db.prepare(`SELECT COUNT(*) AS c FROM message_reports WHERE status = 'open'`).get().c;
-  res.json({ reports: rows, open_count: openCount });
-});
+      )
+      .all();
+    const openCount = (await db.prepare(`SELECT COUNT(*) AS c FROM message_reports WHERE status = 'open'`).get())
+      .c;
+    res.json({ reports: rows, open_count: openCount });
+  })
+);
 
-app.patch("/api/op/reports/:reportId", requireOperator, requireOwner, (req, res) => {
-  const rid = req.params.reportId;
-  const status = String(req.body?.status || "").trim().toLowerCase();
-  const owner_note = String(req.body?.owner_note ?? "").trim().slice(0, 1000);
-  if (status !== "open" && status !== "resolved") {
-    return res.status(400).json({ error: "Pole status: open lub resolved." });
-  }
-  const row = db.prepare(`SELECT id, thread_id, message_id FROM message_reports WHERE id = ?`).get(rid);
-  if (!row) return res.status(404).json({ error: "Nie znaleziono zgłoszenia." });
-  if (status === "resolved") {
-    db.prepare(
-      `UPDATE message_reports SET status = 'resolved', owner_note = ?, resolved_at = datetime('now'),
-       resolved_by_operator_id = ? WHERE id = ?`
-    ).run(owner_note, req.operator.id, rid);
-  } else {
-    db.prepare(
-      `UPDATE message_reports SET status = 'open', resolved_at = NULL, resolved_by_operator_id = NULL
-       WHERE id = ?`
-    ).run(rid);
-    if (owner_note) {
-      db.prepare(`UPDATE message_reports SET owner_note = ? WHERE id = ?`).run(owner_note, rid);
+app.patch(
+  "/api/op/reports/:reportId",
+  requireOperator,
+  requireOwner,
+  asyncRoute(async (req, res) => {
+    const rid = req.params.reportId;
+    const status = String(req.body?.status || "").trim().toLowerCase();
+    const owner_note = String(req.body?.owner_note ?? "").trim().slice(0, 1000);
+    if (status !== "open" && status !== "resolved") {
+      return res.status(400).json({ error: "Pole status: open lub resolved." });
     }
-  }
-  const action = status === "resolved" ? "message_report_resolve" : "message_report_reopen";
-  db.prepare(
-    `INSERT INTO operator_audit (id, operator_id, action, thread_id, detail)
+    const row = await db.prepare(`SELECT id, thread_id, message_id FROM message_reports WHERE id = ?`).get(rid);
+    if (!row) return res.status(404).json({ error: "Nie znaleziono zgłoszenia." });
+    if (status === "resolved") {
+      await db
+        .prepare(
+          `UPDATE message_reports SET status = 'resolved', owner_note = ?, resolved_at = datetime('now'),
+       resolved_by_operator_id = ? WHERE id = ?`
+        )
+        .run(owner_note, req.operator.id, rid);
+    } else {
+      await db
+        .prepare(
+          `UPDATE message_reports SET status = 'open', resolved_at = NULL, resolved_by_operator_id = NULL
+       WHERE id = ?`
+        )
+        .run(rid);
+      if (owner_note) {
+        await db.prepare(`UPDATE message_reports SET owner_note = ? WHERE id = ?`).run(owner_note, rid);
+      }
+    }
+    const action = status === "resolved" ? "message_report_resolve" : "message_report_reopen";
+    await db
+      .prepare(
+        `INSERT INTO operator_audit (id, operator_id, action, thread_id, detail)
      VALUES (?, ?, ?, ?, ?)`
-  ).run(
-    uuidv4(),
-    req.operator.id,
-    action,
-    row.thread_id,
-    JSON.stringify({ report_id: rid, message_id: row.message_id })
-  );
-  const openCount = db.prepare(`SELECT COUNT(*) AS c FROM message_reports WHERE status = 'open'`).get().c;
-  res.json({ ok: true, open_count: openCount });
-});
+      )
+      .run(
+        uuidv4(),
+        req.operator.id,
+        action,
+        row.thread_id,
+        JSON.stringify({ report_id: rid, message_id: row.message_id })
+      );
+    const openCount = (await db.prepare(`SELECT COUNT(*) AS c FROM message_reports WHERE status = 'open'`).get())
+      .c;
+    res.json({ ok: true, open_count: openCount });
+  })
+);
 
-app.get("/api/op/owner/team-insights", requireOperator, requireOwner, (req, res) => {
-  const raw = parseInt(String(req.query.feed_limit || "120"), 10);
-  const feedLimit = Number.isFinite(raw) ? Math.min(400, Math.max(40, raw)) : 120;
-  const feed = db
-    .prepare(
-      `SELECT m.id, m.body, datetime(m.created_at) AS created_at,
+app.get(
+  "/api/op/owner/team-insights",
+  requireOperator,
+  requireOwner,
+  asyncRoute(async (req, res) => {
+    const raw = parseInt(String(req.query.feed_limit || "120"), 10);
+    const feedLimit = Number.isFinite(raw) ? Math.min(400, Math.max(40, raw)) : 120;
+    const feed = await db
+      .prepare(
+        `SELECT m.id, m.body, datetime(m.created_at) AS created_at,
               m.thread_id, m.operator_id,
               o.display_name AS operator_display_name, o.email AS operator_email,
               c.name AS character_name, u.display_name AS client_display_name
@@ -1037,11 +1163,11 @@ app.get("/api/op/owner/team-insights", requireOperator, requireOwner, (req, res)
        WHERE m.sender = 'staff' AND COALESCE(o.role, 'staff') = 'staff'
        ORDER BY datetime(m.created_at) DESC
        LIMIT ?`
-    )
-    .all(feedLimit);
-  const ranking = db
-    .prepare(
-      `SELECT o.id AS operator_id, o.display_name, o.email,
+      )
+      .all(feedLimit);
+    const ranking = await db
+      .prepare(
+        `SELECT o.id AS operator_id, o.display_name, o.email,
               COUNT(*) AS staff_messages_7d
        FROM messages m
        JOIN operators o ON o.id = m.operator_id
@@ -1050,48 +1176,56 @@ app.get("/api/op/owner/team-insights", requireOperator, requireOwner, (req, res)
          AND datetime(m.created_at) >= datetime('now', '-7 days')
        GROUP BY o.id
        ORDER BY staff_messages_7d DESC, o.display_name COLLATE NOCASE`
-    )
-    .all();
-  res.json({
-    feed,
-    ranking,
-    period: {
-      label: "Ranking: ostatnie 7 dni od zegara serwera (SQLite UTC). Czasy w panelu: Europe/Warsaw.",
-      days: 7,
-    },
-    bonus: {
-      top1_pln: Number(process.env.STAFF_BONUS_TOP1_WEEK_PLN || 0) || 0,
-      top2_pln: Number(process.env.STAFF_BONUS_TOP2_WEEK_PLN || 0) || 0,
-      top3_pln: Number(process.env.STAFF_BONUS_TOP3_WEEK_PLN || 0) || 0,
-    },
-    spotlight_message: String(process.env.STAFF_SPOTLIGHT_WEEK_MESSAGE || "").trim(),
-    recommendation_hint: String(process.env.STAFF_RECOMMENDATION_HINT || "").trim(),
-  });
-});
+      )
+      .all();
+    res.json({
+      feed,
+      ranking,
+      period: {
+        label: "Ranking: ostatnie 7 dni od zegara serwera (SQLite UTC). Czasy w panelu: Europe/Warsaw.",
+        days: 7,
+      },
+      bonus: {
+        top1_pln: Number(process.env.STAFF_BONUS_TOP1_WEEK_PLN || 0) || 0,
+        top2_pln: Number(process.env.STAFF_BONUS_TOP2_WEEK_PLN || 0) || 0,
+        top3_pln: Number(process.env.STAFF_BONUS_TOP3_WEEK_PLN || 0) || 0,
+      },
+      spotlight_message: String(process.env.STAFF_SPOTLIGHT_WEEK_MESSAGE || "").trim(),
+      recommendation_hint: String(process.env.STAFF_RECOMMENDATION_HINT || "").trim(),
+    });
+  })
+);
 
-app.post("/api/op/staff", requireOperator, requireOwner, (req, res) => {
-  const email = String(req.body?.email || "").trim().toLowerCase();
-  const password = String(req.body?.password || "");
-  const display_name = String(req.body?.display_name || "").trim();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return res.status(400).json({ error: "Niepoprawny e-mail." });
-  }
-  if (password.length < 8) return res.status(400).json({ error: "Hasło: min. 8 znaków." });
-  if (display_name.length < 2 || display_name.length > 60) {
-    return res.status(400).json({ error: "Imię: 2–60 znaków." });
-  }
-  if (db.prepare("SELECT id FROM operators WHERE email = ?").get(email)) {
-    return res.status(409).json({ error: "Ten e-mail jest już w systemie." });
-  }
-  const id = uuidv4();
-  const hash = bcrypt.hashSync(password, 12);
-  db.prepare(
-    `INSERT INTO operators (id, email, password_hash, display_name, role) VALUES (?, ?, ?, ?, 'staff')`
-  ).run(id, email, hash, display_name);
-  res.status(201).json({
-    operator: { id, email, display_name, role: "staff" },
-  });
-});
+app.post(
+  "/api/op/staff",
+  requireOperator,
+  requireOwner,
+  asyncRoute(async (req, res) => {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const password = String(req.body?.password || "");
+    const display_name = String(req.body?.display_name || "").trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: "Niepoprawny e-mail." });
+    }
+    if (password.length < 8) return res.status(400).json({ error: "Hasło: min. 8 znaków." });
+    if (display_name.length < 2 || display_name.length > 60) {
+      return res.status(400).json({ error: "Imię: 2–60 znaków." });
+    }
+    if (await db.prepare("SELECT id FROM operators WHERE email = ?").get(email)) {
+      return res.status(409).json({ error: "Ten e-mail jest już w systemie." });
+    }
+    const id = uuidv4();
+    const hash = bcrypt.hashSync(password, 12);
+    await db
+      .prepare(
+        `INSERT INTO operators (id, email, password_hash, display_name, role) VALUES (?, ?, ?, ?, 'staff')`
+      )
+      .run(id, email, hash, display_name);
+    res.status(201).json({
+      operator: { id, email, display_name, role: "staff" },
+    });
+  })
+);
 
 function sanitizeFactsForOperator(facts, operator) {
   if (operator.role === "owner") return facts;
@@ -1102,13 +1236,12 @@ function sanitizeFactsForOperator(facts, operator) {
   });
 }
 
-app.get("/api/op/inbox", requireOperator, (req, res) => {
-  sweepAssignments(db);
+app.get("/api/op/inbox", requireOperator, asyncRoute(async (req, res) => {
+  await sweepAssignments(db);
   const bucketParam = String(req.query.bucket || "").trim().toLowerCase();
   const bucket = bucketParam || (req.operator.role === "owner" ? "all" : "mine");
   const wh = inboxBucketClause(req.operator, bucket);
-  const rows = db
-    .prepare(
+  const rows = await db.prepare(
       `SELECT t.id AS thread_id,
               t.assigned_operator_id,
               u.email AS user_email,
@@ -1137,11 +1270,10 @@ app.get("/api/op/inbox", requireOperator, (req, res) => {
     }
   }
   res.json({ threads: rows, bucket });
-});
+}));
 
-app.get("/api/op/clients", requireOperator, requireOwner, (_req, res) => {
-  const rows = db
-    .prepare(
+app.get("/api/op/clients", requireOperator, requireOwner, asyncRoute(async (_req, res) => {
+  const rows = await db.prepare(
       `SELECT u.id, u.email, u.username, u.first_name, u.display_name, u.birth_date, u.city, u.blocked_at,
               u.email_verified_at,
               u.email_verification_token,
@@ -1153,13 +1285,12 @@ app.get("/api/op/clients", requireOperator, requireOwner, (_req, res) => {
     )
     .all();
   res.json({ clients: rows });
-});
+}));
 
-app.post("/api/op/clients/:clientId/verification-link", requireOperator, requireOwner, (req, res) => {
+app.post("/api/op/clients/:clientId/verification-link", requireOperator, requireOwner, asyncRoute(async (req, res) => {
   const clientId = String(req.params.clientId || "").trim();
   const regenerate = !!req.body?.regenerate;
-  const row = db
-    .prepare(
+  const row = await db.prepare(
       `SELECT id, email, email_verified_at, email_verification_token, email_verification_expires_at
        FROM users WHERE id = ?`
     )
@@ -1173,7 +1304,7 @@ app.post("/api/op/clients/:clientId/verification-link", requireOperator, require
   if (!token || regenerate) {
     token = tokenBytes();
     expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
-    db.prepare(
+    await db.prepare(
       `UPDATE users SET email_verification_token = ?, email_verification_expires_at = ? WHERE id = ?`
     ).run(token, expiresAt, clientId);
   }
@@ -1184,20 +1315,20 @@ app.post("/api/op/clients/:clientId/verification-link", requireOperator, require
     verify_url: verifyUrl,
     expires_at: expiresAt || null,
   });
-});
+}));
 
-app.patch("/api/op/clients/:clientId/block", requireOperator, requireOwner, (req, res) => {
+app.patch("/api/op/clients/:clientId/block", requireOperator, requireOwner, asyncRoute(async (req, res) => {
   const clientId = String(req.params.clientId || "").trim();
   const blocked = !!req.body?.blocked;
-  const row = db.prepare("SELECT id, email, blocked_at FROM users WHERE id = ?").get(clientId);
+  const row = await db.prepare("SELECT id, email, blocked_at FROM users WHERE id = ?").get(clientId);
   if (!row) return res.status(404).json({ error: "Nie znaleziono klienta." });
   const value = blocked ? dtNowIso() : null;
-  db.prepare("UPDATE users SET blocked_at = ? WHERE id = ?").run(value, clientId);
+  await db.prepare("UPDATE users SET blocked_at = ? WHERE id = ?").run(value, clientId);
   if (blocked) {
-    db.prepare("DELETE FROM customer_sessions WHERE user_id = ?").run(clientId);
+    await db.prepare("DELETE FROM customer_sessions WHERE user_id = ?").run(clientId);
   }
   res.json({ ok: true, client_id: clientId, blocked_at: value, email: row.email });
-});
+}));
 
 app.post("/api/op/clients/:clientId/email", requireOperator, requireOwner, async (req, res) => {
   if (!isMailConfigured()) {
@@ -1214,7 +1345,7 @@ app.post("/api/op/clients/:clientId/email", requireOperator, requireOwner, async
   if (text.length < 1 || text.length > 12000) {
     return res.status(400).json({ error: "Treść wiadomości: 1–12 000 znaków." });
   }
-  const row = db.prepare("SELECT id, email FROM users WHERE id = ?").get(clientId);
+  const row = await db.prepare("SELECT id, email FROM users WHERE id = ?").get(clientId);
   if (!row) return res.status(404).json({ error: "Nie znaleziono klienta." });
   try {
     const mailInfo = await sendOperatorEmailToUser({ to: row.email, subject, text });
@@ -1235,35 +1366,34 @@ app.get("/api/op/facts-schema", requireOperator, (_req, res) => {
   res.json(flattenSchemaForApi());
 });
 
-app.get("/api/op/stats", requireOperator, (req, res) => {
+app.get("/api/op/stats", requireOperator, asyncRoute(async (req, res) => {
   if (req.operator.role === "owner") {
     return res.json({ role: "owner", stats: null });
   }
-  sweepAssignments(db);
-  res.json({ role: "staff", stats: getOperatorStats(db, req.operator.id) });
-});
+  await sweepAssignments(db);
+  res.json({ role: "staff", stats: await getOperatorStats(db, req.operator.id) });
+}));
 
-app.get("/api/op/staff-dashboard", requireOperator, (req, res) => {
+app.get("/api/op/staff-dashboard", requireOperator, asyncRoute(async (req, res) => {
   if (req.operator.role === "owner") {
     return res.status(403).json({ error: "Ten widok jest tylko dla pracowników." });
   }
-  sweepAssignments(db);
-  res.json({ dashboard: getStaffDashboard(db, req.operator.id) });
-});
+  await sweepAssignments(db);
+  res.json({ dashboard: await getStaffDashboard(db, req.operator.id) });
+}));
 
-app.get("/api/op/me/payout-ledger", requireOperator, (req, res) => {
+app.get("/api/op/me/payout-ledger", requireOperator, asyncRoute(async (req, res) => {
   if (req.operator.role === "owner") {
     return res.json({ entries: [] });
   }
-  const rows = db
-    .prepare(
+  const rows = await db.prepare(
       `SELECT id, amount_pln, label, period_label, datetime(created_at) AS created_at
        FROM operator_payout_ledger WHERE operator_id = ?
        ORDER BY datetime(created_at) DESC LIMIT 80`
     )
     .all(req.operator.id);
   res.json({ entries: rows });
-});
+}));
 
 app.get("/api/op/me/contacts", requireOperator, (req, res) => {
   res.json({
@@ -1273,9 +1403,8 @@ app.get("/api/op/me/contacts", requireOperator, (req, res) => {
   });
 });
 
-app.get("/api/op/audit/:auditId", requireOperator, requireOwner, (req, res) => {
-  const row = db
-    .prepare(
+app.get("/api/op/audit/:auditId", requireOperator, requireOwner, asyncRoute(async (req, res) => {
+  const row = await db.prepare(
       `SELECT a.id, a.operator_id, a.action, a.thread_id, a.detail, datetime(a.created_at) AS created_at,
               o.email AS operator_email
        FROM operator_audit a
@@ -1285,45 +1414,45 @@ app.get("/api/op/audit/:auditId", requireOperator, requireOwner, (req, res) => {
     .get(req.params.auditId);
   if (!row) return res.status(404).json({ error: "Nie znaleziono wpisu dziennika." });
   res.json({ audit: row });
-});
+}));
 
-app.get("/api/op/queue", requireOperator, (req, res) => {
+app.get("/api/op/queue", requireOperator, asyncRoute(async (req, res) => {
   if (req.operator.role === "owner") {
     return res.status(403).json({ error: "Pula anonimowa jest tylko dla pracowników." });
   }
-  sweepAssignments(db);
-  res.json({ slots: getStaffQueueSlots(db, req.operator.id) });
-});
+  await sweepAssignments(db);
+  res.json({ slots: await getStaffQueueSlots(db, req.operator.id) });
+}));
 
-app.post("/api/op/inbox/:threadId/claim", requireOperator, (req, res) => {
+app.post("/api/op/inbox/:threadId/claim", requireOperator, asyncRoute(async (req, res) => {
   const threadId = req.params.threadId;
-  const r = tryClaimThread(db, req.operator, threadId);
+  const r = await tryClaimThread(db, req.operator, threadId);
   if (!r.ok) return res.status(403).json({ error: r.error });
-  res.json({ ok: true, assignment: getAssignmentPayload(db, threadId, req.operator) });
-});
+  res.json({ ok: true, assignment: await getAssignmentPayload(db, threadId, req.operator) });
+}));
 
-app.post("/api/op/inbox/:threadId/claim-stopped", requireOperator, (req, res) => {
+app.post("/api/op/inbox/:threadId/claim-stopped", requireOperator, asyncRoute(async (req, res) => {
   const threadId = req.params.threadId;
-  const r = tryClaimStoppedThread(db, req.operator, threadId);
+  const r = await tryClaimStoppedThread(db, req.operator, threadId);
   if (!r.ok) return res.status(403).json({ error: r.error });
-  res.json({ ok: true, assignment: getAssignmentPayload(db, threadId, req.operator) });
-});
+  res.json({ ok: true, assignment: await getAssignmentPayload(db, threadId, req.operator) });
+}));
 
-app.post("/api/op/inbox/:threadId/touch", requireOperator, (req, res) => {
+app.post("/api/op/inbox/:threadId/touch", requireOperator, asyncRoute(async (req, res) => {
   const threadId = req.params.threadId;
-  if (!threadVisibleToOperator(db, threadId, req.operator.id, req.operator.role)) {
+  if (!(await threadVisibleToOperator(db, threadId, req.operator.id, req.operator.role))) {
     return res.status(403).json({ error: "Brak dostępu do tego wątku." });
   }
-  bumpStaffActivity(db, threadId, req.operator.id);
+  await bumpStaffActivity(db, threadId, req.operator.id);
   res.json({ ok: true });
-});
+}));
 
-app.get("/api/op/inbox/:threadId/messages", requireOperator, (req, res) => {
+app.get("/api/op/inbox/:threadId/messages", requireOperator, asyncRoute(async (req, res) => {
   const threadId = req.params.threadId;
-  if (!threadVisibleToOperator(db, threadId, req.operator.id, req.operator.role)) {
+  if (!(await threadVisibleToOperator(db, threadId, req.operator.id, req.operator.role))) {
     return res.status(403).json({ error: "Nie widzisz tego wątku na liście." });
   }
-  bumpStaffActivity(db, threadId, req.operator.id);
+  await bumpStaffActivity(db, threadId, req.operator.id);
   const rawLimit = parseInt(String(req.query.limit || "15"), 10);
   let limitTotal = Number.isFinite(rawLimit) ? rawLimit : 15;
   if (limitTotal < 15) limitTotal = 15;
@@ -1333,8 +1462,7 @@ app.get("/api/op/inbox/:threadId/messages", requireOperator, (req, res) => {
       error: "Parametr limit: dozwolone 15, potem 25, 35, 45… (co 10), maks. 500.",
     });
   }
-  const raw = db
-    .prepare(
+  const raw = await db.prepare(
       `SELECT t.id, u.id AS user_id, u.email AS user_email, u.display_name AS user_display_name,
               u.username AS client_username, u.first_name AS client_first_name,
               u.birth_date AS client_birth_date, u.city AS client_city, u.avatar_url AS client_avatar_url, u.blocked_at AS client_blocked_at,
@@ -1387,8 +1515,7 @@ app.get("/api/op/inbox/:threadId/messages", requireOperator, (req, res) => {
     delete meta.message_count;
     delete meta.user_email;
   }
-  const factsRaw = db
-    .prepare(
+  const factsRaw = await db.prepare(
       `SELECT tf.id, tf.scope, tf.category, tf.field, tf.slot, tf.value, tf.updated_at,
               tf.created_operator_id, tf.updated_operator_id,
               oc.email AS created_operator_email
@@ -1399,12 +1526,10 @@ app.get("/api/op/inbox/:threadId/messages", requireOperator, (req, res) => {
     )
     .all(threadId);
   const facts = sanitizeFactsForOperator(factsRaw, req.operator);
-  const totalRow = db
-    .prepare(`SELECT COUNT(*) AS c FROM messages WHERE thread_id = ?`)
+  const totalRow = await db.prepare(`SELECT COUNT(*) AS c FROM messages WHERE thread_id = ?`)
     .get(threadId);
   const messageTotal = totalRow?.c ?? 0;
-  const msgs = db
-    .prepare(
+  const msgs = await db.prepare(
       `SELECT m.id, m.sender, m.body, m.created_at, m.operator_id,
               op.display_name AS staff_join_display_name, op.email AS staff_join_email
        FROM messages m
@@ -1414,8 +1539,7 @@ app.get("/api/op/inbox/:threadId/messages", requireOperator, (req, res) => {
     .all(threadId, limitTotal);
   const isOwner = req.operator.role === "owner";
   const opId = req.operator.id;
-  const openRepRows = db
-    .prepare(`SELECT message_id FROM message_reports WHERE thread_id = ? AND status = 'open'`)
+  const openRepRows = await db.prepare(`SELECT message_id FROM message_reports WHERE thread_id = ? AND status = 'open'`)
     .all(threadId);
   const openReportMsgIds = new Set(openRepRows.map((r) => r.message_id));
   const mapped = msgs.map((m) => {
@@ -1448,11 +1572,11 @@ app.get("/api/op/inbox/:threadId/messages", requireOperator, (req, res) => {
     message_total: messageTotal,
     messages_limit: limitTotal,
     has_more_messages: messageTotal > limitTotal,
-    assignment: getAssignmentPayload(db, threadId, req.operator),
+    assignment: await getAssignmentPayload(db, threadId, req.operator),
   });
-});
+}));
 
-app.post("/api/op/inbox/:threadId/messages/:messageId/report", requireOperator, (req, res) => {
+app.post("/api/op/inbox/:threadId/messages/:messageId/report", requireOperator, asyncRoute(async (req, res) => {
   if (req.operator.role === "owner") {
     return res.status(403).json({
       error: "Zgłoszenia zapisuje pracownik z czatu — Ty widzisz je w zakładce „Zgłoszenia”.",
@@ -1460,16 +1584,15 @@ app.post("/api/op/inbox/:threadId/messages/:messageId/report", requireOperator, 
   }
   const threadId = req.params.threadId;
   const messageId = req.params.messageId;
-  if (!threadVisibleToOperator(db, threadId, req.operator.id, req.operator.role)) {
+  if (!(await threadVisibleToOperator(db, threadId, req.operator.id, req.operator.role))) {
     return res.status(403).json({ error: "Brak dostępu do tego wątku." });
   }
-  const msg = db
-    .prepare(`SELECT id, thread_id, sender FROM messages WHERE id = ?`)
+  const msg = await db.prepare(`SELECT id, thread_id, sender FROM messages WHERE id = ?`)
     .get(messageId);
   if (!msg || msg.thread_id !== threadId) {
     return res.status(404).json({ error: "Nie znaleziono wiadomości." });
   }
-  const ex = db.prepare(`SELECT id FROM message_reports WHERE message_id = ? AND status = 'open'`).get(
+  const ex = await db.prepare(`SELECT id FROM message_reports WHERE message_id = ? AND status = 'open'`).get(
     messageId
   );
   if (ex) {
@@ -1477,11 +1600,11 @@ app.post("/api/op/inbox/:threadId/messages/:messageId/report", requireOperator, 
   }
   const reason = String(req.body?.reason ?? "").trim().slice(0, 500);
   const id = uuidv4();
-  db.prepare(
+  await db.prepare(
     `INSERT INTO message_reports (id, message_id, thread_id, reporter_operator_id, reason, status)
      VALUES (?, ?, ?, ?, ?, 'open')`
   ).run(id, messageId, threadId, req.operator.id, reason);
-  db.prepare(
+  await db.prepare(
     `INSERT INTO operator_audit (id, operator_id, action, thread_id, detail)
      VALUES (?, ?, 'message_report', ?, ?)`
   ).run(
@@ -1496,14 +1619,14 @@ app.post("/api/op/inbox/:threadId/messages/:messageId/report", requireOperator, 
     })
   );
   res.status(201).json({ ok: true, report_id: id });
-});
+}));
 
-app.patch("/api/op/inbox/:threadId/facts", requireOperator, (req, res) => {
+app.patch("/api/op/inbox/:threadId/facts", requireOperator, asyncRoute(async (req, res) => {
   const threadId = req.params.threadId;
-  if (!threadVisibleToOperator(db, threadId, req.operator.id, req.operator.role)) {
+  if (!(await threadVisibleToOperator(db, threadId, req.operator.id, req.operator.role))) {
     return res.status(403).json({ error: "Brak dostępu do tego wątku." });
   }
-  const perm = assertStaffCanMutate(db, req.operator, threadId);
+  const perm = await assertStaffCanMutate(db, req.operator, threadId);
   if (!perm.ok) return res.status(perm.code).json({ error: perm.error });
   const scope = String(req.body?.scope || "");
   const category = String(req.body?.category || "");
@@ -1516,15 +1639,14 @@ app.patch("/api/op/inbox/:threadId/facts", requireOperator, (req, res) => {
   if (!isValidFactKey(scope, category, field)) {
     return res.status(400).json({ error: "Nieprawidłowa kategoria lub pole." });
   }
-  const th = db.prepare("SELECT id FROM threads WHERE id = ?").get(threadId);
+  const th = await db.prepare("SELECT id FROM threads WHERE id = ?").get(threadId);
   if (!th) return res.status(404).json({ error: "Nie znaleziono wątku." });
   if (value.length > FACT_VALUE_MAX_LEN) {
     return res.status(400).json({ error: `Wartość: maks. ${FACT_VALUE_MAX_LEN} znaków.` });
   }
 
-  const loadFactOut = (id) =>
-    db
-      .prepare(
+  const loadFactOut = async (id) =>
+    await db.prepare(
         `SELECT tf.id, tf.scope, tf.category, tf.field, tf.slot, tf.value, tf.updated_at,
               tf.created_operator_id, tf.updated_operator_id,
               oc.email AS created_operator_email
@@ -1538,8 +1660,7 @@ app.patch("/api/op/inbox/:threadId/facts", requireOperator, (req, res) => {
     if (!factId) {
       return res.status(400).json({ error: "Usuń wpis przyciskiem × przy konkretnej notatce." });
     }
-    const delRow = db
-      .prepare(
+    const delRow = await db.prepare(
         `SELECT id, scope, category, field, value, created_operator_id FROM thread_facts WHERE id = ? AND thread_id = ?`
       )
       .get(factId, threadId);
@@ -1557,8 +1678,8 @@ app.patch("/api/op/inbox/:threadId/facts", requireOperator, (req, res) => {
       }
     }
     const priorVal = String(delRow.value ?? "");
-    db.prepare(`DELETE FROM thread_facts WHERE id = ?`).run(factId);
-    db.prepare(
+    await db.prepare(`DELETE FROM thread_facts WHERE id = ?`).run(factId);
+    await db.prepare(
       `INSERT INTO operator_audit (id, operator_id, action, thread_id, detail)
        VALUES (?, ?, 'fact_delete', ?, ?)`
     ).run(
@@ -1573,7 +1694,7 @@ app.patch("/api/op/inbox/:threadId/facts", requireOperator, (req, res) => {
         prior_value: priorVal.slice(0, 8000),
       })
     );
-    bumpStaffActivity(db, threadId, req.operator.id);
+    await bumpStaffActivity(db, threadId, req.operator.id);
     return res.json({ ok: true, deleted: true });
   }
 
@@ -1583,18 +1704,17 @@ app.patch("/api/op/inbox/:threadId/facts", requireOperator, (req, res) => {
     });
   }
 
-  const slotRow = db
-    .prepare(
+  const slotRow = await db.prepare(
       `SELECT COALESCE(MAX(slot), -1) + 1 AS s FROM thread_facts WHERE thread_id = ? AND scope = ? AND category = ? AND field = ?`
     )
     .get(threadId, scope, category, field);
   const slot = Number(slotRow?.s ?? 0);
   const newId = uuidv4();
-  db.prepare(
+  await db.prepare(
     `INSERT INTO thread_facts (id, thread_id, scope, category, field, slot, value, updated_at, created_operator_id, updated_operator_id)
      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?)`
   ).run(newId, threadId, scope, category, field, slot, value, req.operator.id, req.operator.id);
-  db.prepare(
+  await db.prepare(
     `INSERT INTO operator_audit (id, operator_id, action, thread_id, detail)
      VALUES (?, ?, 'fact_save', ?, ?)`
   ).run(
@@ -1610,33 +1730,33 @@ app.patch("/api/op/inbox/:threadId/facts", requireOperator, (req, res) => {
       value_preview: value.slice(0, 800),
     })
   );
-  bumpStaffActivity(db, threadId, req.operator.id);
-  const outRow = loadFactOut(newId);
+  await bumpStaffActivity(db, threadId, req.operator.id);
+  const outRow = await loadFactOut(newId);
   const factOut = sanitizeFactsForOperator(outRow ? [outRow] : [], req.operator)[0] || outRow;
   res.json({ ok: true, fact: factOut });
-});
+}));
 
-app.patch("/api/op/inbox/:threadId/notes", requireOperator, (req, res) => {
+app.patch("/api/op/inbox/:threadId/notes", requireOperator, asyncRoute(async (req, res) => {
   const threadId = req.params.threadId;
-  if (!threadVisibleToOperator(db, threadId, req.operator.id, req.operator.role)) {
+  if (!(await threadVisibleToOperator(db, threadId, req.operator.id, req.operator.role))) {
     return res.status(403).json({ error: "Brak dostępu do tego wątku." });
   }
-  const perm = assertStaffCanMutate(db, req.operator, threadId);
+  const perm = await assertStaffCanMutate(db, req.operator, threadId);
   if (!perm.ok) return res.status(perm.code).json({ error: perm.error });
   const notes = String(req.body?.notes ?? "");
   if (notes.length > 32000) {
     return res.status(400).json({ error: "Notatki: maks. 32 000 znaków." });
   }
-  const info = db.prepare("SELECT id FROM threads WHERE id = ?").get(threadId);
+  const info = await db.prepare("SELECT id FROM threads WHERE id = ?").get(threadId);
   if (!info) return res.status(404).json({ error: "Nie znaleziono wątku." });
-  db.prepare("UPDATE threads SET internal_notes = ? WHERE id = ?").run(notes, threadId);
-  bumpStaffActivity(db, threadId, req.operator.id);
+  await db.prepare("UPDATE threads SET internal_notes = ? WHERE id = ?").run(notes, threadId);
+  await bumpStaffActivity(db, threadId, req.operator.id);
   res.json({ ok: true, internal_notes: notes });
-});
+}));
 
-app.post("/api/op/inbox/:threadId/reply", requireOperator, (req, res) => {
+app.post("/api/op/inbox/:threadId/reply", requireOperator, asyncRoute(async (req, res) => {
   const threadId = req.params.threadId;
-  if (!threadVisibleToOperator(db, threadId, req.operator.id, req.operator.role)) {
+  if (!(await threadVisibleToOperator(db, threadId, req.operator.id, req.operator.role))) {
     return res.status(403).json({ error: "Brak dostępu do tego wątku." });
   }
   const body = String(req.body?.body || "").trim();
@@ -1657,18 +1777,17 @@ app.post("/api/op/inbox/:threadId/reply", requireOperator, (req, res) => {
       });
     }
   }
-  const th = db.prepare("SELECT id FROM threads WHERE id = ?").get(threadId);
+  const th = await db.prepare("SELECT id FROM threads WHERE id = ?").get(threadId);
   if (!th) return res.status(404).json({ error: "Nie znaleziono wątku." });
-  const perm = ensureReplyPermission(db, req.operator, threadId);
+  const perm = await ensureReplyPermission(db, req.operator, threadId);
   if (!perm.ok) return res.status(perm.code).json({ error: perm.error });
   const msgId = uuidv4();
-  db.prepare(
+  await db.prepare(
     "INSERT INTO messages (id, thread_id, sender, body, operator_id) VALUES (?, ?, 'staff', ?, ?)"
   ).run(msgId, threadId, body, req.operator.id);
-  bumpStaffActivity(db, threadId, req.operator.id);
-  onStaffReply(db, threadId, req.operator);
-  const msg = db
-    .prepare("SELECT id, sender, body, created_at, operator_id FROM messages WHERE id = ?")
+  await bumpStaffActivity(db, threadId, req.operator.id);
+  await onStaffReply(db, threadId, req.operator);
+  const msg = await db.prepare("SELECT id, sender, body, created_at, operator_id FROM messages WHERE id = ?")
     .get(msgId);
   const isOwner = req.operator.role === "owner";
   const isOwnStaffReply = msg.sender === "staff" && msg.operator_id === req.operator.id;
@@ -1683,14 +1802,12 @@ app.post("/api/op/inbox/:threadId/reply", requireOperator, (req, res) => {
   res.json({
     ok: true,
     message: msgOut,
-    assignment: getAssignmentPayload(db, threadId, req.operator),
+    assignment: await getAssignmentPayload(db, threadId, req.operator),
   });
-});
+}));
 
 app.use("/operator", express.static(path.join(__dirname, "public", "operator")));
 app.use(express.static(path.join(__dirname, "public")));
-
-ensureBootstrapOperator();
 
 app.listen(PORT, () => {
   console.log(`Portal klienta:  http://localhost:${PORT}/`);

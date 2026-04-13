@@ -20,8 +20,8 @@ const REMINDER_AFTER_STAFF_HOURS = Math.min(
   Math.max(1, Number(process.env.STAFF_REMINDER_AFTER_STAFF_HOURS || 48))
 );
 
-function countAssignedThreadsForOperator(db, operatorId) {
-  const r = db
+async function countAssignedThreadsForOperator(db, operatorId) {
+  const r = await db
     .prepare(`SELECT COUNT(*) AS c FROM threads WHERE assigned_operator_id = ?`)
     .get(operatorId);
   return Number(r?.c || 0);
@@ -54,8 +54,8 @@ function responseDueFromUserMessageIso(userMsgIso) {
   return new Date(base.getTime() + REPLY_DEADLINE_MIN * 60 * 1000).toISOString();
 }
 
-export function lastMessageSender(db, threadId) {
-  const r = db
+export async function lastMessageSender(db, threadId) {
+  const r = await db
     .prepare(
       `SELECT sender FROM messages WHERE thread_id = ? ORDER BY datetime(created_at) DESC LIMIT 1`
     )
@@ -63,64 +63,72 @@ export function lastMessageSender(db, threadId) {
   return r?.sender || null;
 }
 
-function lastUserMessageRow(db, threadId) {
-  return db
+async function lastUserMessageRow(db, threadId) {
+  return await db
     .prepare(
       `SELECT created_at FROM messages WHERE thread_id = ? AND sender = 'user' ORDER BY datetime(created_at) DESC LIMIT 1`
     )
     .get(threadId);
 }
 
-function lastStaffWithOperator(db, threadId) {
-  return db
+async function lastStaffWithOperator(db, threadId) {
+  return await db
     .prepare(
       `SELECT operator_id FROM messages WHERE thread_id = ? AND sender = 'staff' AND operator_id IS NOT NULL ORDER BY datetime(created_at) DESC LIMIT 1`
     )
     .get(threadId);
 }
 
-function sweepExpiredResume(db) {
-  db.prepare(
-    `UPDATE threads SET resume_operator_id = NULL, resume_until = NULL
+async function sweepExpiredResume(db) {
+  await db
+    .prepare(
+      `UPDATE threads SET resume_operator_id = NULL, resume_until = NULL
      WHERE resume_until IS NOT NULL AND datetime(resume_until) < datetime('now')`
-  ).run();
+    )
+    .run();
 }
 
 /** Zwolnienie po bezczynności (2 min przy aktywnym terminie odpowiedzi). */
-function idleKick(db, t) {
+async function idleKick(db, t) {
   const prev = t.assigned_operator_id;
-  db.prepare(
-    `UPDATE threads SET
+  await db
+    .prepare(
+      `UPDATE threads SET
        assigned_operator_id = NULL,
        response_due_at = NULL,
        last_staff_activity_at = NULL,
        reclaim_operator_id = ?,
        reclaim_until = ?
      WHERE id = ?`
-  ).run(prev, dtPlusMinutes(RECLAIM_MIN), t.id);
+    )
+    .run(prev, dtPlusMinutes(RECLAIM_MIN), t.id);
 }
 
 /** Po STAFF_REPLY_DEADLINE min od ostatniej wiadomości klienta — zwolnij wątek. */
-function deadlineMiss(db, t) {
-  db.prepare(
-    `UPDATE threads SET
+async function deadlineMiss(db, t) {
+  await db
+    .prepare(
+      `UPDATE threads SET
        assigned_operator_id = NULL,
        response_due_at = NULL,
        last_staff_activity_at = NULL,
        reclaim_operator_id = NULL,
        reclaim_until = NULL
      WHERE id = ?`
-  ).run(t.id);
+    )
+    .run(t.id);
 }
 
-export function sweepAssignments(db) {
-  sweepExpiredResume(db);
-  db.prepare(
-    `UPDATE threads SET reclaim_operator_id = NULL, reclaim_until = NULL
+export async function sweepAssignments(db) {
+  await sweepExpiredResume(db);
+  await db
+    .prepare(
+      `UPDATE threads SET reclaim_operator_id = NULL, reclaim_until = NULL
      WHERE reclaim_until IS NOT NULL AND datetime(reclaim_until) < datetime('now')`
-  ).run();
+    )
+    .run();
 
-  const rows = db
+  const rows = await db
     .prepare(
       `SELECT id, assigned_operator_id, response_due_at, last_staff_activity_at
        FROM threads
@@ -134,39 +142,39 @@ export function sweepAssignments(db) {
         new Date(t.last_staff_activity_at).getTime() + IDLE_KICK_MIN * 60 * 1000
       ).toISOString();
       if (new Date() > new Date(idleUntil)) {
-        idleKick(db, t);
+        await idleKick(db, t);
         continue;
       }
     }
     if (t.response_due_at && new Date() > new Date(t.response_due_at)) {
-      if (lastMessageSender(db, t.id) === "user") {
-        deadlineMiss(db, t);
+      if ((await lastMessageSender(db, t.id)) === "user") {
+        await deadlineMiss(db, t);
       }
     }
   }
 }
 
 /** Po wiadomości od klienta: pierwszeństwo dla ostatniego konsultanta (4 min), przedłużenie terminu jeśli wątek już obsadzony. */
-export function onClientMessage(db, threadId) {
-  sweepAssignments(db);
-  const lastStaff = lastStaffWithOperator(db, threadId);
+export async function onClientMessage(db, threadId) {
+  await sweepAssignments(db);
+  const lastStaff = await lastStaffWithOperator(db, threadId);
   if (lastStaff?.operator_id) {
-    db.prepare(`UPDATE threads SET resume_operator_id = ?, resume_until = ? WHERE id = ?`).run(
+    await db.prepare(`UPDATE threads SET resume_operator_id = ?, resume_until = ? WHERE id = ?`).run(
       lastStaff.operator_id,
       dtPlusMinutes(RESUME_PRIORITY_MIN),
       threadId
     );
   } else {
-    db.prepare(`UPDATE threads SET resume_operator_id = NULL, resume_until = NULL WHERE id = ?`).run(
+    await db.prepare(`UPDATE threads SET resume_operator_id = NULL, resume_until = NULL WHERE id = ?`).run(
       threadId
     );
   }
 
-  const t = db.prepare(`SELECT assigned_operator_id FROM threads WHERE id = ?`).get(threadId);
+  const t = await db.prepare(`SELECT assigned_operator_id FROM threads WHERE id = ?`).get(threadId);
   if (t?.assigned_operator_id) {
-    const u = lastUserMessageRow(db, threadId);
+    const u = await lastUserMessageRow(db, threadId);
     const due = responseDueFromUserMessageIso(u?.created_at);
-    db.prepare(`UPDATE threads SET response_due_at = ?, last_staff_activity_at = ? WHERE id = ?`).run(
+    await db.prepare(`UPDATE threads SET response_due_at = ?, last_staff_activity_at = ? WHERE id = ?`).run(
       due,
       dtNow(),
       threadId
@@ -175,21 +183,24 @@ export function onClientMessage(db, threadId) {
 }
 
 /** Po odpowiedzi: właściciel — tylko kasuje termin; pracownik — zwalnia wątek (jedna odpowiedź na przejęcie). */
-export function onStaffReply(db, threadId, operator) {
+export async function onStaffReply(db, threadId, operator) {
   const isOwner = operator.role === "owner";
   if (isOwner) {
-    db.prepare(
-      `UPDATE threads SET
+    await db
+      .prepare(
+        `UPDATE threads SET
          response_due_at = NULL,
          last_staff_activity_at = ?,
          resume_operator_id = NULL,
          resume_until = NULL
        WHERE id = ?`
-    ).run(dtNow(), threadId);
+      )
+      .run(dtNow(), threadId);
     return;
   }
-  db.prepare(
-    `UPDATE threads SET
+  await db
+    .prepare(
+      `UPDATE threads SET
        assigned_operator_id = NULL,
        response_due_at = NULL,
        last_staff_activity_at = ?,
@@ -198,13 +209,14 @@ export function onStaffReply(db, threadId, operator) {
        reclaim_operator_id = NULL,
        reclaim_until = NULL
      WHERE id = ?`
-  ).run(dtNow(), threadId);
+    )
+    .run(dtNow(), threadId);
 }
 
-export function bumpStaffActivity(db, threadId, operatorId) {
-  const t = db.prepare(`SELECT assigned_operator_id FROM threads WHERE id = ?`).get(threadId);
+export async function bumpStaffActivity(db, threadId, operatorId) {
+  const t = await db.prepare(`SELECT assigned_operator_id FROM threads WHERE id = ?`).get(threadId);
   if (t?.assigned_operator_id === operatorId) {
-    db.prepare(`UPDATE threads SET last_staff_activity_at = ? WHERE id = ?`).run(dtNow(), threadId);
+    await db.prepare(`UPDATE threads SET last_staff_activity_at = ? WHERE id = ?`).run(dtNow(), threadId);
   }
 }
 
@@ -250,14 +262,14 @@ export function inboxBucketClause(operator, bucketRaw) {
   return isOwner ? { sql: "1=1", params: [] } : { sql: "t.assigned_operator_id = ?", params: [operator.id] };
 }
 
-export function isStoppedReminderEligible(db, threadId) {
-  const t = db
+export async function isStoppedReminderEligible(db, threadId) {
+  const t = await db
     .prepare(
       `SELECT assigned_operator_id FROM threads WHERE id = ?`
     )
     .get(threadId);
   if (!t || t.assigned_operator_id) return false;
-  const last = db
+  const last = await db
     .prepare(
       `SELECT sender, created_at FROM messages WHERE thread_id = ? ORDER BY datetime(created_at) DESC LIMIT 1`
     )
@@ -269,17 +281,17 @@ export function isStoppedReminderEligible(db, threadId) {
   return Date.now() - ts.getTime() >= ms;
 }
 
-export function threadVisibleToOperator(db, threadId, operatorId, role) {
+export async function threadVisibleToOperator(db, threadId, operatorId, role) {
   if (role === "owner") return true;
-  const t = db.prepare(`SELECT assigned_operator_id FROM threads WHERE id = ?`).get(threadId);
+  const t = await db.prepare(`SELECT assigned_operator_id FROM threads WHERE id = ?`).get(threadId);
   return t?.assigned_operator_id === operatorId;
 }
 
-export function assertStaffCanMutate(db, operator, threadId) {
-  sweepAssignments(db);
+export async function assertStaffCanMutate(db, operator, threadId) {
+  await sweepAssignments(db);
   if (operator.role === "owner") return { ok: true };
 
-  const t = db
+  const t = await db
     .prepare(
       `SELECT assigned_operator_id, response_due_at FROM threads WHERE id = ?`
     )
@@ -300,11 +312,11 @@ export function assertStaffCanMutate(db, operator, threadId) {
   return { ok: false, code: 403, error: "Najpierw przejmij wątek z puli." };
 }
 
-export function ensureReplyPermission(db, operator, threadId) {
-  sweepAssignments(db);
+export async function ensureReplyPermission(db, operator, threadId) {
+  await sweepAssignments(db);
   if (operator.role === "owner") return { ok: true };
 
-  const t = db.prepare(`SELECT assigned_operator_id, response_due_at FROM threads WHERE id = ?`).get(threadId);
+  const t = await db.prepare(`SELECT assigned_operator_id, response_due_at FROM threads WHERE id = ?`).get(threadId);
   if (!t) return { ok: false, code: 404, error: "Nie znaleziono wątku." };
 
   if (t.assigned_operator_id === operator.id) {
@@ -317,8 +329,8 @@ export function ensureReplyPermission(db, operator, threadId) {
   return { ok: false, code: 403, error: "Najpierw przejmij wątek z puli." };
 }
 
-function staffCharsInThread(db, threadId, operatorId) {
-  const r = db
+async function staffCharsInThread(db, threadId, operatorId) {
+  const r = await db
     .prepare(
       `SELECT IFNULL(SUM(LENGTH(body)), 0) AS n FROM messages
        WHERE thread_id = ? AND sender = 'staff' AND operator_id = ?`
@@ -328,8 +340,8 @@ function staffCharsInThread(db, threadId, operatorId) {
 }
 
 /** Wątki w puli (ostatnia wiadomość od klienta); termin odpowiedzi liczy się od przejęcia. */
-function getStaffQueueRows(db, operatorId, limit = QUEUE_VISIBLE_MAX) {
-  const raw = db
+async function getStaffQueueRows(db, operatorId, limit = QUEUE_VISIBLE_MAX) {
+  const raw = await db
     .prepare(
       `SELECT t.id,
         (SELECT m.created_at FROM messages m
@@ -372,44 +384,46 @@ function getStaffQueueRows(db, operatorId, limit = QUEUE_VISIBLE_MAX) {
     .map((r) => ({ id: r.id, last_user_at: r.last_user_at }));
 }
 
-export function canStaffPickFromQueue(db, operatorId, threadId) {
-  const rows = getStaffQueueRows(db, operatorId, QUEUE_VISIBLE_MAX);
+export async function canStaffPickFromQueue(db, operatorId, threadId) {
+  const rows = await getStaffQueueRows(db, operatorId, QUEUE_VISIBLE_MAX);
   return rows.some((r) => r.id === threadId);
 }
 
-export function getStaffQueueSlots(db, operatorId) {
-  sweepAssignments(db);
-  const rows = getStaffQueueRows(db, operatorId, QUEUE_VISIBLE_MAX);
+export async function getStaffQueueSlots(db, operatorId) {
+  await sweepAssignments(db);
+  const rows = await getStaffQueueRows(db, operatorId, QUEUE_VISIBLE_MAX);
   const now = Date.now();
-  return rows.map((r, i) => {
+  const out = [];
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
     const t0 = parseMessageTimestamp(r.last_user_at)?.getTime();
     const waitMs = t0 != null && !Number.isNaN(t0) ? now - t0 : 0;
     const waitSec = Math.max(0, Math.floor(waitMs / 1000));
     const waitLabel =
       waitSec < 90 ? `${waitSec} s` : `ok. ${Math.floor(waitSec / 60)} min`;
-    const exclusive =
-      !!db
-        .prepare(
-          `SELECT 1 FROM threads WHERE id = ?
+    const exclusive = !!(await db
+      .prepare(
+        `SELECT 1 FROM threads WHERE id = ?
            AND resume_operator_id = ? AND datetime(resume_until) > datetime('now')`
-        )
-        .get(r.id, operatorId);
-    return {
+      )
+      .get(r.id, operatorId));
+    out.push({
       slot: i + 1,
       thread_id: r.id,
       waiting_label: waitLabel,
       exclusive_for_you: !!exclusive,
-    };
-  });
+    });
+  }
+  return out;
 }
 
-export function getOperatorStats(db, operatorId) {
-  const sent = db
+export async function getOperatorStats(db, operatorId) {
+  const sent = await db
     .prepare(
       `SELECT COUNT(*) AS c FROM messages WHERE sender = 'staff' AND operator_id = ?`
     )
     .get(operatorId);
-  const active = db
+  const active = await db
     .prepare(
       `SELECT COUNT(*) AS c FROM threads WHERE assigned_operator_id = ? AND response_due_at IS NOT NULL`
     )
@@ -421,26 +435,26 @@ export function getOperatorStats(db, operatorId) {
 }
 
 /** Statystyki pracownika: okna czasowe + szacunek wynagrodzenia wg stawki z .env */
-export function getStaffDashboard(db, operatorId) {
+export async function getStaffDashboard(db, operatorId) {
   const ratePln = Number(process.env.STAFF_RATE_PLN_PER_REPLY || 0.39);
-  const q = (sql) => Number(db.prepare(sql).get(operatorId)?.c ?? 0);
-  const today = q(
+  const q = async (sql) => Number((await db.prepare(sql).get(operatorId))?.c ?? 0);
+  const today = await q(
     `SELECT COUNT(*) AS c FROM messages WHERE sender = 'staff' AND operator_id = ?
      AND date(created_at) = date('now')`
   );
-  const last7 = q(
+  const last7 = await q(
     `SELECT COUNT(*) AS c FROM messages WHERE sender = 'staff' AND operator_id = ?
      AND datetime(created_at) >= datetime('now', '-7 days')`
   );
-  const prev7 = q(
+  const prev7 = await q(
     `SELECT COUNT(*) AS c FROM messages WHERE sender = 'staff' AND operator_id = ?
      AND datetime(created_at) >= datetime('now', '-14 days')
      AND datetime(created_at) < datetime('now', '-7 days')`
   );
-  const total = q(
+  const total = await q(
     `SELECT COUNT(*) AS c FROM messages WHERE sender = 'staff' AND operator_id = ?`
   );
-  const stats = getOperatorStats(db, operatorId);
+  const stats = await getOperatorStats(db, operatorId);
   const estTotal = Math.round(total * ratePln * 100) / 100;
   const estToday = Math.round(today * ratePln * 100) / 100;
   const estLast7 = Math.round(last7 * ratePln * 100) / 100;
@@ -459,8 +473,8 @@ export function getStaffDashboard(db, operatorId) {
   };
 }
 
-export function getOperatorMonitorSnapshot(db) {
-  const operators = db
+export async function getOperatorMonitorSnapshot(db) {
+  const operators = await db
     .prepare(
       `SELECT o.id, o.email, o.display_name, o.role, o.disabled_at,
         COALESCE(o.kyc_status, 'unverified') AS kyc_status,
@@ -483,7 +497,7 @@ export function getOperatorMonitorSnapshot(db) {
        ORDER BY CASE WHEN o.role = 'owner' THEN 0 ELSE 1 END, o.email`
     )
     .all();
-  const audits = db
+  const audits = await db
     .prepare(
       `SELECT a.id, a.operator_id, a.action, a.thread_id, a.detail, a.created_at, o.email AS operator_email
        FROM operator_audit a
@@ -495,9 +509,9 @@ export function getOperatorMonitorSnapshot(db) {
   return { operators, audits };
 }
 
-export function getAssignmentPayload(db, threadId, operator) {
-  sweepAssignments(db);
-  const t = db
+export async function getAssignmentPayload(db, threadId, operator) {
+  await sweepAssignments(db);
+  const t = await db
     .prepare(
       `SELECT assigned_operator_id, response_due_at, reclaim_operator_id, reclaim_until,
               last_staff_activity_at
@@ -505,7 +519,7 @@ export function getAssignmentPayload(db, threadId, operator) {
     )
     .get(threadId);
   if (!t) return null;
-  const vis = threadVisibleToOperator(db, threadId, operator.id, operator.role);
+  const vis = await threadVisibleToOperator(db, threadId, operator.id, operator.role);
   const isOwner = operator.role === "owner";
   const mine = t.assigned_operator_id === operator.id;
 
@@ -519,7 +533,7 @@ export function getAssignmentPayload(db, threadId, operator) {
 
   let staff_chars_in_thread = null;
   if (mine && !isOwner) {
-    staff_chars_in_thread = staffCharsInThread(db, threadId, operator.id);
+    staff_chars_in_thread = await staffCharsInThread(db, threadId, operator.id);
   }
 
   const min_reply_chars = isOwner ? OWNER_REPLY_MIN_CHARS : STAFF_REPLY_MIN_CHARS;
@@ -556,11 +570,12 @@ export function getAssignmentPayload(db, threadId, operator) {
   };
 }
 
-export function tryClaimThread(db, operator, threadId) {
-  sweepAssignments(db);
+export async function tryClaimThread(db, operator, threadId) {
+  await sweepAssignments(db);
   if (operator.role === "owner") {
-    db.prepare(
-      `UPDATE threads SET
+    await db
+      .prepare(
+        `UPDATE threads SET
          assigned_operator_id = ?,
          response_due_at = NULL,
          last_staff_activity_at = ?,
@@ -569,11 +584,12 @@ export function tryClaimThread(db, operator, threadId) {
          resume_operator_id = NULL,
          resume_until = NULL
        WHERE id = ?`
-    ).run(operator.id, dtNow(), threadId);
+      )
+      .run(operator.id, dtNow(), threadId);
     return { ok: true };
   }
 
-  const t = db
+  const t = await db
     .prepare(
       `SELECT assigned_operator_id, reclaim_operator_id, reclaim_until FROM threads WHERE id = ?`
     )
@@ -593,14 +609,14 @@ export function tryClaimThread(db, operator, threadId) {
     }
   }
 
-  if (!reclaimOk && !canStaffPickFromQueue(db, operator.id, threadId)) {
+  if (!reclaimOk && !(await canStaffPickFromQueue(db, operator.id, threadId))) {
     return {
       ok: false,
       error: "Nie możesz przejąć tego wątku (poza widoczną pulą max 5).",
     };
   }
 
-  if (countAssignedThreadsForOperator(db, operator.id) >= 1) {
+  if ((await countAssignedThreadsForOperator(db, operator.id)) >= 1) {
     return {
       ok: false,
       error: "Masz już otwartą rozmowę — dokończ ją lub wyślij odpowiedź, zanim przejmiesz kolejną.",
@@ -609,8 +625,9 @@ export function tryClaimThread(db, operator, threadId) {
 
   const due = dtPlusMinutes(REPLY_DEADLINE_MIN);
 
-  db.prepare(
-    `UPDATE threads SET
+  await db
+    .prepare(
+      `UPDATE threads SET
        assigned_operator_id = ?,
        response_due_at = ?,
        last_staff_activity_at = ?,
@@ -619,24 +636,25 @@ export function tryClaimThread(db, operator, threadId) {
        resume_operator_id = NULL,
        resume_until = NULL
      WHERE id = ?`
-  ).run(operator.id, due, dtNow(), threadId);
+    )
+    .run(operator.id, due, dtNow(), threadId);
   return { ok: true };
 }
 
 /** Przejęcie wątku „zatrzymanego” — po N h od ostatniej wiadomości pracownika, gdy klient nie odpisał. */
-export function tryClaimStoppedThread(db, operator, threadId) {
-  sweepAssignments(db);
+export async function tryClaimStoppedThread(db, operator, threadId) {
+  await sweepAssignments(db);
   if (operator.role === "owner") {
     return tryClaimThread(db, operator, threadId);
   }
-  const t = db
+  const t = await db
     .prepare(
       `SELECT assigned_operator_id, reclaim_operator_id, reclaim_until FROM threads WHERE id = ?`
     )
     .get(threadId);
   if (!t) return { ok: false, error: "Nie znaleziono wątku." };
   if (t.assigned_operator_id) return { ok: false, error: "Wątek jest już przypisany." };
-  if (!isStoppedReminderEligible(db, threadId)) {
+  if (!(await isStoppedReminderEligible(db, threadId))) {
     return {
       ok: false,
       error: `Przypomnienie możliwe dopiero po ${REMINDER_AFTER_STAFF_HOURS} h od ostatniej wiadomości zespołu, gdy klient jeszcze nie odpisał.`,
@@ -652,15 +670,16 @@ export function tryClaimStoppedThread(db, operator, threadId) {
       return { ok: false, error: "Inny pracownik ma pierwszeństwo przejęcia (okno reclaim)." };
     }
   }
-  if (!reclaimOk && countAssignedThreadsForOperator(db, operator.id) >= 1) {
+  if (!reclaimOk && (await countAssignedThreadsForOperator(db, operator.id)) >= 1) {
     return {
       ok: false,
       error: "Masz już otwartą rozmowę — dokończ ją lub wyślij odpowiedź, zanim przejmiesz kolejną.",
     };
   }
   const due = dtPlusMinutes(REPLY_DEADLINE_MIN);
-  db.prepare(
-    `UPDATE threads SET
+  await db
+    .prepare(
+      `UPDATE threads SET
        assigned_operator_id = ?,
        response_due_at = ?,
        last_staff_activity_at = ?,
@@ -669,6 +688,7 @@ export function tryClaimStoppedThread(db, operator, threadId) {
        resume_operator_id = NULL,
        resume_until = NULL
      WHERE id = ?`
-  ).run(operator.id, due, dtNow(), threadId);
+    )
+    .run(operator.id, due, dtNow(), threadId);
   return { ok: true };
 }
