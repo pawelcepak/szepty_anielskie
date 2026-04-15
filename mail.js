@@ -18,6 +18,11 @@ export function isMailConfigured() {
   return !!(String(process.env.SMTP_USER || "").trim() && String(process.env.SMTP_PASS || "").trim());
 }
 
+function envMs(name, fallback) {
+  const raw = Number(process.env[name]);
+  return Number.isFinite(raw) && raw > 0 ? raw : fallback;
+}
+
 export function createMailTransporter() {
   if (!isMailConfigured()) return null;
   const provider = String(process.env.SMTP_PROVIDER || "").trim().toLowerCase();
@@ -34,6 +39,9 @@ export function createMailTransporter() {
     host,
     port,
     secure,
+    connectionTimeout: envMs("SMTP_CONNECTION_TIMEOUT_MS", 10000),
+    greetingTimeout: envMs("SMTP_GREETING_TIMEOUT_MS", 10000),
+    socketTimeout: envMs("SMTP_SOCKET_TIMEOUT_MS", 15000),
     auth: {
       user: String(process.env.SMTP_USER || "").trim(),
       pass: String(process.env.SMTP_PASS || "").trim(),
