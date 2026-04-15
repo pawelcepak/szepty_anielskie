@@ -14,8 +14,16 @@ export function publicBaseUrl() {
   return String(raw).replace(/\/$/, "");
 }
 
+function brevoApiKey() {
+  return String(process.env.BREVO_API_KEY || "").trim();
+}
+
+function hasBrevoApi() {
+  return !!brevoApiKey();
+}
+
 export function isMailConfigured() {
-  return !!(String(process.env.SMTP_USER || "").trim() && String(process.env.SMTP_PASS || "").trim());
+  return hasBrevoApi() || !!(String(process.env.SMTP_USER || "").trim() && String(process.env.SMTP_PASS || "").trim());
 }
 
 function envMs(name, fallback) {
@@ -24,7 +32,8 @@ function envMs(name, fallback) {
 }
 
 export function createMailTransporter() {
-  if (!isMailConfigured()) return null;
+  const hasSmtpCreds = !!(String(process.env.SMTP_USER || "").trim() && String(process.env.SMTP_PASS || "").trim());
+  if (!hasSmtpCreds) return null;
   const provider = String(process.env.SMTP_PROVIDER || "").trim().toLowerCase();
   const defaults = provider === "brevo"
     ? { host: "smtp-relay.brevo.com", port: 587 }
@@ -54,16 +63,64 @@ function mailFrom() {
   return f || "noreply@localhost";
 }
 
-export async function sendVerificationEmail({ to, verifyUrl, displayName }) {
+function parseSender(value) {
+  const raw = String(value || "").trim();
+  const m = raw.match(/^(.*)<\s*([^>]+)\s*>$/);
+  if (m) {
+    const name = m[1].trim().replace(/^"|"$/g, "");
+    const email = m[2].trim();
+    return {
+      email,
+      ...(name ? { name } : {}),
+    };
+  }
+  return { email: raw };
+}
+
+async function sendViaBrevoApi({ to, subject, text, html }) {
+  const key = brevoApiKey();
+  if (!key) throw new Error("Brak BREVO_API_KEY.");
+  const sender = parseSender(mailFrom());
+  const r = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      "api-key": key,
+      "content-type": "application/json",
+      accept: "application/json",
+    },
+    body: JSON.stringify({
+      sender,
+      to: [{ email: String(to || "").trim() }],
+      subject: String(subject || "").trim(),
+      ...(text ? { textContent: String(text) } : {}),
+      ...(html ? { htmlContent: String(html) } : {}),
+    }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const msg =
+      String(data?.message || "").trim() || String(data?.code || "").trim() || `Brevo API error ${r.status}`;
+    throw new Error(msg);
+  }
+  const messageId =
+    String(data?.messageId || "").trim() ||
+    (Array.isArray(data?.messageIds) && data.messageIds[0] ? String(data.messageIds[0]) : "");
+  return {
+    messageId,
+    accepted: [String(to || "").trim()],
+    rejected: [],
+  };
+}
+
+async function sendViaSmtp({ to, subject, text, html }) {
   const t = createMailTransporter();
   if (!t) throw new Error("Brak konfiguracji SMTP (SMTP_USER / SMTP_PASS).");
-  const name = displayName || "użytkowniku";
   const info = await t.sendMail({
     from: mailFrom(),
-    to,
-    subject: "Potwierdź adres e-mail — Szept Kart",
-    text: `Cześć ${name},\n\nOtwórz link, aby potwierdzić konto:\n${verifyUrl}\n\nLink jest ważny 48 godzin.\n`,
-    html: `<p>Cześć ${escapeHtml(name)},</p><p><a href="${verifyUrl}">Potwierdź adres e-mail</a></p><p>Link jest ważny 48 godzin.</p>`,
+    to: String(to || "").trim(),
+    subject: String(subject || "").trim(),
+    text: String(text || ""),
+    ...(html != null && String(html).trim() !== "" ? { html: String(html) } : {}),
   });
   const accepted = Array.isArray(info?.accepted) ? info.accepted : [];
   if (accepted.length === 0) {
@@ -77,27 +134,31 @@ export async function sendVerificationEmail({ to, verifyUrl, displayName }) {
   };
 }
 
+async function sendMailMessage({ to, subject, text, html }) {
+  if (hasBrevoApi()) {
+    return sendViaBrevoApi({ to, subject, text, html });
+  }
+  return sendViaSmtp({ to, subject, text, html });
+}
+
+export async function sendVerificationEmail({ to, verifyUrl, displayName }) {
+  const name = displayName || "użytkowniku";
+  return sendMailMessage({
+    to: String(to || "").trim(),
+    subject: "Potwierdź adres e-mail — Szepty Anielskie",
+    text: `Cześć ${name},\n\nOtwórz link, aby potwierdzić konto:\n${verifyUrl}\n\nLink jest ważny 48 godzin.\n`,
+    html: `<p>Cześć ${escapeHtml(name)},</p><p><a href="${verifyUrl}">Potwierdź adres e-mail</a></p><p>Link jest ważny 48 godzin.</p>`,
+  });
+}
+
 export async function sendOperatorEmailToUser({ to, subject, text, html }) {
-  const t = createMailTransporter();
-  if (!t) throw new Error("Brak konfiguracji SMTP (SMTP_USER / SMTP_PASS).");
   const subj = String(subject || "").trim();
   const bodyText = String(text || "").trim();
   const bodyHtml = html != null && String(html).trim() !== "" ? String(html) : undefined;
-  const info = await t.sendMail({
-    from: mailFrom(),
-    to,
+  return sendMailMessage({
+    to: String(to || "").trim(),
     subject: subj,
     text: bodyText,
-    ...(bodyHtml ? { html: bodyHtml } : {}),
+    html: bodyHtml,
   });
-  const accepted = Array.isArray(info?.accepted) ? info.accepted : [];
-  if (accepted.length === 0) {
-    const rejected = Array.isArray(info?.rejected) ? info.rejected.join(", ") : "";
-    throw new Error(`SMTP nie potwierdził odbiorcy. Rejected: ${rejected || "brak danych"}`);
-  }
-  return {
-    messageId: String(info?.messageId || ""),
-    accepted,
-    rejected: Array.isArray(info?.rejected) ? info.rejected : [],
-  };
 }
