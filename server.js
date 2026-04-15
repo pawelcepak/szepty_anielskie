@@ -187,7 +187,7 @@ async function generateDraftWithOpenAi({ prompt }) {
 async function generateDraftWithAnthropic({ prompt }) {
   const key = anthropicKey();
   if (!key) throw new Error("Brak ANTHROPIC_API_KEY.");
-  const model = String(process.env.ANTHROPIC_MODEL || "claude-3-5-haiku-latest").trim();
+  const model = String(process.env.ANTHROPIC_MODEL || "claude-haiku-4-5").trim();
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
