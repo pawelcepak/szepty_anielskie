@@ -281,6 +281,7 @@ for (const [col, sqlt] of [
   ["email_verification_token", "TEXT"],
   ["email_verification_expires_at", "TEXT"],
   ["pending_open_character_id", "TEXT"],
+  ["pending_email_change", "TEXT"],
 ]) {
   if (!userCols3.has(col)) {
     db.exec(`ALTER TABLE users ADD COLUMN ${col} ${sqlt}`);

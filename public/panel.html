@@ -59,6 +59,31 @@
           </div>
           <p class="form-error" id="panel-city-err" hidden></p>
         </form>
+        <details class="panel-settings" id="panel-settings">
+          <summary>Ustawienia konta</summary>
+          <form id="panel-settings-form" class="panel-settings-grid">
+            <label for="settings-city">Miasto</label>
+            <input id="settings-city" type="text" minlength="2" maxlength="80" />
+            <label for="settings-avatar">Zdjęcie profilowe (opcjonalnie)</label>
+            <input id="settings-avatar" type="file" accept="image/jpeg,image/png,image/webp" />
+            <button type="submit" class="btn btn-outline btn-sm">Zapisz profil</button>
+            <p class="form-error" id="settings-profile-err" hidden></p>
+          </form>
+          <form id="panel-password-form" class="panel-settings-grid">
+            <label for="settings-current-pass">Aktualne hasło</label>
+            <input id="settings-current-pass" type="password" autocomplete="current-password" />
+            <label for="settings-new-pass">Nowe hasło</label>
+            <input id="settings-new-pass" type="password" autocomplete="new-password" />
+            <button type="submit" class="btn btn-outline btn-sm">Zmień hasło</button>
+            <p class="form-error" id="settings-password-err" hidden></p>
+          </form>
+          <form id="panel-email-form" class="panel-settings-grid">
+            <label for="settings-new-email">Nowy e-mail</label>
+            <input id="settings-new-email" type="email" autocomplete="email" />
+            <button type="submit" class="btn btn-outline btn-sm">Zmień e-mail (potwierdzenie)</button>
+            <p class="form-error" id="settings-email-err" hidden></p>
+          </form>
+        </details>
       </section>
       <nav class="panel-view-tabs" aria-label="Widok panelu">
         <button type="button" class="panel-tab panel-tab--active" id="tab-browse" data-view="browse">
@@ -71,6 +96,22 @@
         <div class="browse-inner">
           <header class="browse-header">
             <h1 class="browse-title">Konsultanci</h1>
+            <div class="catalog-filters" id="panel-catalog-filters" aria-label="Filtry konsultantów">
+              <button type="button" class="catalog-filter active" data-filter="Wszystko">Wszystko</button>
+              <button type="button" class="catalog-filter" data-filter="Wróżby">Wróżby</button>
+              <button type="button" class="catalog-filter" data-filter="Tarot">Tarot</button>
+              <button type="button" class="catalog-filter" data-filter="Astrologia">Astrologia</button>
+              <button type="button" class="catalog-filter" data-filter="Jasnowidzenie">Jasnowidzenie</button>
+            </div>
+            <div class="panel-sort-row">
+              <label for="panel-sort">Sortowanie</label>
+              <select id="panel-sort">
+                <option value="online">Najpierw online</option>
+                <option value="morning">Najpierw rano</option>
+                <option value="afternoon">Najpierw popołudnie</option>
+                <option value="evening">Najpierw wieczór</option>
+              </select>
+            </div>
             <p class="browse-lead">
               Kliknij <strong>Otwórz rozmowę</strong> przy wybranej osobie. Zakładka
               <strong>Moje rozmowy</strong> pokazuje tylko wątki, które już zacząłeś.

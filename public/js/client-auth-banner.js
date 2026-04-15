@@ -11,6 +11,8 @@ function esc(s) {
 async function refreshAuthBanners() {
   const slots = document.querySelectorAll("[data-auth-banner]");
   if (!slots.length) return;
+  const guestOnly = document.querySelectorAll(".auth-only-guest");
+  const userOnly = document.querySelectorAll(".auth-only-user");
   try {
     const st = await api("/api/auth/status");
     const idle = st.session_idle_minutes ?? 10;
@@ -26,10 +28,14 @@ async function refreshAuthBanners() {
       el.innerHTML = `<span class="auth-badge auth-badge--in">Zalogowano: <strong>${lab}</strong>${nick}</span>
         <span class="auth-badge-hint">Sesja wygasa po ok. <strong>${idle} min</strong> bezczynności · <a href="/panel.html">Panel</a> · <a href="#" data-auth-logout>Wyloguj</a></span>`;
     }
+    for (const el of guestOnly) el.classList.toggle("hidden", !!st.logged_in);
+    for (const el of userOnly) el.classList.toggle("hidden", !st.logged_in);
   } catch {
     for (const el of slots) {
       el.innerHTML = `<span class="auth-badge auth-badge--guest">Stan sesji niedostępny</span>`;
     }
+    for (const el of guestOnly) el.classList.remove("hidden");
+    for (const el of userOnly) el.classList.add("hidden");
   }
 }
 

@@ -11,6 +11,8 @@ let characters = [];
 let selectedId = null;
 let myThreads = [];
 let pricing = [];
+let browseFilter = "Wszystko";
+let browseSort = "online";
 let sessionKeepTimer = null;
 let pollTimer = null;
 
@@ -74,6 +76,23 @@ function parseTimeHM(s) {
   const mi = Number(m[2]);
   if (h < 0 || h > 23 || mi < 0 || mi > 59) return null;
   return h * 60 + mi;
+}
+
+function normalizedCategory(c) {
+  const raw = String(c?.category || "").toLowerCase();
+  if (raw.includes("tarot")) return "Tarot";
+  if (raw.includes("astrologia")) return "Astrologia";
+  if (raw.includes("jasnowid")) return "Jasnowidzenie";
+  if (raw.includes("wróż") || raw.includes("wroz")) return "Wróżby";
+  return "Wróżby";
+}
+
+function slotOfDay(hm) {
+  const m = parseTimeHM(hm);
+  if (m == null) return "other";
+  if (m < 12 * 60) return "morning";
+  if (m < 17 * 60) return "afternoon";
+  return "evening";
 }
 
 function availabilityForCharacter(c) {
@@ -302,6 +321,8 @@ function renderProfileStrip() {
     form.classList.toggle("hidden", !need);
     if (inp && need) inp.value = "";
   }
+  const settingsCity = document.getElementById("settings-city");
+  if (settingsCity) settingsCity.value = city;
 }
 
 function bindPanelCityFormOnce() {
@@ -375,7 +396,29 @@ function byCategory(list) {
 function renderBrowseCatalog() {
   if (!browseCatalogEl) return;
   browseCatalogEl.innerHTML = "";
-  const groups = byCategory(characters);
+  const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
+  let list = [...characters];
+  if (browseFilter !== "Wszystko") {
+    list = list.filter((c) => normalizedCategory(c) === browseFilter);
+  }
+  list.sort((a, b) => {
+    if (browseSort === "online") {
+      const af = availabilityForCharacter(a).badgeClass.includes("--on") ? 0 : 1;
+      const bf = availabilityForCharacter(b).badgeClass.includes("--on") ? 0 : 1;
+      if (af !== bf) return af - bf;
+    } else {
+      const order = { morning: 0, afternoon: 1, evening: 2, other: 3 };
+      const desired = browseSort;
+      const ao = slotOfDay(a.typical_hours_from) === desired ? 0 : order[slotOfDay(a.typical_hours_from)];
+      const bo = slotOfDay(b.typical_hours_from) === desired ? 0 : order[slotOfDay(b.typical_hours_from)];
+      if (ao !== bo) return ao - bo;
+    }
+    const ad = Math.abs((parseTimeHM(a.typical_hours_from) ?? nowMins) - nowMins);
+    const bd = Math.abs((parseTimeHM(b.typical_hours_from) ?? nowMins) - nowMins);
+    if (ad !== bd) return ad - bd;
+    return String(a.name).localeCompare(String(b.name), "pl");
+  });
+  const groups = byCategory(list);
   for (const [cat, items] of groups) {
     const sec = document.createElement("section");
     sec.className = "browse-cat";
@@ -498,6 +541,19 @@ document.getElementById("logout").addEventListener("click", async () => {
 document.getElementById("tab-browse")?.addEventListener("click", () => switchView("browse"));
 document.getElementById("tab-chat")?.addEventListener("click", () => switchView("chat"));
 document.getElementById("btn-to-browse")?.addEventListener("click", () => switchView("browse"));
+document.getElementById("panel-catalog-filters")?.addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-filter]");
+  if (!btn) return;
+  browseFilter = String(btn.dataset.filter || "Wszystko");
+  for (const el of document.querySelectorAll("#panel-catalog-filters [data-filter]")) {
+    el.classList.toggle("active", el === btn);
+  }
+  renderBrowseCatalog();
+});
+document.getElementById("panel-sort")?.addEventListener("change", (event) => {
+  browseSort = String(event.target.value || "online");
+  renderBrowseCatalog();
+});
 
 document.getElementById("account-summary-toggle")?.addEventListener("click", () => {
   const card = document.getElementById("account-summary-card");
@@ -563,6 +619,79 @@ document.getElementById("composer").addEventListener("submit", async (e) => {
   } catch (err) {
     sendErr.textContent = err.message;
     sendErr.hidden = false;
+  }
+});
+
+document.getElementById("panel-settings-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const err = document.getElementById("settings-profile-err");
+  if (err) err.hidden = true;
+  const city = String(document.getElementById("settings-city")?.value || "").trim();
+  const avatarFile = document.getElementById("settings-avatar")?.files?.[0];
+  let avatar_url = undefined;
+  if (avatarFile) {
+    if (avatarFile.size > 420000) {
+      if (err) {
+        err.textContent = "Zdjęcie jest za duże (max ok. 400 KB).";
+        err.hidden = false;
+      }
+      return;
+    }
+    avatar_url = await new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result || ""));
+      r.onerror = () => reject(new Error("Nie udało się odczytać zdjęcia."));
+      r.readAsDataURL(avatarFile);
+    });
+  }
+  try {
+    const payload = { city };
+    if (avatar_url) payload.avatar_url = avatar_url;
+    const r = await api("/api/me", { method: "PATCH", body: JSON.stringify(payload) });
+    me.user = r.user;
+    renderProfileStrip();
+    showToast("Zapisano ustawienia profilu.");
+  } catch (x) {
+    if (err) {
+      err.textContent = x.message || String(x);
+      err.hidden = false;
+    }
+  }
+});
+
+document.getElementById("panel-password-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const err = document.getElementById("settings-password-err");
+  if (err) err.hidden = true;
+  const current_password = String(document.getElementById("settings-current-pass")?.value || "");
+  const new_password = String(document.getElementById("settings-new-pass")?.value || "");
+  try {
+    await api("/api/me/change-password", { method: "POST", body: JSON.stringify({ current_password, new_password }) });
+    document.getElementById("settings-current-pass").value = "";
+    document.getElementById("settings-new-pass").value = "";
+    showToast("Hasło zostało zmienione.");
+  } catch (x) {
+    if (err) {
+      err.textContent = x.message || String(x);
+      err.hidden = false;
+    }
+  }
+});
+
+document.getElementById("panel-email-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const err = document.getElementById("settings-email-err");
+  if (err) err.hidden = true;
+  const new_email = String(document.getElementById("settings-new-email")?.value || "").trim();
+  try {
+    await api("/api/me/request-email-change", { method: "POST", body: JSON.stringify({ new_email }) });
+    document.getElementById("settings-new-email").value = "";
+    showToast("Wysłaliśmy link potwierdzający zmianę e-mail na nowy adres.");
+  } catch (x) {
+    if (err) {
+      err.textContent = x.message || String(x);
+      err.hidden = false;
+    }
   }
 });
 

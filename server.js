@@ -37,6 +37,7 @@ import {
 } from "./assignment.js";
 import { APP_CONFIG } from "./app-config.js";
 import {
+  sendEmailChangeConfirmation,
   isMailConfigured,
   publicBaseUrl,
   sendOperatorEmailToUser,
@@ -492,6 +493,35 @@ app.get(
   })
 );
 
+app.get(
+  "/api/auth/confirm-email-change",
+  asyncRoute(async (req, res) => {
+    const token = String(req.query.token || "").trim();
+    if (!token) return res.redirect(302, "/panel.html?email_change=missing_token");
+    const row = await db
+      .prepare(
+        `SELECT id, pending_email_change, email_verification_expires_at
+         FROM users WHERE email_verification_token = ?`
+      )
+      .get(token);
+    if (!row || !row.pending_email_change) return res.redirect(302, "/panel.html?email_change=invalid");
+    const exp = row.email_verification_expires_at ? new Date(row.email_verification_expires_at).getTime() : 0;
+    if (!exp || Number.isNaN(exp) || exp < Date.now()) return res.redirect(302, "/panel.html?email_change=expired");
+    const newEmail = String(row.pending_email_change || "").trim().toLowerCase();
+    const exists = await db.prepare("SELECT id FROM users WHERE lower(email) = lower(?) AND id <> ?").get(newEmail, row.id);
+    if (exists) return res.redirect(302, "/panel.html?email_change=taken");
+    await db
+      .prepare(
+        `UPDATE users
+         SET email = ?, pending_email_change = NULL, email_verification_token = NULL, email_verification_expires_at = NULL
+         WHERE id = ?`
+      )
+      .run(newEmail, row.id);
+    await setCustomerSession(res, row.id);
+    res.redirect(302, "/panel.html?email_change=ok");
+  })
+);
+
 app.post("/api/auth/resend-verification", registerJsonParser, async (req, res) => {
   const email = String(req.body?.email || "").trim().toLowerCase();
   if (!emailOk(email)) return res.status(400).json({ error: "Podaj poprawny adres e-mail." });
@@ -612,12 +642,23 @@ app.patch(
   "/api/me",
   requireCustomer,
   asyncRoute(async (req, res) => {
-    const city = String(req.body?.city ?? "").trim();
+    const city = String(req.body?.city ?? req.customer.city ?? "").trim();
+    const avatar_url = String(req.body?.avatar_url ?? "").trim() || req.customer.avatar_url || null;
     if (city.length < 2 || city.length > 80) {
       return res.status(400).json({ error: "Miasto: 2–80 znaków." });
     }
-    await db.prepare(`UPDATE users SET city = ? WHERE id = ?`).run(city, req.customer.id);
+    if (avatar_url) {
+      if (avatar_url.startsWith("data:image/")) {
+        if (avatar_url.length > 450000) {
+          return res.status(400).json({ error: "Zdjęcie profilowe jest za duże (max ok. 400 KB)." });
+        }
+      } else if (avatar_url.length > 2000) {
+        return res.status(400).json({ error: "Nieprawidłowy adres zdjęcia." });
+      }
+    }
+    await db.prepare(`UPDATE users SET city = ?, avatar_url = ? WHERE id = ?`).run(city, avatar_url, req.customer.id);
     req.customer.city = city;
+    req.customer.avatar_url = avatar_url;
     res.json({
       user: {
         id: req.customer.id,
@@ -627,9 +668,65 @@ app.patch(
         first_name: req.customer.first_name,
         birth_date: req.customer.birth_date,
         city,
-        avatar_url: req.customer.avatar_url,
+        avatar_url,
       },
     });
+  })
+);
+
+app.post(
+  "/api/me/change-password",
+  requireCustomer,
+  asyncRoute(async (req, res) => {
+    const current_password = String(req.body?.current_password || "");
+    const new_password = String(req.body?.new_password || "");
+    if (new_password.length < 8) {
+      return res.status(400).json({ error: "Nowe hasło musi mieć co najmniej 8 znaków." });
+    }
+    if (!passwordStrongOk(new_password)) {
+      return res.status(400).json({
+        error: "Nowe hasło musi zawierać co najmniej jedną wielką literę, jedną cyfrę i jeden znak specjalny.",
+      });
+    }
+    const row = await db.prepare("SELECT password_hash FROM users WHERE id = ?").get(req.customer.id);
+    const ok = row?.password_hash ? bcrypt.compareSync(current_password, row.password_hash) : false;
+    if (!ok) return res.status(400).json({ error: "Aktualne hasło jest nieprawidłowe." });
+    const nextHash = bcrypt.hashSync(new_password, 12);
+    await db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(nextHash, req.customer.id);
+    res.json({ ok: true });
+  })
+);
+
+app.post(
+  "/api/me/request-email-change",
+  requireCustomer,
+  asyncRoute(async (req, res) => {
+    const newEmail = String(req.body?.new_email || "").trim().toLowerCase();
+    if (!emailOk(newEmail)) return res.status(400).json({ error: "Podaj poprawny adres e-mail." });
+    if (newEmail === String(req.customer.email || "").toLowerCase()) {
+      return res.status(400).json({ error: "Nowy e-mail musi być inny od obecnego." });
+    }
+    const exists = await db.prepare("SELECT id FROM users WHERE lower(email) = lower(?)").get(newEmail);
+    if (exists) return res.status(409).json({ error: "Ten adres e-mail jest już zajęty." });
+    if (!isMailConfigured()) {
+      return res.status(503).json({ error: "Brak konfiguracji wysyłki e-mail na serwerze." });
+    }
+    const token = tokenBytes();
+    const exp = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+    await db
+      .prepare(
+        `UPDATE users
+         SET pending_email_change = ?, email_verification_token = ?, email_verification_expires_at = ?
+         WHERE id = ?`
+      )
+      .run(newEmail, token, exp, req.customer.id);
+    const confirmUrl = `${publicBaseUrl()}/api/auth/confirm-email-change?token=${encodeURIComponent(token)}`;
+    await sendEmailChangeConfirmation({
+      to: newEmail,
+      confirmUrl,
+      displayName: req.customer.first_name || req.customer.display_name || "użytkowniku",
+    });
+    res.json({ ok: true, sent: true });
   })
 );
 

@@ -162,3 +162,13 @@ export async function sendOperatorEmailToUser({ to, subject, text, html }) {
     html: bodyHtml,
   });
 }
+
+export async function sendEmailChangeConfirmation({ to, confirmUrl, displayName }) {
+  const name = displayName || "użytkowniku";
+  return sendMailMessage({
+    to: String(to || "").trim(),
+    subject: "Potwierdź zmianę adresu e-mail — Szepty Anielskie",
+    text: `Cześć ${name},\n\nPotwierdź zmianę adresu e-mail klikając link:\n${confirmUrl}\n\nLink jest ważny 48 godzin.\n`,
+    html: `<p>Cześć ${escapeHtml(name)},</p><p><a href="${confirmUrl}">Potwierdź zmianę adresu e-mail</a></p><p>Link jest ważny 48 godzin.</p>`,
+  });
+}

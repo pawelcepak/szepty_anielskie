@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS users (
   email_verified_at TEXT,
   email_verification_token TEXT,
   email_verification_expires_at TEXT,
-  pending_open_character_id TEXT
+  pending_open_character_id TEXT,
+  pending_email_change TEXT
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_ci ON users (lower(email));
