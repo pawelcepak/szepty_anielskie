@@ -14,7 +14,11 @@ npm run pg:check
 
 `pg:check` should print connected DB and counts for `users` and `operators`.
 
-## 2) SMTP via Brevo
+## 2) Operator panel URL (security by obscurity)
+
+Do not rely on `/operator` on production. Set a long, random `OPERATOR_PANEL_PATH` in Railway (for example `/zz-a7k9m2xq-praca`). The app serves the panel only under that prefix. Share the full URL only with staff.
+
+## 3) SMTP via Brevo
 
 Set these variables in backend service:
 
@@ -28,7 +32,7 @@ MAIL_FROM=Szept Kart <no-reply@szeptyanielskie.pl>
 PUBLIC_BASE_URL=https://szeptyanielskie.pl
 ```
 
-## 3) DNS for deliverability
+## 4) DNS for deliverability
 
 In your DNS zone for `szeptyanielskie.pl`, add records required by Brevo:
 
@@ -38,9 +42,9 @@ In your DNS zone for `szeptyanielskie.pl`, add records required by Brevo:
 
 Without these records, verification emails can be delayed or rejected.
 
-## 4) Verification testing checklist
+## 5) Verification testing checklist
 
 1. Register a fresh user.
 2. Confirm backend logs contain `[mail][verify][register]` with non-empty `accepted`.
 3. If mail does not arrive, use `Wyślij link ponownie` on login page and check `[mail][verify][resend]`.
-4. In `/operator` -> clients table, check `Status e-mail`.
+4. In the owner clients table in the operator panel (URL path from `OPERATOR_PANEL_PATH`), check `Status e-mail`.

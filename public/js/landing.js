@@ -11,12 +11,26 @@ function esc(s) {
 const root = document.getElementById("landing-team");
 if (!root) throw new Error("landing-team missing");
 
+let isLoggedIn = false;
+try {
+  const st = await api("/api/auth/status");
+  isLoggedIn = !!st?.logged_in;
+} catch {
+  isLoggedIn = false;
+}
+
+for (const link of document.querySelectorAll('a[href="/rejestracja.html"]')) {
+  if (isLoggedIn) link.setAttribute("href", "/panel.html");
+}
+
 try {
   const { characters } = await api("/api/characters");
   root.innerHTML = "";
   for (const c of characters) {
     const url = c.portrait_url || "";
-    const regHref = `/rejestracja.html?medium=${encodeURIComponent(c.id)}`;
+    const regHref = isLoggedIn
+      ? `/panel.html?open=${encodeURIComponent(c.id)}`
+      : `/rejestracja.html?medium=${encodeURIComponent(c.id)}`;
     const profileHref = `/medium.html?id=${encodeURIComponent(c.id)}`;
     const card = document.createElement("article");
     card.className = "tarot-card";

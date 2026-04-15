@@ -10,11 +10,11 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/operator/operator.css" />
+    <link rel="stylesheet" href="operator.css" />
   </head>
   <body>
     <header class="op-header op-header--main">
-      <a class="op-logo" href="/operator/">← Panel pracy</a>
+      <a class="op-logo" href="./">← Panel pracy</a>
       <span></span>
       <div class="op-header-actions">
         <button type="button" class="btn-ghost" id="btn-theme-toggle" title="Motyw">Motyw</button>
@@ -38,7 +38,7 @@
       <section class="moje-card">
         <h2>Skrót statystyk</h2>
         <div id="moje-dash" class="moje-dash"></div>
-        <p class="moje-hint"><a href="/operator/">Wróć do pulpitu</a>, aby zobaczyć pulę i szczegółowe okna czasowe.</p>
+        <p class="moje-hint"><a href="./">Wróć do pulpitu</a>, aby zobaczyć pulę i szczegółowe okna czasowe.</p>
       </section>
     </main>
     <script type="module">
@@ -75,7 +75,7 @@
       try {
         const me = await api("/api/op/me");
         if (me.operator.role === "owner") {
-          window.location.href = "/operator/";
+          window.location.href = "./";
           throw new Error("redirect");
         }
         document.getElementById("moje-who").textContent = `${me.operator.display_name} · ${me.operator.email}`;
@@ -126,7 +126,7 @@
           <li>Poprzednie 7 dni: ${d.messages_prev_7_days} wiad. · ~${d.estimated_earnings_prev_7_days_pln} zł</li>
         </ul>`;
       } catch (e) {
-        if (e.message !== "redirect") window.location.href = "/operator/";
+        if (e.message !== "redirect") window.location.href = "./";
       }
     </script>
   </body>

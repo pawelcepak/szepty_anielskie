@@ -30,20 +30,16 @@
       <div class="auth-card">
         <h1>Nowe konto</h1>
         <div id="chosen-medium-banner" class="chosen-medium-banner hidden" role="status" aria-live="polite"></div>
-        <p class="sub">
-          E-mail tylko do logowania — zespół go nie widzi. Przy rozmowie konsultanci widzą: nick, imię,
-          <strong>miasto</strong> i datę urodzenia. Miasto jest wymagane. Zdjęcie profilowe opcjonalne.
-          Po rejestracji wyślemy link aktywacyjny na podany adres e-mail.
-        </p>
+        <p class="sub">Po rejestracji wyślemy link aktywacyjny na podany adres e-mail.</p>
         <p class="form-info form-info--ok" id="register-success" hidden></p>
         <form id="form">
-          <label for="username">Nazwa użytkownika (widoczna dla zespołu)</label>
+          <label for="username">Nazwa użytkownika</label>
           <input
             id="username"
             name="username"
             type="text"
             autocomplete="username"
-            pattern="[a-z0-9_]{3,24}"
+            pattern="[A-Za-z0-9_]{3,24}"
             minlength="3"
             maxlength="24"
             required
@@ -61,7 +57,7 @@
             required
           />
 
-          <label for="city">Miasto (wymagane — orientacja dla zespołu, np. Kraków)</label>
+          <label for="city">Miasto</label>
           <input
             id="city"
             name="city"
@@ -73,19 +69,21 @@
             placeholder="Np. Warszawa"
           />
 
-          <label for="birth_date">Data urodzenia (wymagane ukończone 18 lat względem dzisiejszej daty)</label>
+          <label for="birth_date">Data urodzenia</label>
           <input id="birth_date" name="birth_date" type="date" required />
 
           <label for="email">E-mail (logowanie)</label>
           <input id="email" name="email" type="email" autocomplete="email" required />
 
-          <label for="password">Hasło (min. 8 znaków)</label>
+          <label for="password">Hasło</label>
           <input
             id="password"
             name="password"
             type="password"
             autocomplete="new-password"
             minlength="8"
+            pattern="(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,}"
+            title="Minimum 8 znaków, co najmniej 1 wielka litera, 1 cyfra i 1 znak specjalny"
             required
           />
 

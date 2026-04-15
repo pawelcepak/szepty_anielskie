@@ -39,7 +39,7 @@ if not exist ".env" (
 
 echo Serwer startuje. TO OKNO MUSI ZOSTAĆ OTWARTE podczas testów.
 echo Portal klienta:  http://localhost:3000/
-echo Panel pracy:     http://localhost:3000/operator/
+echo Panel pracy:     pelny adres w logu Node (OPERATOR_PANEL_PATH w .env, domyslnie .../operator/)
 echo Strona rekrut.:  http://localhost:3000/rekrutacja.html
 echo Zatrzymanie: Ctrl+C
 echo.

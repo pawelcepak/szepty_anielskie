@@ -57,6 +57,16 @@ if (process.env.NODE_ENV === "production" && !DATABASE_URL) {
 const ALLOW_FAKE_PURCHASE =
   String(process.env.ALLOW_FAKE_PURCHASE || "true").toLowerCase() === "true";
 
+/** Publiczny URL panelu operatora (ustaw w produkcji długi, losowy segment — nie używaj „/operator”). */
+function operatorPanelBasePath() {
+  let p = String(process.env.OPERATOR_PANEL_PATH || "").trim();
+  if (!p) p = "/operator";
+  if (!p.startsWith("/")) p = `/${p}`;
+  p = p.replace(/\/+$/, "");
+  return p || "/operator";
+}
+const OPERATOR_PANEL_PATH = operatorPanelBasePath();
+
 const COOKIE_CUSTOMER = "customer_session";
 const COOKIE_OPERATOR = "operator_session";
 const PKG_AMOUNTS = new Set(APP_CONFIG.pricing.clientPackages.map((pkg) => Number(pkg.amount)));
@@ -261,6 +271,8 @@ async function clearOperatorSession(req, res) {
 
 const emailOk = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 const usernameOk = (u) => /^[a-z0-9_]{3,24}$/.test(u);
+const passwordStrongOk = (p) =>
+  /[A-Z]/.test(p) && /[0-9]/.test(p) && /[^A-Za-z0-9]/.test(p);
 
 function parseBirthDate(s) {
   const t = String(s || "").trim();
@@ -355,6 +367,11 @@ app.post("/api/auth/register", registerJsonParser, async (req, res, next) => {
   if (!emailOk(email)) return res.status(400).json({ error: "Podaj poprawny adres e-mail." });
   if (password.length < 8) {
     return res.status(400).json({ error: "Hasło musi mieć co najmniej 8 znaków." });
+  }
+  if (!passwordStrongOk(password)) {
+    return res.status(400).json({
+      error: "Hasło musi zawierać co najmniej jedną wielką literę, jedną cyfrę i jeden znak specjalny.",
+    });
   }
   if (!usernameOk(username)) {
     return res.status(400).json({
@@ -621,7 +638,9 @@ app.get("/api/public/pricing", (_req, res) => {
 });
 
 app.get("/api/public/site-config", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
   res.json({
+    operator_panel_path: OPERATOR_PANEL_PATH,
     brandName: APP_CONFIG.brandName,
     domain: APP_CONFIG.domain,
     company: APP_CONFIG.company,
@@ -1806,11 +1825,11 @@ app.post("/api/op/inbox/:threadId/reply", requireOperator, asyncRoute(async (req
   });
 }));
 
-app.use("/operator", express.static(path.join(__dirname, "public", "operator")));
+app.use(OPERATOR_PANEL_PATH, express.static(path.join(__dirname, "public", "op-panel")));
 app.use(express.static(path.join(__dirname, "public")));
 
 app.listen(PORT, () => {
   console.log(`Portal klienta:  http://localhost:${PORT}/`);
-  console.log(`Panel pracy:     http://localhost:${PORT}/operator/`);
+  console.log(`Panel pracy:     http://localhost:${PORT}${OPERATOR_PANEL_PATH}/`);
   console.log(`Testowy zakup:   ${ALLOW_FAKE_PURCHASE ? "włączony" : "wyłączony"}`);
 });

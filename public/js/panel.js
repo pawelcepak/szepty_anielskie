@@ -252,9 +252,9 @@ function renderProfileStrip() {
   const u = me.user;
   const city = (u.city || "").trim();
   const bd = u.birth_date ? String(u.birth_date).slice(0, 10) : "—";
-  line.innerHTML = `Widoczne dla zespołu przy rozmowie: <strong>@${esc(u.username || "?")}</strong>, imię <strong>${esc(
+  line.innerHTML = `Profil: <strong>@${esc(u.username || "?")}</strong> · imię <strong>${esc(
     u.first_name || "?"
-  )}</strong>, miasto <strong>${city ? esc(city) : "—"}</strong>, data urodzenia <strong>${esc(bd)}</strong> (e-mail tylko do logowania).`;
+  )}</strong> · miasto <strong>${city ? esc(city) : "—"}</strong> · data urodzenia <strong>${esc(bd)}</strong>.`;
   if (form) {
     const need = !city;
     form.classList.toggle("hidden", !need);

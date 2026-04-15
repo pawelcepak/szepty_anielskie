@@ -54,7 +54,7 @@
         <a class="logo" href="/">Szept Kart</a>
         <nav class="nav-actions" aria-label="Nawigacja">
           <a href="/">Strona główna</a>
-          <a href="/operator/">Panel pracy (logowanie)</a>
+          <a href="#" class="js-op-panel-href">Panel pracy (logowanie)</a>
           <a href="/rejestracja.html">Konto klienta</a>
         </nav>
       </div>
@@ -73,7 +73,7 @@
             widełkach, które dopasujesz do swojej marki.
           </p>
           <div class="btn-row">
-            <a class="btn btn-primary" href="/operator/">Przejdź do panelu pracy</a>
+            <a class="btn btn-primary js-op-panel-href" href="#">Przejdź do panelu pracy</a>
             <a class="btn btn-outline" href="/">Zobacz stronę dla klientów</a>
           </div>
         </div>
@@ -173,5 +173,17 @@
         </p>
       </footer>
     </main>
+    <script type="module">
+      try {
+        const r = await fetch("/api/public/site-config", { credentials: "same-origin" });
+        const cfg = await r.json();
+        const base = String(cfg.operator_panel_path || "/operator").replace(/\/+$/, "") || "/operator";
+        document.querySelectorAll(".js-op-panel-href").forEach((a) => {
+          a.setAttribute("href", `${base}/`);
+        });
+      } catch {
+        /* ignore */
+      }
+    </script>
   </body>
 </html>

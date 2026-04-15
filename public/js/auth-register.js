@@ -107,6 +107,12 @@ document.getElementById("form").addEventListener("submit", async (e) => {
     if (submitBtn) submitBtn.disabled = false;
     return;
   }
+  if (!/[A-Z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+    err.textContent = "Hasło musi zawierać co najmniej jedną wielką literę, jedną cyfrę i jeden znak specjalny.";
+    err.hidden = false;
+    if (submitBtn) submitBtn.disabled = false;
+    return;
+  }
   const mediumParam = new URLSearchParams(window.location.search).get("medium");
   try {
     await api("/api/auth/register", {

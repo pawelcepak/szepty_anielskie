@@ -44,9 +44,18 @@ if (!id) {
   root.innerHTML = `<p class="form-error">Brak identyfikatora medium.</p>`;
 } else {
   try {
+    let isLoggedIn = false;
+    try {
+      const st = await api("/api/auth/status");
+      isLoggedIn = !!st?.logged_in;
+    } catch {
+      isLoggedIn = false;
+    }
     const { character: c } = await api(`/api/characters/${encodeURIComponent(id)}`);
     const av = availabilityForCharacter(c);
-    const regHref = `/rejestracja.html?medium=${encodeURIComponent(c.id)}`;
+    const regHref = isLoggedIn
+      ? `/panel.html?open=${encodeURIComponent(c.id)}`
+      : `/rejestracja.html?medium=${encodeURIComponent(c.id)}`;
     const panelHref = `/panel.html?open=${encodeURIComponent(c.id)}`;
     root.innerHTML = `
       <div class="medium-profile-top">
