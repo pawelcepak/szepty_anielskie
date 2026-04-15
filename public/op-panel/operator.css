@@ -2945,3 +2945,216 @@ kbd {
 .op-pass-dlg-err {
   margin: 0.25rem 0 0;
 }
+
+/* 2026 refresh: czytelniejszy panel administratora */
+:root {
+  --op-2026-bg: radial-gradient(circle at 22% 0%, #1e2344 0%, #13172d 44%, #0d1122 80%, #0a0d18 100%);
+  --op-2026-panel: rgba(20, 24, 42, 0.92);
+  --op-2026-panel-2: rgba(30, 37, 63, 0.92);
+  --op-2026-line: rgba(159, 173, 220, 0.25);
+  --op-2026-text: #e8ecff;
+  --op-2026-muted: rgba(210, 219, 246, 0.82);
+  --op-2026-accent: #77d3ff;
+  --op-2026-gold: #d8b56b;
+}
+
+body {
+  background: var(--op-2026-bg);
+  color: var(--op-2026-text);
+}
+
+.op-header,
+.op-header--main,
+.owner-tabs,
+.owner-mode-banner,
+.owner-advanced-toggle-wrap {
+  background: linear-gradient(180deg, rgba(10, 14, 28, 0.97), rgba(12, 16, 30, 0.95));
+  border-color: var(--op-2026-line);
+}
+
+.owner-tab,
+.btn-mon,
+.inbox-tab {
+  border-color: var(--op-2026-line);
+  background: rgba(34, 41, 72, 0.7);
+  color: #e7efff;
+}
+
+.owner-tab--active,
+.inbox-tab--active {
+  background: linear-gradient(180deg, #7dd8ff, #55b8e7);
+  color: #071726;
+  border-color: #6fd0ff;
+}
+
+.owner-full-page,
+.owner-full-inner,
+.layout-work,
+.col-inbox,
+.col-chat,
+.col-client,
+.col-consultant,
+.owner-monitor,
+.owner-insight-card,
+.owner-insight-feed-row,
+.owner-report-card,
+.mon-card,
+.moje-card,
+.reply-box {
+  background: var(--op-2026-panel);
+  border-color: var(--op-2026-line);
+  color: var(--op-2026-text);
+}
+
+.owner-page-title,
+.owner-subtitle,
+.col-title,
+.side-name {
+  color: #f4f7ff;
+}
+
+.owner-monitor-hint,
+.owner-prose,
+.owner-prose-lead,
+.queue-note,
+.queue-empty,
+.staff-payout-note,
+.side-meta,
+.reply-meta {
+  color: var(--op-2026-muted);
+}
+
+.thread-item {
+  border-bottom: 1px solid rgba(160, 175, 225, 0.16);
+}
+
+.thread-item:hover {
+  background: rgba(119, 211, 255, 0.1);
+}
+
+.thread-item.active {
+  background: rgba(119, 211, 255, 0.16);
+  box-shadow: inset 3px 0 0 var(--op-2026-accent);
+}
+
+.messages {
+  background: linear-gradient(180deg, rgba(20, 25, 45, 0.96), rgba(18, 21, 37, 0.94));
+}
+
+.bubble.user {
+  background: rgba(249, 251, 255, 0.96);
+  color: #11203c;
+  border-color: rgba(85, 130, 220, 0.36);
+}
+
+.bubble.staff {
+  background: rgba(223, 248, 240, 0.97);
+  color: #0f2f26;
+  border-color: rgba(20, 138, 103, 0.4);
+}
+
+.reply-box textarea,
+.payout-grid input,
+.payout-grid select,
+.sel,
+.fact-value,
+.login-card input {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--op-2026-line);
+  color: #eef3ff;
+}
+
+.reply-box textarea::placeholder {
+  color: rgba(219, 227, 250, 0.56);
+}
+
+.btn-primary-sm,
+.btn-send,
+.btn-queue-claim {
+  background: linear-gradient(180deg, #d8b56b, #b88d42);
+  color: #201307;
+}
+
+.btn-primary-sm:hover,
+.btn-send:hover,
+.btn-queue-claim:hover {
+  filter: brightness(1.06);
+}
+
+/* Mobile (popularne rozmiary 360-430 px) */
+@media (max-width: 430px) {
+  .op-header--main {
+    grid-template-columns: 1fr;
+    gap: 0.45rem;
+    padding: 0.55rem 0.65rem;
+  }
+  .op-header-center,
+  .op-header-actions {
+    justify-self: stretch;
+    justify-content: space-between;
+  }
+  .op-who {
+    max-width: 100%;
+    white-space: normal;
+    line-height: 1.3;
+    font-size: 11px;
+  }
+  .owner-tabs {
+    padding: 0.35rem 0.45rem;
+    gap: 0.3rem;
+  }
+  .owner-tab {
+    font-size: 11px;
+    padding: 0.3rem 0.5rem;
+  }
+  .layout-work--owner .col-inbox {
+    max-height: 48vh;
+  }
+  .layout-work--owner #inbox {
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
+    padding: 0.35rem;
+  }
+  .layout-work:not(.no-thread) .col-inbox,
+  .layout-work:not(.no-thread) .col-consultant,
+  .layout-work:not(.no-thread) .col-chat,
+  .layout-work:not(.no-thread) .col-client {
+    max-height: none;
+  }
+  .col-consultant,
+  .col-client {
+    padding: 0.6rem;
+  }
+  .reply-box {
+    padding: 0.6rem;
+  }
+  .messages {
+    padding: 0.55rem;
+    gap: 0.45rem;
+  }
+  .bubble {
+    max-width: 98%;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 393px) {
+  .btn-inbox-toggle,
+  .op-header button,
+  .op-header .linkbtn {
+    font-size: 11px;
+    padding: 0.28rem 0.48rem;
+  }
+  .owner-page-title {
+    font-size: 1.08rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .owner-full-inner {
+    padding: 0.7rem 0.65rem 1.25rem;
+  }
+  .mon-cards {
+    grid-template-columns: 1fr;
+  }
+}
