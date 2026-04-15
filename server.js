@@ -1711,6 +1711,81 @@ app.post("/api/op/inbox/:threadId/claim-stopped", requireOperator, asyncRoute(as
   res.json({ ok: true, assignment: await getAssignmentPayload(db, threadId, req.operator) });
 }));
 
+app.get("/api/op/teaser/targets", requireOperator, requireOwner, asyncRoute(async (req, res) => {
+  const limRaw = Number(req.query.limit || 80);
+  const limit = Number.isFinite(limRaw) ? Math.max(10, Math.min(300, Math.floor(limRaw))) : 80;
+  const rows = await db.prepare(
+      `SELECT u.id AS user_id, u.first_name, u.display_name, u.username, u.city,
+              c.id AS character_id, c.name AS character_name, c.category
+       FROM users u
+       CROSS JOIN characters c
+       WHERE u.blocked_at IS NULL
+         AND u.email_verified_at IS NOT NULL
+         AND NOT EXISTS (
+           SELECT 1 FROM threads t
+           WHERE t.user_id = u.id AND t.character_id = c.id
+         )
+       ORDER BY datetime(u.created_at) DESC, c.sort_order ASC, c.name ASC
+       LIMIT ?`
+    )
+    .all(limit);
+  res.json({
+    targets: rows.map((r) => ({
+      user_id: r.user_id,
+      user_name: r.first_name || r.display_name || r.username || "Klient",
+      username: r.username || "",
+      city: r.city || "",
+      character_id: r.character_id,
+      character_name: r.character_name,
+      category: r.category || "",
+    })),
+  });
+}));
+
+app.post("/api/op/teaser/send", requireOperator, requireOwner, asyncRoute(async (req, res) => {
+  const userId = String(req.body?.user_id || "").trim();
+  const characterId = String(req.body?.character_id || "").trim();
+  const body = String(req.body?.body || "").trim();
+  if (!userId || !characterId) {
+    return res.status(400).json({ error: "Wybierz klienta i medium." });
+  }
+  if (body.length < 8 || body.length > 1200) {
+    return res.status(400).json({ error: "Treść zaczepki: 8-1200 znaków." });
+  }
+  const userRow = await db
+    .prepare("SELECT id, blocked_at, email_verified_at FROM users WHERE id = ?")
+    .get(userId);
+  if (!userRow || userRow.blocked_at || !userRow.email_verified_at) {
+    return res.status(404).json({ error: "Nie znaleziono aktywnego klienta." });
+  }
+  const chRow = await db.prepare("SELECT id FROM characters WHERE id = ?").get(characterId);
+  if (!chRow) return res.status(404).json({ error: "Nie znaleziono medium." });
+  let thread = await db
+    .prepare("SELECT id FROM threads WHERE user_id = ? AND character_id = ?")
+    .get(userId, characterId);
+  if (!thread) {
+    const tid = uuidv4();
+    await db.prepare("INSERT INTO threads (id, user_id, character_id) VALUES (?, ?, ?)").run(tid, userId, characterId);
+    thread = { id: tid };
+  }
+  const msgId = uuidv4();
+  await db
+    .prepare("INSERT INTO messages (id, thread_id, sender, body, operator_id) VALUES (?, ?, 'staff', ?, ?)")
+    .run(msgId, thread.id, body, req.operator.id);
+  await db
+    .prepare(
+      `INSERT INTO operator_audit (id, operator_id, action, thread_id, detail)
+       VALUES (?, ?, 'teaser_send', ?, ?)`
+    )
+    .run(
+      uuidv4(),
+      req.operator.id,
+      thread.id,
+      JSON.stringify({ user_id: userId, character_id: characterId, message_id: msgId })
+    );
+  res.json({ ok: true, thread_id: thread.id, message_id: msgId });
+}));
+
 app.post("/api/op/inbox/:threadId/ai-draft", requireOperator, asyncRoute(async (req, res) => {
   const threadId = String(req.params.threadId || "").trim();
   if (!(await threadVisibleToOperator(db, threadId, req.operator.id, req.operator.role))) {

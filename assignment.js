@@ -231,7 +231,7 @@ const sqlLastAt = `(SELECT m.created_at FROM messages m WHERE m.thread_id = t.id
 const sqlUserMsgCount = `(SELECT COUNT(*) FROM messages m WHERE m.thread_id = t.id AND m.sender = 'user')`;
 
 /**
- * Filtr listy rozmów (zakładki): mine | pool | no_user | stopped | all (właściciel).
+ * Filtr listy rozmów (zakładki): mine | pool | no_user | stopped | pending | all (właściciel).
  */
 export function inboxBucketClause(operator, bucketRaw) {
   const isOwner = operator.role === "owner";
@@ -256,6 +256,13 @@ export function inboxBucketClause(operator, bucketRaw) {
   if (b === "stopped") {
     return {
       sql: `t.assigned_operator_id IS NULL AND ${sqlLastSender} = 'staff' AND datetime(${sqlLastAt}) <= datetime('now', '-${REMINDER_AFTER_STAFF_HOURS} hours')`,
+      params: [],
+    };
+  }
+  if (b === "pending") {
+    if (!isOwner) return { sql: "0=1", params: [] };
+    return {
+      sql: `${sqlLastSender} = 'user'`,
       params: [],
     };
   }

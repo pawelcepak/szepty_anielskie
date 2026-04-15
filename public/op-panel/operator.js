@@ -113,6 +113,48 @@ let ownerClientsActionsBound = false;
 let ownerAdvancedUnlocked = false;
 let ownerMarketingBound = false;
 let marketingSelectedChannels = new Set(["instagram", "tiktok"]);
+const TEASER_TEMPLATES_KEY = "owner-teaser-templates-v1";
+const DEFAULT_TEASER_TEMPLATES = [
+  "Witaj! Jeśli chcesz, mogę pomóc Ci spojrzeć spokojnie na Twoją obecną sytuację i podpowiedzieć pierwszy krok.",
+  "Cześć! Widzę, że możesz potrzebować wsparcia. Napisz 2-3 zdania o tym, co teraz jest dla Ciebie najważniejsze.",
+  "Dzień dobry! Jeśli masz pytanie o relacje, pracę lub kierunek działania, chętnie pomogę w krótkiej konsultacji.",
+  "Witaj! Możesz opisać, co najbardziej Cię teraz martwi, a przygotuję konkretną odpowiedź krok po kroku.",
+  "Cześć! Jeśli chcesz, zaczniemy od jednego pytania przewodniego i ustalimy, co warto zrobić najpierw.",
+];
+const MARKETING_STARTER_PRESETS = [
+  "Nowy tydzień, nowa energia",
+  "Krótka wróżba dnia",
+  "Tarot na dziś",
+  "3 znaki, że czas na zmianę",
+  "Relacje: sygnały, których nie warto ignorować",
+  "Jak odzyskać spokój po stresie",
+  "Mini rytuał na dobry dzień",
+  "Astrologiczna wskazówka tygodnia",
+  "Jak zadawać dobre pytania do konsultacji",
+  "Pierwsza konsultacja: od czego zacząć",
+];
+const MARKETING_GROWTH_PRESETS = [
+  "Powrót klienta po 7 dniach",
+  "Pakiet 20 wiadomości - przypomnienie",
+  "Historia przemiany klientki",
+  "Q&A: najczęstsze pytania o tarot",
+  "TikTok: 3 szybkie porady relacyjne",
+  "Instagram Reels: karta dnia",
+  "Kampania weekendowa: relacje",
+  "Kampania weekendowa: praca i finanse",
+  "Lookalike: podobni do aktywnych klientów",
+  "Remarketing: porzucony panel rozmów",
+  "Cross-sell: tarot + astrologia",
+  "Urodzinowa kampania klienta",
+  "Reaktywacja klienta po 30 dniach",
+  "Seria edukacyjna: mity o wróżbach",
+  "Przewodnik: jak korzystać z konsultacji",
+  "Sezonowa kampania pełni księżyca",
+  "Mikro-oferta: 10 wiadomości start",
+  "Oferta premium: 100 wiadomości",
+  "Newsletter: horoskop tygodnia",
+  "Pinterest: inspiracje duchowe",
+];
 
 function showLogin(on) {
   viewLogin.classList.toggle("hidden", !on);
@@ -436,7 +478,7 @@ function applyRoleChrome() {
   const staffSub = document.getElementById("staff-top-subnav");
   const advWrap = document.getElementById("owner-advanced-toggle-wrap");
   const advBtn = document.getElementById("owner-advanced-toggle");
-  inboxBucket = opRole === "owner" ? "all" : "mine";
+  inboxBucket = opRole === "owner" ? "pending" : "mine";
   layoutWork?.classList.remove("layout-work--sidebar-hidden");
   setInboxOpen(false);
   btnRozmowy?.setAttribute("aria-pressed", "false");
@@ -986,6 +1028,23 @@ async function refreshOwnerMarketing() {
   const err = document.getElementById("mkt-err");
   const out = document.getElementById("mkt-results");
   if (!channelsWrap || !btn || !err || !out) return;
+  const starterEl = document.getElementById("mkt-starter-list");
+  const growthEl = document.getElementById("mkt-growth-list");
+  function renderPresetCards() {
+    const mk = (arr, kind) =>
+      arr
+        .map(
+          (name) => `<article class="owner-insight-card">
+            <h4 class="owner-insight-card-title">${esc(name)}</h4>
+            <p class="owner-insight-card-body">Kanały: Instagram + TikTok (domyślnie). Kliknij, aby wypełnić temat.</p>
+            <button type="button" class="btn-mon" data-mkt-preset="${esc(name)}" data-mkt-kind="${kind}">Użyj tego startera</button>
+          </article>`
+        )
+        .join("");
+    if (starterEl) starterEl.innerHTML = mk(MARKETING_STARTER_PRESETS, "starter");
+    if (growthEl) growthEl.innerHTML = mk(MARKETING_GROWTH_PRESETS, "growth");
+  }
+  renderPresetCards();
   if (!ownerMarketingBound) {
     ownerMarketingBound = true;
     channelsWrap.addEventListener("click", (ev) => {
@@ -1053,6 +1112,28 @@ async function refreshOwnerMarketing() {
         btn.disabled = false;
       }
     });
+    document.getElementById("owner-page-marketing")?.addEventListener("click", (ev) => {
+      const p = ev.target.closest("[data-mkt-preset]");
+      if (!p) return;
+      const name = p.getAttribute("data-mkt-preset") || "";
+      const kind = p.getAttribute("data-mkt-kind") || "starter";
+      const topic = document.getElementById("mkt-topic");
+      const offer = document.getElementById("mkt-offer");
+      const audience = document.getElementById("mkt-audience");
+      const custom = document.getElementById("mkt-custom-prompt");
+      if (topic) topic.value = name;
+      if (offer) {
+        offer.value =
+          kind === "growth"
+            ? "Przypomnienie o pakietach i szybkim wejściu do konsultacji"
+            : "Start konsultacji i pierwsza odpowiedź bez czekania";
+      }
+      if (audience) audience.value = kind === "growth" ? "aktywni + powracający klienci" : "nowi odbiorcy";
+      if (custom) {
+        custom.value =
+          "Skup się głównie na Instagram i TikTok. Podaj krótki hook, zwięzły opis i praktyczne hashtagi.";
+      }
+    });
   }
 }
 
@@ -1062,10 +1143,10 @@ function renderInboxTabs() {
   const tabs =
     opRole === "owner"
       ? [
-          { key: "all", label: "Wszystkie" },
-          { key: "pool", label: "Pula (klient pisze)" },
-          { key: "no_user", label: "Bez wiad. klienta" },
+          { key: "pending", label: "Oczekujące na odpowiedź" },
           { key: "stopped", label: "Zatrzymane" },
+          { key: "teaser", label: "Zaczepka" },
+          { key: "all", label: "Wszystkie" },
         ]
       : [
           { key: "mine", label: "Twoje rozmowy" },
@@ -1648,6 +1729,112 @@ async function refreshStaffList() {
   }
 }
 
+function loadTeaserTemplates() {
+  const raw = localStorage.getItem(TEASER_TEMPLATES_KEY);
+  if (!raw) return [...DEFAULT_TEASER_TEMPLATES];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [...DEFAULT_TEASER_TEMPLATES];
+    const out = parsed.map((x) => String(x || "").trim()).filter(Boolean);
+    return out.length ? out.slice(0, 80) : [...DEFAULT_TEASER_TEMPLATES];
+  } catch {
+    return [...DEFAULT_TEASER_TEMPLATES];
+  }
+}
+
+function saveTeaserTemplates(list) {
+  localStorage.setItem(TEASER_TEMPLATES_KEY, JSON.stringify(list.slice(0, 80)));
+}
+
+async function renderOwnerTeaserPanel() {
+  if (opRole !== "owner") return;
+  const wrap = document.getElementById("owner-teaser-panel");
+  const inboxEl = document.getElementById("inbox");
+  const targetSel = document.getElementById("teaser-target");
+  const tplSel = document.getElementById("teaser-template");
+  const bodyEl = document.getElementById("teaser-body");
+  const err = document.getElementById("teaser-err");
+  const btnSave = document.getElementById("btn-teaser-save-template");
+  const btnSend = document.getElementById("btn-teaser-send");
+  if (!wrap || !inboxEl || !targetSel || !tplSel || !bodyEl || !err || !btnSave || !btnSend) return;
+  wrap.classList.remove("hidden");
+  inboxEl.classList.add("hidden");
+  const templates = loadTeaserTemplates();
+  tplSel.innerHTML = templates
+    .map((t, i) => `<option value="${i}">${esc(t.slice(0, 70))}</option>`)
+    .join("");
+  if (templates[0] && !bodyEl.value.trim()) bodyEl.value = templates[0];
+  tplSel.onchange = () => {
+    const idx = Number(tplSel.value);
+    if (Number.isFinite(idx) && templates[idx]) bodyEl.value = templates[idx];
+  };
+  err.hidden = true;
+  err.textContent = "";
+  const data = await api("/api/op/teaser/targets?limit=120");
+  const targets = data.targets || [];
+  if (!targets.length) {
+    targetSel.innerHTML = `<option value="">Brak par klient-medium do zaczepki.</option>`;
+  } else {
+    targetSel.innerHTML = targets
+      .map(
+        (t, i) =>
+          `<option value="${i}">${esc(t.user_name)}${t.username ? " (@" + esc(t.username) + ")" : ""} → ${esc(
+            t.character_name
+          )} [${esc(t.category || "medium")}]</option>`
+      )
+      .join("");
+  }
+  btnSave.onclick = () => {
+    const text = String(bodyEl.value || "").trim();
+    if (text.length < 8) {
+      err.textContent = "Szablon jest za krótki.";
+      err.hidden = false;
+      return;
+    }
+    const next = [text, ...templates.filter((x) => x !== text)];
+    saveTeaserTemplates(next);
+    tplSel.innerHTML = next
+      .map((t, i) => `<option value="${i}">${esc(t.slice(0, 70))}</option>`)
+      .join("");
+    tplSel.value = "0";
+    err.hidden = true;
+  };
+  btnSend.onclick = async () => {
+    err.hidden = true;
+    const idx = Number(targetSel.value);
+    const item = targets[idx];
+    const text = String(bodyEl.value || "").trim();
+    if (!item) {
+      err.textContent = "Wybierz klienta i medium.";
+      err.hidden = false;
+      return;
+    }
+    if (text.length < 8) {
+      err.textContent = "Treść zaczepki jest za krótka.";
+      err.hidden = false;
+      return;
+    }
+    btnSend.disabled = true;
+    try {
+      await api("/api/op/teaser/send", {
+        method: "POST",
+        body: JSON.stringify({
+          user_id: item.user_id,
+          character_id: item.character_id,
+          body: text,
+        }),
+      });
+      await refreshInbox();
+      alert("Zaczepka wysłana.");
+    } catch (e) {
+      err.textContent = e.message || String(e);
+      err.hidden = false;
+    } finally {
+      btnSend.disabled = false;
+    }
+  };
+}
+
 function inboxMessagesUrl(threadId, limit) {
   return `/api/op/inbox/${encodeURIComponent(threadId)}/messages?limit=${limit}`;
 }
@@ -2216,11 +2403,22 @@ async function refreshInbox() {
     await refreshStaffConvView();
     return;
   }
+  const teaserWrap = document.getElementById("owner-teaser-panel");
+  const inboxEl = document.getElementById("inbox");
+  if (inboxBucket === "teaser") {
+    if (teaserWrap) teaserWrap.classList.remove("hidden");
+    if (inboxEl) inboxEl.classList.add("hidden");
+    renderInboxTabs();
+    await renderOwnerTeaserPanel();
+    return;
+  }
   const data = await api(`/api/op/inbox?bucket=${encodeURIComponent(inboxBucket)}`);
   threads = data.threads || [];
+  if (teaserWrap) teaserWrap.classList.add("hidden");
+  if (inboxEl) inboxEl.classList.remove("hidden");
   renderInboxTabs();
-  const inboxEl = document.getElementById("inbox");
-  inboxEl.innerHTML = "";
+  const inboxPane = document.getElementById("inbox");
+  inboxPane.innerHTML = "";
   for (const t of threads) {
     const btn = document.createElement("button");
     btn.type = "button";
@@ -2249,7 +2447,7 @@ async function refreshInbox() {
       await openThread(t.thread_id);
       setInboxOpen(false);
     });
-    inboxEl.appendChild(btn);
+    inboxPane.appendChild(btn);
   }
 }
 

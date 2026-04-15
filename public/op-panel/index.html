@@ -197,6 +197,12 @@
             </div>
             <p class="err" id="mkt-err" hidden></p>
           </div>
+          <div class="owner-monitor">
+            <h3 class="owner-subtitle">Startery kampanii (na start: 10)</h3>
+            <div id="mkt-starter-list" class="owner-insights-cards"></div>
+            <h3 class="owner-subtitle">Startery kampanii (gdy są już klienci: 20)</h3>
+            <div id="mkt-growth-list" class="owner-insights-cards"></div>
+          </div>
           <div id="mkt-results" class="owner-insights-cards" style="margin-top: 1rem"></div>
         </div>
       </div>
@@ -223,6 +229,21 @@
           <h2 class="col-title" id="inbox-main-title">Skrzynka</h2>
           <nav class="inbox-bucket-tabs hidden" id="inbox-bucket-tabs" aria-label="Widok listy rozmów"></nav>
           <h3 class="col-title col-title--sub hidden" id="inbox-subtitle">Moje przypisane rozmowy</h3>
+          <section id="owner-teaser-panel" class="hidden" aria-label="Panel zaczepki">
+            <div class="owner-monitor" style="margin: 0.5rem">
+              <h4 class="owner-subtitle" style="margin-top: 0">Zaczepka klienta</h4>
+              <p class="owner-monitor-hint">Wybierz klienta i medium, którego jeszcze nie wybrał, a potem wyślij zaczepkę.</p>
+              <select id="teaser-target" class="sel"></select>
+              <label class="inline-label" for="teaser-template">Szablon zaczepki</label>
+              <select id="teaser-template" class="sel"></select>
+              <textarea id="teaser-body" class="fact-value" rows="5" maxlength="1200" placeholder="Treść zaczepki do klienta..."></textarea>
+              <div class="owner-reports-toolbar">
+                <button type="button" class="btn-mon" id="btn-teaser-save-template">Zapisz jako szablon</button>
+                <button type="button" class="btn-mon" id="btn-teaser-send">Wyślij zaczepkę</button>
+              </div>
+              <p class="err" id="teaser-err" hidden></p>
+            </div>
+          </section>
           <div id="inbox"></div>
         </aside>
 
