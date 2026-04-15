@@ -49,7 +49,7 @@
       </div>
       <nav class="owner-tabs hidden" id="owner-tabs" aria-label="Sekcje administratora">
         <button type="button" class="owner-tab owner-tab--active" data-owner-tab="inbox">Rozmowy</button>
-        <button type="button" class="owner-tab" data-owner-tab="marketing">Reklama</button>
+        <button type="button" class="owner-tab" data-owner-tab="clients">Klienci</button>
         <button type="button" class="owner-tab owner-tab--advanced hidden" data-owner-tab="monitor">Monitor i sesje</button>
         <button type="button" class="owner-tab owner-tab--advanced hidden" data-owner-tab="reports">
           Zgłoszenia <span class="owner-tab-badge hidden" id="owner-tab-reports-badge" aria-live="polite"></span>
@@ -58,19 +58,14 @@
         <button type="button" class="owner-tab owner-tab--advanced hidden" data-owner-tab="insights">Audyt i premie</button>
         <button type="button" class="owner-tab owner-tab--advanced hidden" data-owner-tab="hr">Obsługa pracowników</button>
         <button type="button" class="owner-tab owner-tab--advanced hidden" data-owner-tab="kyc">Weryfikacja tożsamości</button>
-        <button type="button" class="owner-tab" data-owner-tab="clients">Klienci</button>
+        <button type="button" class="owner-tab owner-tab--trail" data-owner-tab="marketing">Reklama</button>
       </nav>
       <header class="op-header op-header--main">
         <a class="op-logo" href="./" id="op-logo-main" title="Panel pracy — Szepty Anielskie">Szept</a>
-        <div class="op-header-center">
-          <button type="button" class="btn-inbox-toggle" id="btn-toggle-inbox" aria-expanded="false">
-            Panel boczny
-          </button>
-          <button type="button" class="btn-inbox-toggle btn-rozmowy-toggle" id="btn-rozmowy">
-            Rozmowy
-          </button>
-        </div>
         <div class="op-header-actions">
+          <button type="button" class="btn-ghost hidden" id="btn-inbox-sidebar" title="Lista rozmów (Ctrl+B — pokaż/ukryj kolumnę)">
+            Lista
+          </button>
           <nav class="staff-top-subnav hidden" id="staff-top-subnav" aria-label="Pracownik — skróty">
             <a class="linkbtn linkbtn--subtle" href="moje.html" id="link-staff-moje">Moje konto</a>
             <button type="button" class="btn-ghost btn-ghost--tab" id="btn-staff-tab-main">Pulpit</button>
@@ -232,8 +227,14 @@
           <section id="owner-teaser-panel" class="hidden" aria-label="Panel zaczepki">
             <div class="owner-monitor" style="margin: 0.5rem">
               <h4 class="owner-subtitle" style="margin-top: 0">Zaczepka klienta</h4>
-              <p class="owner-monitor-hint">Wybierz klienta i medium, którego jeszcze nie wybrał, a potem wyślij zaczepkę.</p>
-              <select id="teaser-target" class="sel"></select>
+              <p class="owner-monitor-hint">
+                Wybierz klienta, potem medium (tylko taka para, z którą klient jeszcze nie pisał). Wątki „Zatrzymane” —
+                gdy klient nie odpowie ≥48 h po wiadomości zespołu (zgodnie z ustawieniem serwera).
+              </p>
+              <label class="inline-label" for="teaser-client">Klient</label>
+              <select id="teaser-client" class="sel"></select>
+              <label class="inline-label" for="teaser-medium">Medium (bez istniejącej rozmowy)</label>
+              <select id="teaser-medium" class="sel"></select>
               <label class="inline-label" for="teaser-template">Szablon zaczepki</label>
               <select id="teaser-template" class="sel"></select>
               <textarea id="teaser-body" class="fact-value" rows="5" maxlength="1200" placeholder="Treść zaczepki do klienta..."></textarea>
@@ -274,6 +275,17 @@
           </aside>
 
           <section class="col-chat" aria-label="Czat i odpowiedź">
+            <div class="client-admin-actions client-admin-actions--above-chat hidden" id="client-admin-actions">
+              <h3 class="fact-block-title">Obsługa klienta</h3>
+              <p class="side-hint" id="client-admin-status"></p>
+              <div class="client-admin-actions-row">
+                <button type="button" class="btn-primary-sm" id="btn-client-block">Zablokuj klienta</button>
+                <button type="button" class="btn-primary-sm hidden" id="btn-client-unblock">Odblokuj klienta</button>
+                <button type="button" class="btn-primary-sm" id="btn-client-email">Wyślij e-mail</button>
+                <button type="button" class="btn-primary-sm btn-mon--danger" id="btn-client-delete">Usuń konto klienta</button>
+              </div>
+              <p class="err" id="client-admin-err" hidden></p>
+            </div>
             <div id="staff-hub-panel" class="staff-hub-panel hidden">
               <div id="staff-hub-main-view">
                 <p class="dash-lead">
@@ -371,7 +383,7 @@
             <div class="chat-empty" id="chat-empty">
               <p id="chat-empty-line1">Wybierz rozmowę z listy po lewej.</p>
               <p class="chat-empty-tip" id="chat-empty-tip">
-                Na węższym ekranie otwórz panel przyciskiem <strong>Panel boczny</strong>.
+                Na węższym ekranie: przycisk <strong>Lista</strong> lub <strong>Ctrl+B</strong> — pokazuje / ukrywa listę rozmów.
               </p>
             </div>
             <div class="chat-body hidden" id="chat-body">
@@ -385,7 +397,8 @@
                     <div class="reply-banned-popover" id="reply-banned-popover" role="tooltip"></div>
                   </span>
                 </div>
-                <textarea id="reply" maxlength="8000" rows="3" placeholder="Treść wiadomości…"></textarea>
+                <textarea id="reply" maxlength="1500" rows="3" placeholder="Treść wiadomości…"></textarea>
+                <p class="reply-char-bar hidden" id="reply-char-bar" aria-live="polite"></p>
                 <details class="ai-assist-details">
                   <summary class="ai-assist-summary">
                     Asystent AI
@@ -451,17 +464,6 @@
               <p class="err" id="fk-err" hidden></p>
             </div>
             <div class="fact-list" id="fk-list"></div>
-            <div class="client-admin-actions hidden" id="client-admin-actions">
-              <h3 class="fact-block-title">Obsługa klienta</h3>
-              <p class="side-hint" id="client-admin-status"></p>
-              <div class="client-admin-actions-row">
-                <button type="button" class="btn-primary-sm" id="btn-client-block">Zablokuj klienta</button>
-                <button type="button" class="btn-primary-sm hidden" id="btn-client-unblock">Odblokuj klienta</button>
-                <button type="button" class="btn-primary-sm" id="btn-client-email">Wyślij e-mail</button>
-                <button type="button" class="btn-primary-sm btn-mon--danger" id="btn-client-delete">Usuń konto klienta</button>
-              </div>
-              <p class="err" id="client-admin-err" hidden></p>
-            </div>
           </aside>
         </div>
       </div>

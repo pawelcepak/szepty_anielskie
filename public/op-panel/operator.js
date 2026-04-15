@@ -101,8 +101,8 @@ const ownerTabsEl = document.getElementById("owner-tabs");
 const layoutWork = document.getElementById("layout-work");
 const colInbox = document.getElementById("col-inbox");
 const inboxBackdrop = document.getElementById("inbox-backdrop");
-const btnToggleInbox = document.getElementById("btn-toggle-inbox");
-const btnRozmowy = document.getElementById("btn-rozmowy");
+const btnInboxSidebar = document.getElementById("btn-inbox-sidebar");
+const INBOX_COLLAPSE_KEY = "op-inbox-collapsed-v1";
 const chatBody = document.getElementById("chat-body");
 /** Czy są jeszcze starsze wiadomości do pobrania (większy limit niż obecna liczba). */
 let messagesHasMore = false;
@@ -164,7 +164,6 @@ function showLogin(on) {
 function setInboxOpen(open) {
   colInbox.classList.toggle("is-open", open);
   inboxBackdrop.hidden = !open;
-  btnToggleInbox.setAttribute("aria-expanded", open ? "true" : "false");
 }
 
 function isWideInboxLayout() {
@@ -174,17 +173,36 @@ function isWideInboxLayout() {
 /** Lista rozmów jako osobny widok (nie zawsze widoczny panel). */
 function rozmowySetOpen(open) {
   if (!layoutWork) return;
+  if (opRole === "owner") {
+    layoutWork.classList.toggle("layout-work--inbox-collapsed", !open);
+    if (btnInboxSidebar) btnInboxSidebar.setAttribute("aria-pressed", open ? "true" : "false");
+    try {
+      localStorage.setItem(
+        INBOX_COLLAPSE_KEY,
+        layoutWork.classList.contains("layout-work--inbox-collapsed") ? "1" : "0"
+      );
+    } catch {
+      /* ignore */
+    }
+    if (!isWideInboxLayout()) setInboxOpen(false);
+    return;
+  }
   if (isWideInboxLayout()) {
     layoutWork.classList.toggle("layout-work--sidebar-hidden", !open);
-    if (btnRozmowy) btnRozmowy.setAttribute("aria-pressed", open ? "true" : "false");
+    if (btnInboxSidebar) btnInboxSidebar.setAttribute("aria-pressed", open ? "true" : "false");
   } else {
     layoutWork.classList.remove("layout-work--sidebar-hidden");
     setInboxOpen(open);
-    if (btnRozmowy) btnRozmowy.setAttribute("aria-pressed", open ? "true" : "false");
+    if (btnInboxSidebar) btnInboxSidebar.setAttribute("aria-pressed", open ? "true" : "false");
   }
 }
 
 function rozmowyToggle() {
+  if (opRole === "owner") {
+    const collapsed = layoutWork.classList.contains("layout-work--inbox-collapsed");
+    rozmowySetOpen(collapsed);
+    return;
+  }
   if (isWideInboxLayout()) {
     const hidden = layoutWork.classList.contains("layout-work--sidebar-hidden");
     rozmowySetOpen(hidden);
@@ -471,6 +489,7 @@ function applyRoleChrome() {
   const bucketTabs = document.getElementById("inbox-bucket-tabs");
   const mainTitle = document.getElementById("inbox-main-title");
   const line1 = document.getElementById("chat-empty-line1");
+  const chatEmptyTip = document.getElementById("chat-empty-tip");
   const chatEmpty = document.getElementById("chat-empty");
   const ob = document.getElementById("owner-mode-banner");
   const linkClient = document.getElementById("header-link-client");
@@ -481,9 +500,9 @@ function applyRoleChrome() {
   inboxBucket = opRole === "owner" ? "pending" : "mine";
   layoutWork?.classList.remove("layout-work--sidebar-hidden");
   setInboxOpen(false);
-  btnRozmowy?.setAttribute("aria-pressed", "false");
-  btnToggleInbox?.classList.toggle("hidden", opRole !== "owner");
-  btnRozmowy?.classList.toggle("hidden", opRole !== "owner");
+  btnInboxSidebar?.setAttribute("aria-pressed", "false");
+  if (opRole !== "owner") layoutWork?.classList.remove("layout-work--inbox-collapsed");
+  btnInboxSidebar?.classList.toggle("hidden", opRole !== "owner");
   staffSub?.classList.toggle("hidden", opRole === "owner");
   const logoMain = document.getElementById("op-logo-main");
   if (logoMain) {
@@ -506,6 +525,10 @@ function applyRoleChrome() {
     mainTitle.textContent = "Lista rozmów (administrator)";
     line1.textContent =
       "Wątki po lewej (jak w komunikatorze). U góry: Monitor, Klienci, Reklama. Pracownicy nie widzą witryny klienta.";
+    if (chatEmptyTip) {
+      chatEmptyTip.innerHTML =
+        "Na węższym ekranie: przycisk <strong>Lista</strong> lub <strong>Ctrl+B</strong> — pokazuje / ukrywa listę rozmów.";
+    }
     chatEmpty.classList.remove("hidden");
     layoutWork.classList.remove("hidden");
     layoutWork.classList.add("layout-work--owner");
@@ -523,6 +546,10 @@ function applyRoleChrome() {
     mainTitle.textContent = "Lista rozmów";
     line1.textContent =
       "Jako pracownik lista rozmów jest w zakładce „Rozmowy” — stąd przechodzisz do wątku; odpowiedź piszesz dopiero w otwartym czacie.";
+    if (chatEmptyTip) {
+      chatEmptyTip.innerHTML =
+        "Na węższym ekranie otwórz panel przyciskiem <strong>Panel boczny</strong>.";
+    }
     chatEmpty.classList.add("hidden");
     layoutWork.classList.remove("hidden");
     layoutWork.classList.remove("layout-work--owner");
@@ -726,10 +753,10 @@ function setOwnerTab(tab) {
   }
   layoutWork.classList.toggle("hidden", tab !== "inbox");
   if (tab === "inbox") {
-    if (isWideInboxLayout() && opRole !== "owner") layoutWork.classList.add("layout-work--sidebar-hidden");
-    else layoutWork.classList.remove("layout-work--sidebar-hidden");
+    layoutWork.classList.remove("layout-work--sidebar-hidden");
     setInboxOpen(false);
-    btnRozmowy?.setAttribute("aria-pressed", "false");
+    const collapsed = layoutWork.classList.contains("layout-work--inbox-collapsed");
+    btnInboxSidebar?.setAttribute("aria-pressed", collapsed ? "false" : "true");
   }
   if (tab === "monitor") refreshOwnerMonitor();
   if (tab === "reports") refreshOwnerReports();
@@ -758,13 +785,27 @@ function setOwnerTab(tab) {
 
 function updateReplyMeta() {
   const el = document.getElementById("reply-meta");
+  const bar = document.getElementById("reply-char-bar");
   const ta = document.getElementById("reply");
   const send = document.getElementById("btn-send");
   if (!el || !ta || !send) return;
   const n = ta.value.length;
   const min = currentAssignment?.min_reply_chars ?? (opRole === "owner" ? 20 : 100);
-  const max = currentAssignment?.reply_max_chars ?? (opRole === "owner" ? 8000 : 900);
-  el.textContent = `Znaki w odpowiedzi: ${n} (wymagane minimum ${min}, maks. ${max}).`;
+  const max = currentAssignment?.reply_max_chars ?? (opRole === "owner" ? 1500 : 900);
+  if (bar) {
+    if (opRole === "owner") {
+      bar.hidden = false;
+      bar.textContent = `${n}/${max}`;
+      bar.classList.toggle("reply-char-bar--warn", n > max * 0.95);
+    } else {
+      bar.hidden = true;
+      bar.textContent = "";
+    }
+  }
+  el.textContent =
+    opRole === "owner"
+      ? `Minimum ${min} znaków.`
+      : `Znaki w odpowiedzi: ${n} (wymagane minimum ${min}, maks. ${max}).`;
   const okLen = n >= min && n <= max;
   send.disabled = !okLen || !activeId;
 }
@@ -1746,17 +1787,38 @@ function saveTeaserTemplates(list) {
   localStorage.setItem(TEASER_TEMPLATES_KEY, JSON.stringify(list.slice(0, 80)));
 }
 
+function fillTeaserMediumOptions(clientSel, mediumSel, targets) {
+  const uid = String(clientSel.value || "").trim();
+  mediumSel.innerHTML = "";
+  if (!uid) {
+    mediumSel.innerHTML = `<option value="">— najpierw wybierz klienta —</option>`;
+    return;
+  }
+  const opts = targets.filter((t) => t.user_id === uid);
+  if (!opts.length) {
+    mediumSel.innerHTML = `<option value="">Brak dostępnych medium dla tego klienta.</option>`;
+    return;
+  }
+  mediumSel.innerHTML = opts
+    .map(
+      (t) =>
+        `<option value="${esc(t.character_id)}">${esc(t.character_name)} (${esc(t.category || "medium")})</option>`
+    )
+    .join("");
+}
+
 async function renderOwnerTeaserPanel() {
   if (opRole !== "owner") return;
   const wrap = document.getElementById("owner-teaser-panel");
   const inboxEl = document.getElementById("inbox");
-  const targetSel = document.getElementById("teaser-target");
+  const clientSel = document.getElementById("teaser-client");
+  const mediumSel = document.getElementById("teaser-medium");
   const tplSel = document.getElementById("teaser-template");
   const bodyEl = document.getElementById("teaser-body");
   const err = document.getElementById("teaser-err");
   const btnSave = document.getElementById("btn-teaser-save-template");
   const btnSend = document.getElementById("btn-teaser-send");
-  if (!wrap || !inboxEl || !targetSel || !tplSel || !bodyEl || !err || !btnSave || !btnSend) return;
+  if (!wrap || !inboxEl || !clientSel || !mediumSel || !tplSel || !bodyEl || !err || !btnSave || !btnSend) return;
   wrap.classList.remove("hidden");
   inboxEl.classList.add("hidden");
   const templates = loadTeaserTemplates();
@@ -1773,16 +1835,28 @@ async function renderOwnerTeaserPanel() {
   const data = await api("/api/op/teaser/targets?limit=120");
   const targets = data.targets || [];
   if (!targets.length) {
-    targetSel.innerHTML = `<option value="">Brak par klient-medium do zaczepki.</option>`;
+    clientSel.innerHTML = `<option value="">Brak klientów z możliwą zaczepką.</option>`;
+    mediumSel.innerHTML = `<option value="">—</option>`;
   } else {
-    targetSel.innerHTML = targets
+    const byUser = new Map();
+    for (const t of targets) {
+      if (!byUser.has(t.user_id)) {
+        byUser.set(t.user_id, {
+          user_id: t.user_id,
+          user_name: t.user_name,
+          username: t.username || "",
+        });
+      }
+    }
+    const clients = [...byUser.values()];
+    clientSel.innerHTML = clients
       .map(
-        (t, i) =>
-          `<option value="${i}">${esc(t.user_name)}${t.username ? " (@" + esc(t.username) + ")" : ""} → ${esc(
-            t.character_name
-          )} [${esc(t.category || "medium")}]</option>`
+        (c) =>
+          `<option value="${esc(c.user_id)}">${esc(c.user_name)}${c.username ? " (@" + esc(c.username) + ")" : ""}</option>`
       )
       .join("");
+    clientSel.onchange = () => fillTeaserMediumOptions(clientSel, mediumSel, targets);
+    fillTeaserMediumOptions(clientSel, mediumSel, targets);
   }
   btnSave.onclick = () => {
     const text = String(bodyEl.value || "").trim();
@@ -1801,10 +1875,10 @@ async function renderOwnerTeaserPanel() {
   };
   btnSend.onclick = async () => {
     err.hidden = true;
-    const idx = Number(targetSel.value);
-    const item = targets[idx];
+    const uid = String(clientSel.value || "").trim();
+    const cid = String(mediumSel.value || "").trim();
     const text = String(bodyEl.value || "").trim();
-    if (!item) {
+    if (!uid || !cid) {
       err.textContent = "Wybierz klienta i medium.";
       err.hidden = false;
       return;
@@ -1819,8 +1893,8 @@ async function renderOwnerTeaserPanel() {
       await api("/api/op/teaser/send", {
         method: "POST",
         body: JSON.stringify({
-          user_id: item.user_id,
-          character_id: item.character_id,
+          user_id: uid,
+          character_id: cid,
           body: text,
         }),
       });
@@ -2036,26 +2110,25 @@ function opRenderMessages(msgs, opts = {}) {
         ? `<span class="bubble-own-foot">Twoja wiadomość</span>`
         : "";
     const bubbleInner = `<span class="meta">${esc(who)} · ${esc(formatOpPlTime(msg.created_at))}</span>${esc(msg.body)}${ownFoot}`;
-    const aiPick = `<label class="msg-ai-pick"><input type="checkbox" class="msg-ai-check" data-msg-id="${esc(
-      msg.id
-    )}" ${selectedAiMessageIds.has(msg.id) ? "checked" : ""}/>AI</label>`;
-    let sideHtml = aiPick;
+    const aiSel = selectedAiMessageIds.has(msg.id) ? " bubble-row--ai-selected" : "";
+    let sideHtml = "";
     if (opRole === "staff") {
-      const reportHtml = msg.has_open_report
+      sideHtml = msg.has_open_report
         ? `<span class="msg-report-badge" title="Właściciel widzi to zgłoszenie">Zgłoszone</span>`
         : `<button type="button" class="btn-msg-report" data-msg-id="${esc(
             msg.id
           )}" title="Zgłoś właścicielowi (dowolna wiadomość z czatu)">Zgłoś</button>`;
-      sideHtml = `${reportHtml}${aiPick}`;
     } else if (opRole === "owner" && msg.has_open_report) {
-      sideHtml = `<span class="msg-report-badge" title="Otwarte zgłoszenie">Zgłoszenie</span>${aiPick}`;
+      sideHtml = `<span class="msg-report-badge" title="Otwarte zgłoszenie">Zgłoszenie</span>`;
     }
     const div = document.createElement("div");
     div.className = `bubble ${msg.sender === "staff" ? "staff" : "user"}`;
     div.innerHTML = bubbleInner;
+    const row = document.createElement("div");
+    row.className = `bubble-row bubble-row--${msg.sender === "user" ? "user" : "staff"}${aiSel}`;
+    row.setAttribute("data-msg-id", msg.id);
+    row.title = "Kliknij wiersz, aby zaznaczyć lub odznaczyć do asystenta AI";
     if (sideHtml) {
-      const row = document.createElement("div");
-      row.className = `bubble-row bubble-row--${msg.sender === "user" ? "user" : "staff"}`;
       const aside = document.createElement("div");
       aside.className = "bubble-aside";
       aside.innerHTML = sideHtml;
@@ -2066,10 +2139,14 @@ function opRenderMessages(msgs, opts = {}) {
         row.appendChild(div);
         row.appendChild(aside);
       }
-      opMessages.appendChild(row);
     } else {
-      opMessages.appendChild(div);
+      if (msg.sender === "user") {
+        row.appendChild(div);
+      } else {
+        row.appendChild(div);
+      }
     }
+    opMessages.appendChild(row);
   }
   if (preserve && prev) {
     opMessages.scrollTop = opMessages.scrollHeight - prev.scrollHeight + prev.scrollTop;
@@ -2090,6 +2167,16 @@ async function trySession() {
     if (opRole === "owner") await refreshStaffList();
     if (opRole === "owner") updateOwnerReportsBadge(me.open_message_reports ?? 0);
     applyRoleChrome();
+    if (opRole === "owner" && layoutWork) {
+      try {
+        if (localStorage.getItem(INBOX_COLLAPSE_KEY) === "1") layoutWork.classList.add("layout-work--inbox-collapsed");
+        else layoutWork.classList.remove("layout-work--inbox-collapsed");
+      } catch {
+        /* ignore */
+      }
+      const collapsed = layoutWork.classList.contains("layout-work--inbox-collapsed");
+      btnInboxSidebar?.setAttribute("aria-pressed", collapsed ? "false" : "true");
+    }
     if (me.payout) {
       const p = me.payout;
       const setv = (id, v) => {
@@ -2244,13 +2331,15 @@ async function trySession() {
         }
       });
       document.getElementById("op-messages")?.addEventListener("click", async (ev) => {
-        const chk = ev.target.closest(".msg-ai-check");
-        if (chk) {
-          const mid = chk.getAttribute("data-msg-id");
-          if (!mid) return;
-          if (chk.checked) selectedAiMessageIds.add(mid);
-          else selectedAiMessageIds.delete(mid);
-          updateAiSelectedCounter();
+        const row = ev.target.closest(".bubble-row[data-msg-id]");
+        if (row && !ev.target.closest(".btn-msg-report")) {
+          const mid = row.getAttribute("data-msg-id");
+          if (mid) {
+            if (selectedAiMessageIds.has(mid)) selectedAiMessageIds.delete(mid);
+            else selectedAiMessageIds.add(mid);
+            row.classList.toggle("bubble-row--ai-selected", selectedAiMessageIds.has(mid));
+            updateAiSelectedCounter();
+          }
           return;
         }
         const btn = ev.target.closest(".btn-msg-report");
@@ -2350,7 +2439,7 @@ async function trySession() {
     }
 
     const replyTa = document.getElementById("reply");
-    if (replyTa) replyTa.maxLength = opRole === "owner" ? 8000 : 900;
+    if (replyTa) replyTa.maxLength = opRole === "owner" ? 1500 : 900;
 
     await refreshInbox();
   } catch {
@@ -2391,11 +2480,24 @@ document.getElementById("btn-logout").addEventListener("click", async () => {
 
 document.getElementById("btn-refresh").addEventListener("click", () => refreshInbox());
 
-btnToggleInbox.addEventListener("click", () => {
-  setInboxOpen(!colInbox.classList.contains("is-open"));
-});
-btnRozmowy?.addEventListener("click", () => rozmowyToggle());
+btnInboxSidebar?.addEventListener("click", () => rozmowyToggle());
 inboxBackdrop.addEventListener("click", () => setInboxOpen(false));
+
+document.addEventListener("keydown", (e) => {
+  if (!e.ctrlKey || String(e.key || "").toLowerCase() !== "b" || opRole !== "owner") return;
+  const t = e.target;
+  if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable))
+    return;
+  e.preventDefault();
+  layoutWork?.classList.toggle("layout-work--inbox-collapsed");
+  const collapsed = layoutWork?.classList.contains("layout-work--inbox-collapsed");
+  btnInboxSidebar?.setAttribute("aria-pressed", collapsed ? "false" : "true");
+  try {
+    localStorage.setItem(INBOX_COLLAPSE_KEY, collapsed ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+});
 
 async function refreshInbox() {
   if (opRole !== "owner") {
@@ -2607,7 +2709,7 @@ async function sendReply() {
   const body = document.getElementById("reply").value.trim();
   if (!body) return;
   const min = currentAssignment?.min_reply_chars ?? (opRole === "owner" ? 20 : 100);
-  const max = currentAssignment?.reply_max_chars ?? (opRole === "owner" ? 8000 : 900);
+  const max = currentAssignment?.reply_max_chars ?? (opRole === "owner" ? 1500 : 900);
   if (body.length < min) {
     replyErr.textContent = `Odpowiedź musi mieć co najmniej ${min} znaków (obecnie ${body.length}).`;
     replyErr.hidden = false;

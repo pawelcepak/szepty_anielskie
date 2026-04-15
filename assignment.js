@@ -13,7 +13,7 @@ const QUEUE_FETCH_CAP = 150;
 export const STAFF_REPLY_MIN_CHARS = Number(process.env.STAFF_REPLY_MIN_CHARS || 100);
 export const OWNER_REPLY_MIN_CHARS = Number(process.env.OWNER_REPLY_MIN_CHARS || 20);
 export const STAFF_REPLY_MAX_CHARS = Number(process.env.STAFF_REPLY_MAX_CHARS || 900);
-export const OWNER_REPLY_MAX_CHARS = Number(process.env.OWNER_REPLY_MAX_CHARS || 8000);
+export const OWNER_REPLY_MAX_CHARS = Number(process.env.OWNER_REPLY_MAX_CHARS || 1500);
 
 const REMINDER_AFTER_STAFF_HOURS = Math.min(
   168,
