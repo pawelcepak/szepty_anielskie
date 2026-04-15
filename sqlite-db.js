@@ -403,6 +403,14 @@ db.transaction(() => {
 const updCharMeta = db.prepare(
   `UPDATE characters SET gender = ?, skills = ?, about = ? WHERE id = ?`
 );
+const updCharCore = db.prepare(
+  `UPDATE characters SET name = ?, tagline = ?, category = ?, sort_order = ? WHERE id = ?`
+);
+db.transaction(() => {
+  for (const r of EXTRA_OR_BASE_ROWS) {
+    updCharCore.run(r[1], r[2], r[3], r[4], r[0]);
+  }
+})();
 db.transaction(() => {
   for (const [id, m] of Object.entries(CHAR_ABOUT)) {
     updCharMeta.run(m.gender, m.skills, m.about, id);

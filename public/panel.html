@@ -19,7 +19,9 @@
         <a class="logo" href="/">Szept Kart</a>
         <nav class="nav-actions nav-actions--panel">
           <div class="panel-nav-status">
-            <span class="top-meta top-meta--strong" id="who"></span>
+            <button type="button" class="btn btn-outline btn-sm" id="account-summary-toggle">
+              <span class="top-meta top-meta--strong" id="who"></span>
+            </button>
             <span class="top-meta" id="session-hint"></span>
           </div>
           <a class="link-panel-topup" href="/panel-doladowanie.html">Pakiet / doładowanie</a>
@@ -31,6 +33,13 @@
 
     <div id="panel-live-region" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
     <div id="client-toast" class="client-toast hidden" role="status"></div>
+    <section id="account-summary-card" class="auth-card auth-card--wide hidden" style="max-width: 980px; margin: 1rem auto 0">
+      <h2 style="margin-top: 0">Twoje konto</h2>
+      <p class="sub" id="summary-current-thread"></p>
+      <p class="sub" id="summary-last-status"></p>
+      <p class="sub" id="summary-pack-left"></p>
+      <p class="sub" id="summary-best-pack"></p>
+    </section>
 
     <div class="panel-app">
       <section class="panel-profile-strip" id="panel-profile-strip" aria-label="Twój profil w skrócie">

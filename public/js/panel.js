@@ -10,6 +10,7 @@ let me = null;
 let characters = [];
 let selectedId = null;
 let myThreads = [];
+let pricing = [];
 let sessionKeepTimer = null;
 let pollTimer = null;
 
@@ -127,6 +128,46 @@ function updateDocumentTitle() {
   document.title = n > 0 ? `(${n}) ${base}` : base;
 }
 
+function bestValuePackage() {
+  if (!pricing.length) return null;
+  const valid = pricing
+    .map((p) => ({ amount: Number(p.amount), price_pln: Number(p.price_pln) }))
+    .filter((p) => Number.isFinite(p.amount) && Number.isFinite(p.price_pln) && p.amount > 0 && p.price_pln > 0)
+    .sort((a, b) => a.price_pln / a.amount - b.price_pln / b.amount || b.amount - a.amount);
+  return valid[0] || null;
+}
+
+function refreshAccountSummary() {
+  const threadEl = document.getElementById("summary-current-thread");
+  const statusEl = document.getElementById("summary-last-status");
+  const leftEl = document.getElementById("summary-pack-left");
+  const bestEl = document.getElementById("summary-best-pack");
+  if (!threadEl || !statusEl || !leftEl || !bestEl || !me) return;
+  const activeThread = myThreads.find((t) => t.character_id === selectedId);
+  threadEl.textContent = activeThread
+    ? `Rozmowa: ${activeThread.character_name}`
+    : "Rozmowa: nie wybrano jeszcze medium.";
+  if (!activeThread) {
+    statusEl.textContent = "Status: brak aktywnego wątku.";
+  } else {
+    statusEl.textContent =
+      activeThread.last_sender === "user"
+        ? "Status: czekasz na odpowiedź medium."
+        : "Status: medium odpowiedziało w tym wątku.";
+  }
+  leftEl.textContent = `Pakiet wiadomości: pozostało ${me.messages_remaining} wiadomości.`;
+  const best = bestValuePackage();
+  if (me.messages_remaining <= 3 && best) {
+    bestEl.textContent = `Kończy się pakiet. Najbardziej opłacalny pakiet: ${best.amount} wiadomości za ${best.price_pln.toFixed(
+      2
+    )} zł.`;
+  } else if (best) {
+    bestEl.textContent = `Najlepsza cena pakietu obecnie: ${best.amount} wiadomości za ${best.price_pln.toFixed(2)} zł.`;
+  } else {
+    bestEl.textContent = "Pakiety: brak danych cennika.";
+  }
+}
+
 function showToast(msg) {
   const t = document.getElementById("client-toast");
   const lr = document.getElementById("panel-live-region");
@@ -162,6 +203,7 @@ async function loadThreads() {
     showToast("Masz nową odpowiedź od konsultanta — otwórz zakładkę „Moje rozmowy”.");
   }
   updateDocumentTitle();
+  refreshAccountSummary();
 }
 
 function renderMyThreads() {
@@ -305,11 +347,13 @@ async function loadMe() {
   renderProfileStrip();
   bindPanelCityFormOnce();
   setBalance(me.messages_remaining);
-  const ch = await api("/api/characters");
+  const [ch, pr] = await Promise.all([api("/api/characters"), api("/api/public/pricing")]);
   characters = ch.characters;
+  pricing = pr.packages || [];
   await loadThreads();
   updateDocumentTitle();
   renderBrowseCatalog();
+  refreshAccountSummary();
   startSessionKeepalive();
   startThreadPoll();
 }
@@ -449,6 +493,13 @@ document.getElementById("logout").addEventListener("click", async () => {
 document.getElementById("tab-browse")?.addEventListener("click", () => switchView("browse"));
 document.getElementById("tab-chat")?.addEventListener("click", () => switchView("chat"));
 document.getElementById("btn-to-browse")?.addEventListener("click", () => switchView("browse"));
+
+document.getElementById("account-summary-toggle")?.addEventListener("click", () => {
+  const card = document.getElementById("account-summary-card");
+  if (!card) return;
+  card.classList.toggle("hidden");
+  refreshAccountSummary();
+});
 
 document.getElementById("btn-hide-thread")?.addEventListener("click", async () => {
   if (!selectedId) return;
