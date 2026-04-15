@@ -375,6 +375,8 @@
               </p>
             </div>
             <div class="chat-body hidden" id="chat-body">
+              <p class="timeline-hint">Najnowsze u góry — starsza historia dołącza automatycznie, gdy przewijasz w dół.</p>
+              <div class="messages messages--newest-first" id="op-messages"></div>
               <div class="reply-box">
                 <div class="reply-label-row">
                   <label for="reply">Odpowiedź do klienta</label>
@@ -383,31 +385,36 @@
                     <div class="reply-banned-popover" id="reply-banned-popover" role="tooltip"></div>
                   </span>
                 </div>
-                <textarea id="reply" maxlength="8000" rows="4" placeholder="Treść wiadomości…"></textarea>
-                <div class="ai-assist-box" id="ai-assist-box">
-                  <div class="ai-assist-top">
-                    <strong>Asystent AI</strong>
-                    <span id="ai-selected-count">Zaznaczone do AI: 0</span>
+                <textarea id="reply" maxlength="8000" rows="3" placeholder="Treść wiadomości…"></textarea>
+                <details class="ai-assist-details">
+                  <summary class="ai-assist-summary">
+                    Asystent AI
+                    <span class="ai-assist-summary-hint">— zaznacz wiadomości w czacie, potem generuj szkic</span>
+                  </summary>
+                  <div class="ai-assist-box" id="ai-assist-box">
+                    <div class="ai-assist-top">
+                      <span id="ai-selected-count">Zaznaczone do AI: 0</span>
+                    </div>
+                    <div class="ai-assist-controls">
+                      <select id="ai-provider" class="sel" aria-label="Dostawca AI">
+                        <option value="auto">Auto (Anthropic/OpenAI)</option>
+                        <option value="anthropic">Anthropic</option>
+                        <option value="openai">OpenAI</option>
+                      </select>
+                      <button type="button" class="btn-primary-sm" id="btn-ai-generate">Generuj szkic</button>
+                      <button type="button" class="btn-primary-sm" id="btn-ai-clear">Wyczyść zaznaczenie</button>
+                    </div>
+                    <label class="inline-label" for="ai-prompt">Twój prompt (edytowalny)</label>
+                    <textarea
+                      id="ai-prompt"
+                      class="fact-value"
+                      rows="2"
+                      maxlength="5000"
+                      placeholder="Np. odpowiedz spokojnie, krótko…"
+                    ></textarea>
+                    <p class="err" id="ai-err" hidden></p>
                   </div>
-                  <div class="ai-assist-controls">
-                    <select id="ai-provider" class="sel" aria-label="Dostawca AI">
-                      <option value="auto">Auto (Anthropic/OpenAI)</option>
-                      <option value="anthropic">Anthropic</option>
-                      <option value="openai">OpenAI</option>
-                    </select>
-                    <button type="button" class="btn-primary-sm" id="btn-ai-generate">Generuj szkic</button>
-                    <button type="button" class="btn-primary-sm" id="btn-ai-clear">Wyczyść zaznaczenie</button>
-                  </div>
-                  <label class="inline-label" for="ai-prompt">Twój prompt (edytowalny)</label>
-                  <textarea
-                    id="ai-prompt"
-                    class="fact-value"
-                    rows="3"
-                    maxlength="5000"
-                    placeholder="Np. Odpowiedz spokojnie, krótko, bez obietnic i z propozycją 1 pytania doprecyzowującego."
-                  ></textarea>
-                  <p class="err" id="ai-err" hidden></p>
-                </div>
+                </details>
                 <p class="reply-meta" id="reply-meta" aria-live="polite"></p>
                 <div class="reply-actions">
                   <span class="reply-deadline-chip hidden" id="reply-deadline-chip" aria-live="polite"></span>
@@ -415,8 +422,6 @@
                 </div>
                 <p class="err" id="reply-err" hidden></p>
               </div>
-              <p class="timeline-hint">Najnowsze u góry — starsza historia dołącza automatycznie, gdy przewijasz w dół.</p>
-              <div class="messages messages--newest-first" id="op-messages"></div>
             </div>
           </section>
 

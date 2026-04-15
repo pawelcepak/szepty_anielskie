@@ -505,7 +505,7 @@ function applyRoleChrome() {
     linkRecruit?.classList.add("hidden");
     mainTitle.textContent = "Lista rozmów (administrator)";
     line1.textContent =
-      "Lista wątków jest zawsze pod zakładkami. Monitor, zespół i klienci — w pasku u góry. Pracownicy nie widzą witryny klienta.";
+      "Wątki po lewej (jak w komunikatorze). U góry: Monitor, Klienci, Reklama. Pracownicy nie widzą witryny klienta.";
     chatEmpty.classList.remove("hidden");
     layoutWork.classList.remove("hidden");
     layoutWork.classList.add("layout-work--owner");
