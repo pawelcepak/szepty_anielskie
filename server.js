@@ -104,6 +104,92 @@ app.use(express.json({ limit: "512kb" }));
 app.use(cookieParser());
 const registerJsonParser = express.json({ limit: "1mb" });
 
+function openAiKey() {
+  return String(process.env.OPENAI_API_KEY || "").trim();
+}
+
+function anthropicKey() {
+  return String(process.env.ANTHROPIC_API_KEY || "").trim();
+}
+
+function hasOpenAi() {
+  return !!openAiKey();
+}
+
+function hasAnthropic() {
+  return !!anthropicKey();
+}
+
+function pickAiProvider(requested) {
+  const pref = String(requested || "auto").trim().toLowerCase();
+  if (pref === "openai") return hasOpenAi() ? "openai" : null;
+  if (pref === "anthropic") return hasAnthropic() ? "anthropic" : null;
+  if (hasAnthropic()) return "anthropic";
+  if (hasOpenAi()) return "openai";
+  return null;
+}
+
+async function generateDraftWithOpenAi({ prompt }) {
+  const key = openAiKey();
+  if (!key) throw new Error("Brak OPENAI_API_KEY.");
+  const model = String(process.env.OPENAI_MODEL || "gpt-4o-mini").trim();
+  const r = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0.6,
+      messages: [
+        {
+          role: "system",
+          content:
+            "Jesteś asystentem operatora portalu ezoterycznego. Tworzysz empatyczne, konkretne odpowiedzi po polsku, bez obietnic gwarantowanego skutku i bez zachęt do kontaktu poza platformą.",
+        },
+        { role: "user", content: prompt },
+      ],
+    }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    throw new Error(String(data?.error?.message || data?.message || `OpenAI API error ${r.status}`));
+  }
+  const txt = String(data?.choices?.[0]?.message?.content || "").trim();
+  if (!txt) throw new Error("OpenAI nie zwrócił treści odpowiedzi.");
+  return { text: txt, model };
+}
+
+async function generateDraftWithAnthropic({ prompt }) {
+  const key = anthropicKey();
+  if (!key) throw new Error("Brak ANTHROPIC_API_KEY.");
+  const model = String(process.env.ANTHROPIC_MODEL || "claude-3-5-haiku-latest").trim();
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": key,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 900,
+      temperature: 0.6,
+      system:
+        "Jesteś asystentem operatora portalu ezoterycznego. Tworzysz empatyczne, konkretne odpowiedzi po polsku, bez obietnic gwarantowanego skutku i bez zachęt do kontaktu poza platformą.",
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    throw new Error(String(data?.error?.message || data?.message || `Anthropic API error ${r.status}`));
+  }
+  const txt = String(data?.content?.[0]?.text || "").trim();
+  if (!txt) throw new Error("Anthropic nie zwrócił treści odpowiedzi.");
+  return { text: txt, model };
+}
+
 function tokenBytes() {
   return crypto.randomBytes(32).toString("hex");
 }
@@ -1601,6 +1687,71 @@ app.post("/api/op/inbox/:threadId/claim-stopped", requireOperator, asyncRoute(as
   const r = await tryClaimStoppedThread(db, req.operator, threadId);
   if (!r.ok) return res.status(403).json({ error: r.error });
   res.json({ ok: true, assignment: await getAssignmentPayload(db, threadId, req.operator) });
+}));
+
+app.post("/api/op/inbox/:threadId/ai-draft", requireOperator, asyncRoute(async (req, res) => {
+  const threadId = String(req.params.threadId || "").trim();
+  if (!(await threadVisibleToOperator(db, threadId, req.operator.id, req.operator.role))) {
+    return res.status(403).json({ error: "Brak dostępu do tego wątku." });
+  }
+  const provider = pickAiProvider(req.body?.provider);
+  if (!provider) {
+    return res.status(503).json({
+      error: "Brak klucza AI. Ustaw OPENAI_API_KEY i/lub ANTHROPIC_API_KEY w zmiennych środowiskowych.",
+    });
+  }
+  const messageIds = Array.isArray(req.body?.message_ids)
+    ? [...new Set(req.body.message_ids.map((x) => String(x || "").trim()).filter(Boolean))]
+    : [];
+  if (messageIds.length < 1) {
+    return res.status(400).json({ error: "Wybierz co najmniej jedną wiadomość do kontekstu." });
+  }
+  if (messageIds.length > 40) {
+    return res.status(400).json({ error: "Maksymalnie 40 wiadomości do jednego szkicu." });
+  }
+  const promptUser = String(req.body?.prompt || "").trim();
+  if (!promptUser) return res.status(400).json({ error: "Podaj własny prompt dla asystenta AI." });
+  if (promptUser.length > 5000) {
+    return res.status(400).json({ error: "Prompt jest za długi (max 5000 znaków)." });
+  }
+  const placeholders = messageIds.map(() => "?").join(", ");
+  const msgs = await db.prepare(
+      `SELECT id, sender, body, created_at
+       FROM messages
+       WHERE thread_id = ? AND id IN (${placeholders})
+       ORDER BY datetime(created_at) ASC`
+    )
+    .all(threadId, ...messageIds);
+  if (!msgs.length) {
+    return res.status(404).json({ error: "Nie znaleziono wybranych wiadomości w tym wątku." });
+  }
+  const lines = msgs.map((m) => {
+    const who = m.sender === "staff" ? "Konsultant" : "Klient";
+    const body = m.sender === "user" ? maskClientNumbersForOperator(m.body) : m.body;
+    return `- [${who}] ${String(body || "").trim()}`;
+  });
+  const finalPrompt = [
+    "Na podstawie wybranych wiadomości przygotuj jedną propozycję odpowiedzi do klienta.",
+    "Styl: ciepły, konkretny, ludzki. Nie podawaj telefonu/e-maila, nie odsyłaj poza portal.",
+    "Zwróć samą gotową odpowiedź, bez nagłówków i bez komentarza meta.",
+    "",
+    "Wybrane wiadomości:",
+    lines.join("\n"),
+    "",
+    "Własna instrukcja operatora:",
+    promptUser,
+  ].join("\n");
+  const out =
+    provider === "anthropic"
+      ? await generateDraftWithAnthropic({ prompt: finalPrompt })
+      : await generateDraftWithOpenAi({ prompt: finalPrompt });
+  res.json({
+    ok: true,
+    provider,
+    model: out.model,
+    draft: out.text,
+    used_messages: msgs.length,
+  });
 }));
 
 app.post("/api/op/inbox/:threadId/touch", requireOperator, asyncRoute(async (req, res) => {

@@ -91,6 +91,9 @@ let touchTimer = null;
 let assignHintTimer = null;
 /** Liczba wiadomości pobieranych z API (15, potem +10). */
 let messagesFetchLimit = 15;
+let selectedAiMessageIds = new Set();
+let currentThreadMessages = [];
+const AI_PROMPT_STORAGE_KEY = "op-ai-prompt-v1";
 
 const viewLogin = document.getElementById("view-login");
 const viewApp = document.getElementById("view-app");
@@ -1588,6 +1591,95 @@ function setHasMoreFromData(data) {
   messagesHasMore = !!data?.has_more_messages;
 }
 
+function loadAiPromptFromStorage() {
+  const el = document.getElementById("ai-prompt");
+  if (!el) return;
+  const saved = localStorage.getItem(AI_PROMPT_STORAGE_KEY);
+  if (saved && saved.trim()) {
+    el.value = saved;
+    return;
+  }
+  el.value =
+    "Napisz propozycję odpowiedzi po polsku, empatycznie i konkretnie. Bez danych kontaktowych i bez obietnic gwarancji.";
+}
+
+function saveAiPromptToStorage() {
+  const el = document.getElementById("ai-prompt");
+  if (!el) return;
+  localStorage.setItem(AI_PROMPT_STORAGE_KEY, String(el.value || ""));
+}
+
+function clearAiSelection() {
+  selectedAiMessageIds.clear();
+  updateAiSelectedCounter();
+}
+
+function updateAiSelectedCounter() {
+  const el = document.getElementById("ai-selected-count");
+  if (!el) return;
+  el.textContent = `Zaznaczone do AI: ${selectedAiMessageIds.size}`;
+}
+
+function getSelectedMessagesForAi() {
+  const ids = [];
+  for (const msg of currentThreadMessages) {
+    if (selectedAiMessageIds.has(msg.id)) ids.push(msg.id);
+  }
+  return ids;
+}
+
+async function generateAiDraft() {
+  const err = document.getElementById("ai-err");
+  if (err) {
+    err.hidden = true;
+    err.textContent = "";
+  }
+  if (!activeId) return;
+  const ids = getSelectedMessagesForAi();
+  if (!ids.length) {
+    if (err) {
+      err.textContent = "Zaznacz co najmniej jedną wiadomość do AI.";
+      err.hidden = false;
+    }
+    return;
+  }
+  const promptEl = document.getElementById("ai-prompt");
+  const providerEl = document.getElementById("ai-provider");
+  const replyEl = document.getElementById("reply");
+  if (!promptEl || !providerEl || !replyEl) return;
+  const prompt = String(promptEl.value || "").trim();
+  if (!prompt) {
+    if (err) {
+      err.textContent = "Podaj prompt dla asystenta AI.";
+      err.hidden = false;
+    }
+    return;
+  }
+  saveAiPromptToStorage();
+  const btn = document.getElementById("btn-ai-generate");
+  if (btn) btn.disabled = true;
+  try {
+    const r = await api(`/api/op/inbox/${encodeURIComponent(activeId)}/ai-draft`, {
+      method: "POST",
+      body: JSON.stringify({
+        message_ids: ids,
+        prompt,
+        provider: String(providerEl.value || "auto"),
+      }),
+    });
+    replyEl.value = String(r.draft || "").trim();
+    updateReplyMeta();
+    replyEl.focus();
+  } catch (e) {
+    if (err) {
+      err.textContent = e.message || String(e);
+      err.hidden = false;
+    }
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 const opMessages = document.getElementById("op-messages");
 
 async function loadMoreMessagesOlder() {
@@ -1655,6 +1747,7 @@ async function reloadThreadData() {
 }
 
 function opRenderMessages(msgs, opts = {}) {
+  currentThreadMessages = Array.isArray(msgs) ? msgs : [];
   const preserve = !!opts.preserveOlderScroll;
   const prev = preserve
     ? { scrollHeight: opMessages.scrollHeight, scrollTop: opMessages.scrollTop }
@@ -1667,15 +1760,19 @@ function opRenderMessages(msgs, opts = {}) {
         ? `<span class="bubble-own-foot">Twoja wiadomość</span>`
         : "";
     const bubbleInner = `<span class="meta">${esc(who)} · ${esc(formatOpPlTime(msg.created_at))}</span>${esc(msg.body)}${ownFoot}`;
-    let sideHtml = "";
+    const aiPick = `<label class="msg-ai-pick"><input type="checkbox" class="msg-ai-check" data-msg-id="${esc(
+      msg.id
+    )}" ${selectedAiMessageIds.has(msg.id) ? "checked" : ""}/>AI</label>`;
+    let sideHtml = aiPick;
     if (opRole === "staff") {
-      sideHtml = msg.has_open_report
+      const reportHtml = msg.has_open_report
         ? `<span class="msg-report-badge" title="Właściciel widzi to zgłoszenie">Zgłoszone</span>`
         : `<button type="button" class="btn-msg-report" data-msg-id="${esc(
             msg.id
           )}" title="Zgłoś właścicielowi (dowolna wiadomość z czatu)">Zgłoś</button>`;
+      sideHtml = `${reportHtml}${aiPick}`;
     } else if (opRole === "owner" && msg.has_open_report) {
-      sideHtml = `<span class="msg-report-badge" title="Otwarte zgłoszenie">Zgłoszenie</span>`;
+      sideHtml = `<span class="msg-report-badge" title="Otwarte zgłoszenie">Zgłoszenie</span>${aiPick}`;
     }
     const div = document.createElement("div");
     div.className = `bubble ${msg.sender === "staff" ? "staff" : "user"}`;
@@ -1703,6 +1800,7 @@ function opRenderMessages(msgs, opts = {}) {
   } else {
     opMessages.scrollTop = 0;
   }
+  updateAiSelectedCounter();
 }
 
 async function trySession() {
@@ -1757,6 +1855,8 @@ async function trySession() {
     }
 
     schema = await api("/api/op/facts-schema");
+    loadAiPromptFromStorage();
+    updateAiSelectedCounter();
     showLogin(false);
     layoutWork.classList.add("no-thread");
     const chatEmptyEl = document.getElementById("chat-empty");
@@ -1857,6 +1957,15 @@ async function trySession() {
         }
       });
       document.getElementById("op-messages")?.addEventListener("click", async (ev) => {
+        const chk = ev.target.closest(".msg-ai-check");
+        if (chk) {
+          const mid = chk.getAttribute("data-msg-id");
+          if (!mid) return;
+          if (chk.checked) selectedAiMessageIds.add(mid);
+          else selectedAiMessageIds.delete(mid);
+          updateAiSelectedCounter();
+          return;
+        }
         const btn = ev.target.closest(".btn-msg-report");
         if (!btn || opRole !== "staff") return;
         const mid = btn.getAttribute("data-msg-id");
@@ -1943,6 +2052,14 @@ async function trySession() {
           err.hidden = false;
         }
       });
+      document.getElementById("btn-ai-clear")?.addEventListener("click", () => {
+        clearAiSelection();
+        opRenderMessages(currentThreadMessages);
+      });
+      document.getElementById("btn-ai-generate")?.addEventListener("click", async () => {
+        await generateAiDraft();
+      });
+      document.getElementById("ai-prompt")?.addEventListener("input", () => saveAiPromptToStorage());
     }
 
     const replyTa = document.getElementById("reply");
@@ -2041,6 +2158,7 @@ async function openThread(id) {
   clearTouch();
   clearAssignHint();
   messagesFetchLimit = 15;
+  clearAiSelection();
   activeId = id;
   document.getElementById("reply-err").hidden = true;
   const qe = document.getElementById("queue-err");

@@ -325,6 +325,30 @@
                   </span>
                 </div>
                 <textarea id="reply" maxlength="8000" rows="4" placeholder="Treść wiadomości…"></textarea>
+                <div class="ai-assist-box" id="ai-assist-box">
+                  <div class="ai-assist-top">
+                    <strong>Asystent AI</strong>
+                    <span id="ai-selected-count">Zaznaczone do AI: 0</span>
+                  </div>
+                  <div class="ai-assist-controls">
+                    <select id="ai-provider" class="sel" aria-label="Dostawca AI">
+                      <option value="auto">Auto (Anthropic/OpenAI)</option>
+                      <option value="anthropic">Anthropic</option>
+                      <option value="openai">OpenAI</option>
+                    </select>
+                    <button type="button" class="btn-primary-sm" id="btn-ai-generate">Generuj szkic</button>
+                    <button type="button" class="btn-primary-sm" id="btn-ai-clear">Wyczyść zaznaczenie</button>
+                  </div>
+                  <label class="inline-label" for="ai-prompt">Twój prompt (edytowalny)</label>
+                  <textarea
+                    id="ai-prompt"
+                    class="fact-value"
+                    rows="3"
+                    maxlength="5000"
+                    placeholder="Np. Odpowiedz spokojnie, krótko, bez obietnic i z propozycją 1 pytania doprecyzowującego."
+                  ></textarea>
+                  <p class="err" id="ai-err" hidden></p>
+                </div>
                 <p class="reply-meta" id="reply-meta" aria-live="polite"></p>
                 <div class="reply-actions">
                   <span class="reply-deadline-chip hidden" id="reply-deadline-chip" aria-live="polite"></span>
