@@ -129,6 +129,19 @@ function pickAiProvider(requested) {
   return null;
 }
 
+/** Odczyt komunikatu z JSON błędu OpenAI / Anthropic / podobnych. */
+function extractApiErrorMessage(data, fallback) {
+  if (data == null || typeof data !== "object") return fallback;
+  if (typeof data.message === "string" && data.message.trim()) return data.message.trim();
+  const e = data.error;
+  if (typeof e === "string" && e.trim()) return e.trim();
+  if (e && typeof e === "object" && typeof e.message === "string" && e.message.trim()) return e.message.trim();
+  if (Array.isArray(data.errors) && data.errors[0] && typeof data.errors[0].message === "string") {
+    return data.errors[0].message;
+  }
+  return fallback;
+}
+
 async function generateDraftWithOpenAi({ prompt }) {
   const key = openAiKey();
   if (!key) throw new Error("Brak OPENAI_API_KEY.");
@@ -152,9 +165,19 @@ async function generateDraftWithOpenAi({ prompt }) {
       ],
     }),
   });
-  const data = await r.json().catch(() => ({}));
+  const raw = await r.text();
+  let data = {};
+  try {
+    data = raw ? JSON.parse(raw) : {};
+  } catch {
+    data = { message: raw.slice(0, 800) };
+  }
   if (!r.ok) {
-    throw new Error(String(data?.error?.message || data?.message || `OpenAI API error ${r.status}`));
+    const msg = extractApiErrorMessage(data, `OpenAI HTTP ${r.status}`);
+    console.error("[openai] chat/completions", r.status, raw.slice(0, 1500));
+    const err = new Error(msg);
+    err.status = 502;
+    throw err;
   }
   const txt = String(data?.choices?.[0]?.message?.content || "").trim();
   if (!txt) throw new Error("OpenAI nie zwrócił treści odpowiedzi.");
@@ -181,9 +204,19 @@ async function generateDraftWithAnthropic({ prompt }) {
       messages: [{ role: "user", content: prompt }],
     }),
   });
-  const data = await r.json().catch(() => ({}));
+  const raw = await r.text();
+  let data = {};
+  try {
+    data = raw ? JSON.parse(raw) : {};
+  } catch {
+    data = { message: raw.slice(0, 800) };
+  }
   if (!r.ok) {
-    throw new Error(String(data?.error?.message || data?.message || `Anthropic API error ${r.status}`));
+    const msg = extractApiErrorMessage(data, `Anthropic HTTP ${r.status}`);
+    console.error("[anthropic] messages", r.status, raw.slice(0, 1500));
+    const err = new Error(msg);
+    err.status = 502;
+    throw err;
   }
   const txt = String(data?.content?.[0]?.text || "").trim();
   if (!txt) throw new Error("Anthropic nie zwrócił treści odpowiedzi.");
@@ -2283,6 +2316,17 @@ app.post("/api/op/inbox/:threadId/reply", requireOperator, asyncRoute(async (req
 
 app.use(OPERATOR_PANEL_PATH, express.static(path.join(__dirname, "public", "op-panel")));
 app.use(express.static(path.join(__dirname, "public")));
+
+app.use((err, req, res, next) => {
+  console.error(err);
+  if (res.headersSent) return next(err);
+  const st =
+    typeof err.status === "number" && err.status >= 400 && err.status < 600 ? err.status : 500;
+  if (String(req.path || "").startsWith("/api")) {
+    return res.status(st).json({ error: err.message || "Błąd serwera." });
+  }
+  res.status(st).send("Internal Server Error");
+});
 
 app.listen(PORT, () => {
   console.log(`Portal klienta:  http://localhost:${PORT}/`);
