@@ -812,15 +812,18 @@ app.get(
     const rows = await db
       .prepare(
         `SELECT t.id AS thread_id, t.character_id, c.name AS character_name, c.category,
-              datetime(t.created_at) AS thread_started_at,
+              t.created_at AS thread_started_at,
               (SELECT COUNT(*) FROM messages m WHERE m.thread_id = t.id) AS message_count,
-              (SELECT m.sender FROM messages m WHERE m.thread_id = t.id ORDER BY datetime(m.created_at) DESC LIMIT 1) AS last_sender,
-              (SELECT m.created_at FROM messages m WHERE m.thread_id = t.id ORDER BY datetime(m.created_at) DESC LIMIT 1) AS last_at,
+              (SELECT m.sender FROM messages m WHERE m.thread_id = t.id ORDER BY m.created_at DESC LIMIT 1) AS last_sender,
+              (SELECT m.created_at FROM messages m WHERE m.thread_id = t.id ORDER BY m.created_at DESC LIMIT 1) AS last_at,
               t.client_hidden_at
        FROM threads t
        JOIN characters c ON c.id = t.character_id
        WHERE t.user_id = ?
-       ORDER BY datetime(COALESCE(last_at, t.created_at)) DESC`
+       ORDER BY COALESCE(
+         (SELECT m.created_at FROM messages m WHERE m.thread_id = t.id ORDER BY m.created_at DESC LIMIT 1),
+         t.created_at
+       ) DESC`
       )
       .all(req.customer.id);
     res.json({ threads: rows });
@@ -1365,17 +1368,20 @@ app.get("/api/op/inbox", requireOperator, asyncRoute(async (req, res) => {
               c.id AS character_id,
               c.name AS character_name,
               c.category,
-              datetime(t.created_at) AS thread_started_at,
+              t.created_at AS thread_started_at,
               (SELECT COUNT(*) FROM messages m WHERE m.thread_id = t.id) AS message_count,
-              (SELECT m.sender FROM messages m WHERE m.thread_id = t.id ORDER BY datetime(m.created_at) DESC LIMIT 1) AS last_sender,
-              (SELECT m.body FROM messages m WHERE m.thread_id = t.id ORDER BY datetime(m.created_at) DESC LIMIT 1) AS last_preview,
-              (SELECT m.created_at FROM messages m WHERE m.thread_id = t.id ORDER BY datetime(m.created_at) DESC LIMIT 1) AS last_at,
+              (SELECT m.sender FROM messages m WHERE m.thread_id = t.id ORDER BY m.created_at DESC LIMIT 1) AS last_sender,
+              (SELECT m.body FROM messages m WHERE m.thread_id = t.id ORDER BY m.created_at DESC LIMIT 1) AS last_preview,
+              (SELECT m.created_at FROM messages m WHERE m.thread_id = t.id ORDER BY m.created_at DESC LIMIT 1) AS last_at,
               t.client_hidden_at
        FROM threads t
        JOIN users u ON u.id = t.user_id
        JOIN characters c ON c.id = t.character_id
        WHERE ${wh.sql}
-       ORDER BY datetime(COALESCE(last_at, t.created_at)) DESC
+       ORDER BY COALESCE(
+         (SELECT m.created_at FROM messages m WHERE m.thread_id = t.id ORDER BY m.created_at DESC LIMIT 1),
+         t.created_at
+       ) DESC
        LIMIT 300`
     )
     .all(...wh.params);
