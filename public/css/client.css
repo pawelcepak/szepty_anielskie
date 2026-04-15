@@ -2297,25 +2297,21 @@ body.page-panel .panel-main > .messages {
   color: #f3ebff;
 }
 
-.page-auth,
-.page-panel {
+.page-auth {
   background: radial-gradient(circle at 20% 0%, #4a2c76 0%, #2b1b4f 35%, #181228 70%, #120d20 100%);
   color: #efe6ff;
 }
 
-.page-auth .site-top,
-.page-panel .site-top {
+.page-auth .site-top {
   background: rgba(24, 15, 42, 0.84);
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-.page-auth .logo,
-.page-panel .logo {
+.page-auth .logo {
   color: #efe6ff;
 }
 
-.page-auth .logo:hover,
-.page-panel .logo:hover {
+.page-auth .logo:hover {
   color: #fff;
 }
 
@@ -2329,40 +2325,84 @@ body.page-panel .panel-main > .messages {
 }
 
 .page-auth .auth-card .sub,
-.page-panel .browse-lead,
-.page-panel .browse-disclaimer,
+.page-auth .browse-lead,
+.page-auth .browse-disclaimer,
+.page-auth .top-meta,
+.page-auth .panel-head p,
+.page-auth .panel-head-meta,
+.page-auth .panel-head-hours,
+.page-auth .panel-head-skills,
+.page-auth .panel-head-about {
+  color: rgba(236, 226, 255, 0.82);
+}
+
+.page-auth label,
+.page-auth label {
+  color: rgba(226, 210, 255, 0.84);
+}
+
+.page-auth input,
+.page-auth textarea,
+.page-auth select {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f4eeff;
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.page-auth .price-box,
+.page-auth .legal-consent-wrap {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #f3ecff;
+}
+
+.page-auth .auth-card h1,
+.page-auth .legal-h2 {
+  color: #fff;
+}
+
+/* Czytelny, jasny motyw panelu klienta (mobile + desktop). */
+.page-panel {
+  color: #2d261f;
+  background: linear-gradient(165deg, #fbf9f5 0%, #f0ebe3 42%, #e8e2d8 100%);
+}
+
+.page-panel .site-top {
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 1px solid #d8ccbd;
+}
+
+.page-panel .logo,
+.page-panel .logo:hover,
 .page-panel .top-meta,
 .page-panel .panel-head p,
 .page-panel .panel-head-meta,
 .page-panel .panel-head-hours,
 .page-panel .panel-head-skills,
 .page-panel .panel-head-about {
-  color: rgba(236, 226, 255, 0.82);
+  color: #3f372f;
 }
 
-.page-auth label,
-.page-panel label {
-  color: rgba(226, 210, 255, 0.84);
-}
-
-.page-auth input,
-.page-auth textarea,
 .page-panel input,
 .page-panel textarea,
 .page-panel select {
-  background: rgba(255, 255, 255, 0.08);
-  color: #f4eeff;
-  border-color: rgba(255, 255, 255, 0.24);
+  background: #fff;
+  color: #2d261f;
+  border-color: #cdbda9;
 }
 
 .page-panel .panel-profile-strip,
 .page-panel .panel-view-tabs,
 .page-panel .composer,
 .page-panel .pkg-bar,
-.page-panel .panel-head,
+.page-panel .panel-head {
+  background: linear-gradient(180deg, #f7f1e8 0%, #efe6da 100%);
+  border-color: #cfbfaa;
+}
+
 .page-panel .messages {
-  background: linear-gradient(180deg, rgba(33, 24, 54, 0.95), rgba(23, 17, 39, 0.95));
-  border-color: rgba(255, 255, 255, 0.14);
+  background: linear-gradient(180deg, #fdfbf7 0%, #f7f0e5 100%);
+  border-color: #d8cab8;
 }
 
 .page-panel .panel-main,
@@ -2371,24 +2411,22 @@ body.page-panel .panel-main > .messages {
 }
 
 .page-panel .panel-side {
-  background: linear-gradient(165deg, #19122b 0%, #120d1f 100%);
+  background: linear-gradient(165deg, #352a28 0%, #2a2220 42%, #1f1a18 100%);
   border-right-color: rgba(196, 163, 90, 0.34);
 }
 
+.page-panel .browse-header,
 .page-panel .browse-card,
-.page-panel .price-box,
-.page-auth .legal-consent-wrap {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.16);
-  color: #f3ecff;
+.page-panel .price-box {
+  background: #fffdf9;
+  border-color: #d2c4b2;
+  color: #2d261f;
 }
 
 .page-panel .browse-card-name,
 .page-panel .browse-cat-title,
-.page-panel .browse-title,
-.page-auth .auth-card h1,
-.page-auth .legal-h2 {
-  color: #fff;
+.page-panel .browse-title {
+  color: #2a211a;
 }
 
 .browse-card-actions {

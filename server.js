@@ -1452,6 +1452,49 @@ app.patch("/api/op/clients/:clientId/block", requireOperator, requireOwner, asyn
   res.json({ ok: true, client_id: clientId, blocked_at: value, email: row.email });
 }));
 
+app.post("/api/op/clients/:clientId/delete", requireOperator, requireOwner, asyncRoute(async (req, res) => {
+  const clientId = String(req.params.clientId || "").trim();
+  const confirmPhrase = String(req.body?.confirm_phrase || "").trim();
+  const ownerPassword = String(req.body?.owner_password || "");
+  if (confirmPhrase !== "USUN_KONTO") {
+    return res.status(400).json({ error: "Wpisz dokładnie frazę USUN_KONTO, aby potwierdzić usunięcie." });
+  }
+  if (!ownerPassword) {
+    return res.status(400).json({ error: "Podaj hasło właściciela, aby usunąć konto klienta." });
+  }
+  const op = await db
+    .prepare("SELECT id, password_hash FROM operators WHERE id = ?")
+    .get(req.operator.id);
+  const passOk = op?.password_hash ? bcrypt.compareSync(ownerPassword, op.password_hash) : false;
+  if (!passOk) {
+    return res.status(403).json({ error: "Nieprawidłowe hasło właściciela." });
+  }
+  const row = await db
+    .prepare("SELECT id, email, username, first_name, display_name FROM users WHERE id = ?")
+    .get(clientId);
+  if (!row) return res.status(404).json({ error: "Nie znaleziono klienta." });
+  await db.prepare("DELETE FROM users WHERE id = ?").run(clientId);
+  await db
+    .prepare(
+      `INSERT INTO operator_audit (id, operator_id, action, thread_id, detail)
+       VALUES (?, ?, ?, ?, ?)`
+    )
+    .run(
+      uuidv4(),
+      req.operator.id,
+      "client_account_delete",
+      null,
+      JSON.stringify({ client_id: clientId, email: row.email, username: row.username || null })
+    );
+  res.json({
+    ok: true,
+    deleted: true,
+    client_id: clientId,
+    email: row.email,
+    display_name: row.first_name || row.display_name || "",
+  });
+}));
+
 app.post("/api/op/clients/:clientId/email", requireOperator, requireOwner, async (req, res) => {
   if (!isMailConfigured()) {
     return res.status(503).json({

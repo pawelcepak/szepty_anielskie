@@ -370,6 +370,7 @@
                 <button type="button" class="btn-primary-sm" id="btn-client-block">Zablokuj klienta</button>
                 <button type="button" class="btn-primary-sm hidden" id="btn-client-unblock">Odblokuj klienta</button>
                 <button type="button" class="btn-primary-sm" id="btn-client-email">Wyślij e-mail</button>
+                <button type="button" class="btn-primary-sm btn-mon--danger" id="btn-client-delete">Usuń konto klienta</button>
               </div>
               <p class="err" id="client-admin-err" hidden></p>
             </div>
@@ -403,6 +404,24 @@
           <div class="op-pass-dialog-actions">
             <button type="button" class="btn-primary-sm" id="op-pass-cancel">Anuluj</button>
             <button type="submit" class="btn-primary-sm">Zapisz hasło</button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog class="op-pass-dialog" id="client-delete-dialog">
+        <form id="client-delete-form" class="op-pass-dialog-form">
+          <h3 class="op-pass-dialog-title">Usuń konto klienta</h3>
+          <p class="owner-monitor-hint">
+            Ta operacja jest nieodwracalna. Wpisz frazę <code>USUN_KONTO</code> oraz hasło właściciela.
+          </p>
+          <label class="op-pass-label" for="client-delete-phrase">Fraza potwierdzająca</label>
+          <input id="client-delete-phrase" class="op-pass-input" type="text" required autocomplete="off" />
+          <label class="op-pass-label" for="client-delete-password">Hasło właściciela</label>
+          <input id="client-delete-password" class="op-pass-input" type="password" required autocomplete="current-password" />
+          <p class="err op-pass-dlg-err" id="client-delete-err" hidden></p>
+          <div class="op-pass-dialog-actions">
+            <button type="button" class="btn-primary-sm" id="client-delete-cancel">Anuluj</button>
+            <button type="submit" class="btn-primary-sm btn-mon--danger">Usuń konto</button>
           </div>
         </form>
       </dialog>

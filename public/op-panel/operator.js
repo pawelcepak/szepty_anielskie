@@ -499,8 +499,9 @@ function setClientAdminActions(meta) {
   const btnBlock = document.getElementById("btn-client-block");
   const btnUnblock = document.getElementById("btn-client-unblock");
   const btnEmail = document.getElementById("btn-client-email");
+  const btnDelete = document.getElementById("btn-client-delete");
   const err = document.getElementById("client-admin-err");
-  if (!box || !st || !btnBlock || !btnUnblock || !btnEmail || !err) return;
+  if (!box || !st || !btnBlock || !btnUnblock || !btnEmail || !btnDelete || !err) return;
   if (opRole !== "owner" || !meta?.user_id) {
     box.classList.add("hidden");
     return;
@@ -575,6 +576,47 @@ function setClientAdminActions(meta) {
       err.hidden = false;
     }
   };
+  const delDlg = document.getElementById("client-delete-dialog");
+  const delForm = document.getElementById("client-delete-form");
+  const delPhrase = document.getElementById("client-delete-phrase");
+  const delPass = document.getElementById("client-delete-password");
+  const delErr = document.getElementById("client-delete-err");
+  const delCancel = document.getElementById("client-delete-cancel");
+  btnDelete.onclick = () => {
+    if (!delDlg || !delPhrase || !delPass || !delErr) return;
+    delPhrase.value = "";
+    delPass.value = "";
+    delErr.hidden = true;
+    delErr.textContent = "";
+    delDlg.showModal();
+  };
+  delCancel.onclick = () => delDlg?.close();
+  if (delForm) {
+    delForm.onsubmit = async (ev) => {
+      ev.preventDefault();
+      if (!meta?.user_id || !delPhrase || !delPass || !delErr) return;
+      delErr.hidden = true;
+      delErr.textContent = "";
+      try {
+        await api(`/api/op/clients/${encodeURIComponent(meta.user_id)}/delete`, {
+          method: "POST",
+          body: JSON.stringify({
+            confirm_phrase: delPhrase.value.trim(),
+            owner_password: delPass.value,
+          }),
+        });
+        delDlg?.close();
+        activeId = null;
+        lastThreadMeta = null;
+        document.getElementById("chat-body")?.classList.add("hidden");
+        document.getElementById("chat-empty")?.classList.remove("hidden");
+        await refreshInbox();
+      } catch (e) {
+        delErr.textContent = e.message || String(e);
+        delErr.hidden = false;
+      }
+    };
+  }
 }
 
 function initTheme() {
@@ -825,23 +867,55 @@ async function refreshOwnerClients() {
   if (!ownerClientsActionsBound) {
     ownerClientsActionsBound = true;
     body.addEventListener("click", async (ev) => {
-      const btn = ev.target.closest("[data-client-verify-link]");
+      const verifyBtn = ev.target.closest("[data-client-verify-link]");
+      const blockBtn = ev.target.closest("[data-client-block]");
+      const unblockBtn = ev.target.closest("[data-client-unblock]");
+      const deleteBtn = ev.target.closest("[data-client-delete]");
+      const btn = verifyBtn || blockBtn || unblockBtn || deleteBtn;
       if (!btn) return;
       const clientId = btn.getAttribute("data-client-id");
       if (!clientId) return;
       btn.disabled = true;
       try {
-        const data = await api(`/api/op/clients/${encodeURIComponent(clientId)}/verification-link`, {
-          method: "POST",
-          body: JSON.stringify({ regenerate: false }),
-        });
-        const u = String(data.verify_url || "");
-        if (!u) throw new Error("Brak linku aktywacyjnego.");
-        if (navigator.clipboard?.writeText) {
-          await navigator.clipboard.writeText(u);
-          alert("Link aktywacyjny skopiowany do schowka.");
+        if (verifyBtn) {
+          const data = await api(`/api/op/clients/${encodeURIComponent(clientId)}/verification-link`, {
+            method: "POST",
+            body: JSON.stringify({ regenerate: false }),
+          });
+          const u = String(data.verify_url || "");
+          if (!u) throw new Error("Brak linku aktywacyjnego.");
+          if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(u);
+            alert("Link aktywacyjny skopiowany do schowka.");
+          } else {
+            window.prompt("Skopiuj link aktywacyjny:", u);
+          }
+        } else if (blockBtn || unblockBtn) {
+          const blocked = !!blockBtn;
+          const q = blocked ? "Zablokować klienta?" : "Odblokować klienta?";
+          if (!window.confirm(q)) return;
+          await api(`/api/op/clients/${encodeURIComponent(clientId)}/block`, {
+            method: "PATCH",
+            body: JSON.stringify({ blocked }),
+          });
+          await refreshOwnerClients();
+        } else if (deleteBtn) {
+          const phrase = window.prompt("Wpisz dokładnie: USUN_KONTO");
+          if (phrase == null) return;
+          const ownerPass = window.prompt("Podaj hasło właściciela, aby usunąć konto:");
+          if (ownerPass == null) return;
+          await api(`/api/op/clients/${encodeURIComponent(clientId)}/delete`, {
+            method: "POST",
+            body: JSON.stringify({
+              confirm_phrase: String(phrase).trim(),
+              owner_password: String(ownerPass),
+            }),
+          });
+          alert("Konto klienta zostało usunięte.");
+          await refreshOwnerClients();
+          await refreshInbox();
         } else {
-          window.prompt("Skopiuj link aktywacyjny:", u);
+          return;
         }
       } catch (e) {
         alert(e.message || String(e));
@@ -855,6 +929,7 @@ async function refreshOwnerClients() {
     const rows = (data.clients || [])
       .map(
         (c) => {
+          const blocked = !!c.blocked_at;
           const verifyStatus = c.email_verified_at
             ? `zweryfikowany (${formatOpPlTime(c.email_verified_at)})`
             : c.email_verification_token
@@ -865,17 +940,23 @@ async function refreshOwnerClients() {
             : `<button type="button" class="btn-mon" data-client-verify-link data-client-id="${esc(
                 c.id
               )}">Link aktywacyjny</button>`;
+          const blockAction = blocked
+            ? `<button type="button" class="btn-mon" data-client-unblock data-client-id="${esc(c.id)}">Odblokuj</button>`
+            : `<button type="button" class="btn-mon btn-mon--danger" data-client-block data-client-id="${esc(c.id)}">Zablokuj</button>`;
+          const deleteAction = `<button type="button" class="btn-mon btn-mon--danger" data-client-delete data-client-id="${esc(
+            c.id
+          )}">Usuń konto</button>`;
           return (
           `<tr><td>${esc(c.username || "—")}</td><td>${esc(c.first_name || c.display_name || "—")}</td><td>${esc(
             c.city || "—"
           )}</td><td>${esc(c.email)}</td><td>${esc(String(c.birth_date || "").slice(0, 10))}</td><td>${esc(
             formatOpPlTime(c.created_at)
-          )}</td><td>${esc(verifyStatus)}</td><td>${verifyAction}</td><td>${c.thread_count ?? 0}</td><td>${c.messages_balance ?? 0}</td></tr>`
+          )}</td><td>${blocked ? "zablokowany" : "aktywny"}</td><td>${esc(verifyStatus)}</td><td>${verifyAction}<br/>${blockAction}<br/>${deleteAction}</td><td>${c.thread_count ?? 0}</td><td>${c.messages_balance ?? 0}</td></tr>`
           );
         }
       )
       .join("");
-    body.innerHTML = `<table class="mon-table"><thead><tr><th>Nick</th><th>Imię</th><th>Miasto</th><th>E-mail</th><th>Ur.</th><th>Rejestracja</th><th>Status e-mail</th><th>Akcja</th><th>Wątki</th><th>Saldo</th></tr></thead><tbody>${
+    body.innerHTML = `<table class="mon-table"><thead><tr><th>Nick</th><th>Imię</th><th>Miasto</th><th>E-mail</th><th>Ur.</th><th>Rejestracja</th><th>Status konta</th><th>Status e-mail</th><th>Akcje</th><th>Wątki</th><th>Saldo</th></tr></thead><tbody>${
       rows || ""
     }</tbody></table>`;
   } catch {
