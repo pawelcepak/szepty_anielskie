@@ -740,6 +740,34 @@ body.page-auth .avatar-preview-wrap img {
   width: 100%;
 }
 
+.footer-home-grid--center {
+  justify-content: center;
+  text-align: center;
+}
+
+.footer-main-nav {
+  display: flex;
+  gap: 2rem;
+  justify-content: center;
+  width: 100%;
+}
+
+.footer-main-link {
+  color: #f7f0ff;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.footer-main-link:hover {
+  color: #d4b06b;
+}
+
+.footer-note--center {
+  width: 100%;
+  margin-top: 0;
+  max-width: none;
+}
+
 .footer-legal-nav {
   font-size: 0.82rem;
 }
@@ -752,6 +780,14 @@ body.page-auth .avatar-preview-wrap img {
 
 .footer-legal-link:hover {
   color: var(--accent);
+}
+
+.page-home .footer-legal-link {
+  color: rgba(245, 235, 255, 0.8);
+}
+
+.page-home .footer-legal-link:hover {
+  color: #d4b06b;
 }
 
 .team-card-actions {
@@ -1969,6 +2005,18 @@ body.page-panel .panel-main > .messages {
   letter-spacing: 0.08em;
   font-weight: 700;
   font-size: 1.05rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+}
+
+.tarot-brand::before {
+  content: "";
+  width: 0.72rem;
+  height: 0.72rem;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fff7d2 0%, #e7c680 35%, #9c6f2f 100%);
+  box-shadow: 0 0 10px rgba(231, 198, 128, 0.4);
 }
 
 .tarot-menu {

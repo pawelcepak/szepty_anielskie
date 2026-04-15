@@ -440,7 +440,7 @@ function applyRoleChrome() {
   const logoMain = document.getElementById("op-logo-main");
   if (logoMain) {
     logoMain.title =
-      opRole === "owner" ? "Panel pracy — Szept Kart" : "Szept — powrót do pulpitu pracownika";
+      opRole === "owner" ? "Panel pracy — Szepty Anielskie" : "Szept — powrót do pulpitu pracownika";
   }
   if (opRole === "owner") {
     hub.classList.add("hidden");

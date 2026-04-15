@@ -124,7 +124,7 @@ function unreadCount() {
 
 function updateDocumentTitle() {
   const n = unreadCount();
-  const base = "Panel klienta — Szept Kart";
+  const base = "Panel klienta — Szepty Anielskie";
   document.title = n > 0 ? `(${n}) ${base}` : base;
 }
 
@@ -347,9 +347,14 @@ async function loadMe() {
   renderProfileStrip();
   bindPanelCityFormOnce();
   setBalance(me.messages_remaining);
-  const [ch, pr] = await Promise.all([api("/api/characters"), api("/api/public/pricing")]);
+  const ch = await api("/api/characters");
   characters = ch.characters;
-  pricing = pr.packages || [];
+  try {
+    const pr = await api("/api/public/pricing");
+    pricing = pr.packages || [];
+  } catch {
+    pricing = [];
+  }
   await loadThreads();
   updateDocumentTitle();
   renderBrowseCatalog();
@@ -571,6 +576,14 @@ try {
     if (openId) history.replaceState({}, "", "/panel.html");
     switchView("browse");
   }
-} catch {
-  window.location.href = "/logowanie.html";
+} catch (e) {
+  if (e?.status === 401 || e?.status === 403) {
+    window.location.href = "/logowanie.html";
+  } else {
+    const se = document.getElementById("send-err");
+    if (se) {
+      se.textContent = "Nie udało się załadować panelu. Odśwież stronę.";
+      se.hidden = false;
+    }
+  }
 }

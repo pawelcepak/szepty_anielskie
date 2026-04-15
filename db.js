@@ -44,11 +44,8 @@ export async function initDatabase() {
   return wrapSqliteAsync(createSqliteDatabase());
 }
 
-/** Pierwsze konto operatorskie z .env (tylko gdy brak operatorów). */
+/** Konto operatorskie bootstrap z .env (tworzy lub synchronizuje dane logowania). */
 export async function ensureBootstrapOperator(db) {
-  const row = await db.prepare("SELECT COUNT(*) AS c FROM operators").get();
-  const n = Number(row?.c || 0);
-  if (n > 0) return;
   const email = String(process.env.OPERATOR_BOOTSTRAP_EMAIL || "").trim().toLowerCase();
   const pass = String(process.env.OPERATOR_BOOTSTRAP_PASSWORD || "");
   const name = String(process.env.OPERATOR_BOOTSTRAP_NAME || "Operator").trim() || "Operator";
@@ -58,8 +55,20 @@ export async function ensureBootstrapOperator(db) {
     );
     return;
   }
-  const id = uuidv4();
   const hash = bcrypt.hashSync(pass, 12);
+  const existing = await db.prepare("SELECT id FROM operators WHERE lower(email) = lower(?)").get(email);
+  if (existing?.id) {
+    await db
+      .prepare(
+        `UPDATE operators
+         SET password_hash = ?, display_name = ?, role = 'owner', disabled_at = NULL
+         WHERE id = ?`
+      )
+      .run(hash, name, existing.id);
+    console.log(`[db] Zsynchronizowano konto operatorskie: ${email}`);
+    return;
+  }
+  const id = uuidv4();
   await db
     .prepare(
       `INSERT INTO operators (id, email, password_hash, display_name, role) VALUES (?, ?, ?, ?, 'owner')`
