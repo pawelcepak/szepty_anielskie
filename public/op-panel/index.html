@@ -49,7 +49,8 @@
       </div>
       <nav class="owner-tabs hidden" id="owner-tabs" aria-label="Sekcje administratora">
         <button type="button" class="owner-tab owner-tab--active" data-owner-tab="inbox">Rozmowy</button>
-        <button type="button" class="owner-tab" data-owner-tab="monitor">Monitor i sesje</button>
+        <button type="button" class="owner-tab" data-owner-tab="marketing">Reklama</button>
+        <button type="button" class="owner-tab owner-tab--advanced hidden" data-owner-tab="monitor">Monitor i sesje</button>
         <button type="button" class="owner-tab owner-tab--advanced hidden" data-owner-tab="reports">
           Zgłoszenia <span class="owner-tab-badge hidden" id="owner-tab-reports-badge" aria-live="polite"></span>
         </button>
@@ -57,7 +58,7 @@
         <button type="button" class="owner-tab owner-tab--advanced hidden" data-owner-tab="insights">Audyt i premie</button>
         <button type="button" class="owner-tab owner-tab--advanced hidden" data-owner-tab="hr">Obsługa pracowników</button>
         <button type="button" class="owner-tab owner-tab--advanced hidden" data-owner-tab="kyc">Weryfikacja tożsamości</button>
-        <button type="button" class="owner-tab owner-tab--advanced hidden" data-owner-tab="clients">Klienci</button>
+        <button type="button" class="owner-tab" data-owner-tab="clients">Klienci</button>
       </nav>
       <header class="op-header op-header--main">
         <a class="op-logo" href="./" id="op-logo-main" title="Panel pracy — Szepty Anielskie">Szept</a>
@@ -160,6 +161,43 @@
           <h2 class="owner-page-title">Zarejestrowani klienci</h2>
           <p class="owner-monitor-hint">E-maile i salda kredytów wiadomości — tylko dla właściciela.</p>
           <div id="owner-clients-body" class="owner-monitor-body"></div>
+        </div>
+      </div>
+
+      <div id="owner-page-marketing" class="owner-full-page hidden" aria-label="Tworzenie reklam i treści">
+        <div class="owner-full-inner">
+          <h2 class="owner-page-title">Panel reklamowy</h2>
+          <p class="owner-monitor-hint">
+            Wybierz kanały, wpisz temat i prompt — dostaniesz propozycje tytułów, opisów, tagów i promptu graficznego.
+          </p>
+          <div class="owner-monitor">
+            <div class="add-staff">
+              <input id="mkt-topic" type="text" placeholder="Temat kampanii (np. Wróżba partnerska na weekend)" />
+              <input id="mkt-offer" type="text" placeholder="Oferta / CTA (np. Pakiet 20 wiadomości -10%)" />
+              <input id="mkt-audience" type="text" placeholder="Grupa docelowa (np. kobiety 20-40, relacje)" />
+              <textarea id="mkt-custom-prompt" class="fact-value" rows="4" maxlength="5000" placeholder="Twój prompt: styl, ton, zakazy, format..."></textarea>
+            </div>
+            <h3 class="owner-subtitle">Kanały reklamowe</h3>
+            <div class="owner-reports-toolbar" id="mkt-channels">
+              <button type="button" class="owner-report-filter owner-report-filter--active" data-mkt-channel="instagram">Instagram</button>
+              <button type="button" class="owner-report-filter owner-report-filter--active" data-mkt-channel="tiktok">TikTok</button>
+              <button type="button" class="owner-report-filter" data-mkt-channel="facebook">Facebook</button>
+              <button type="button" class="owner-report-filter" data-mkt-channel="youtube_shorts">YouTube Shorts</button>
+              <button type="button" class="owner-report-filter" data-mkt-channel="pinterest">Pinterest</button>
+              <button type="button" class="owner-report-filter" data-mkt-channel="google_ads">Google Ads</button>
+              <button type="button" class="owner-report-filter" data-mkt-channel="newsletter">Newsletter</button>
+            </div>
+            <div class="owner-reports-toolbar">
+              <select id="mkt-ai-provider" class="sel" style="max-width: 260px">
+                <option value="auto">Auto (Anthropic/OpenAI)</option>
+                <option value="anthropic">Anthropic</option>
+                <option value="openai">OpenAI</option>
+              </select>
+              <button type="button" class="btn-primary-sm" id="btn-mkt-generate">Generuj treści reklamowe</button>
+            </div>
+            <p class="err" id="mkt-err" hidden></p>
+          </div>
+          <div id="mkt-results" class="owner-insights-cards" style="margin-top: 1rem"></div>
         </div>
       </div>
 

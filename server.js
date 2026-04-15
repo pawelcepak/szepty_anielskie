@@ -190,6 +190,28 @@ async function generateDraftWithAnthropic({ prompt }) {
   return { text: txt, model };
 }
 
+function safeJsonParse(input) {
+  try {
+    return JSON.parse(String(input || ""));
+  } catch {
+    return null;
+  }
+}
+
+function normalizeMarketingItem(item, fallbackChannel) {
+  const channel = String(item?.channel || fallbackChannel || "").trim() || "general";
+  const title = String(item?.title || "").trim();
+  const description = String(item?.description || "").trim();
+  const tagsRaw = Array.isArray(item?.tags)
+    ? item.tags
+    : String(item?.tags || "")
+        .split(/[,\n#]+/)
+        .map((x) => x.trim());
+  const tags = tagsRaw.filter(Boolean).slice(0, 25);
+  const visualPrompt = String(item?.visual_prompt || item?.image_prompt || "").trim();
+  return { channel, title, description, tags, visual_prompt: visualPrompt };
+}
+
 function tokenBytes() {
   return crypto.randomBytes(32).toString("hex");
 }
@@ -1751,6 +1773,68 @@ app.post("/api/op/inbox/:threadId/ai-draft", requireOperator, asyncRoute(async (
     model: out.model,
     draft: out.text,
     used_messages: msgs.length,
+  });
+}));
+
+app.post("/api/op/marketing/generate", requireOperator, requireOwner, asyncRoute(async (req, res) => {
+  const provider = pickAiProvider(req.body?.provider);
+  if (!provider) {
+    return res.status(503).json({
+      error: "Brak klucza AI. Ustaw OPENAI_API_KEY i/lub ANTHROPIC_API_KEY.",
+    });
+  }
+  const topic = String(req.body?.topic || "").trim();
+  const offer = String(req.body?.offer || "").trim();
+  const audience = String(req.body?.audience || "").trim();
+  const customPrompt = String(req.body?.custom_prompt || "").trim();
+  const channels = Array.isArray(req.body?.channels)
+    ? [...new Set(req.body.channels.map((x) => String(x || "").trim()).filter(Boolean))]
+    : [];
+  if (!topic) return res.status(400).json({ error: "Podaj temat kampanii." });
+  if (!channels.length) return res.status(400).json({ error: "Wybierz co najmniej jeden kanał reklamowy." });
+  const instruction = [
+    "Zwróć WYŁĄCZNIE JSON (bez markdown).",
+    "Klucz główny: items (tablica).",
+    "Każdy element items: channel, title, description, tags (tablica string), visual_prompt.",
+    "Język: polski. Styl: marketing ezoteryczny, ale bez obiecywania gwarantowanych rezultatów.",
+    "Dla każdego kanału podaj oddzielny wpis.",
+    "Tagi bez znaku #, krótkie, praktyczne.",
+  ].join(" ");
+  const userPrompt = [
+    `Kanały: ${channels.join(", ")}`,
+    `Temat: ${topic}`,
+    `Oferta/CTA: ${offer || "brak dodatkowej oferty"}`,
+    `Grupa docelowa: ${audience || "ogólna"}`,
+    `Dodatkowy prompt operatora: ${customPrompt || "brak"}`,
+  ].join("\n");
+  const fullPrompt = `${instruction}\n\n${userPrompt}`;
+  const aiOut =
+    provider === "anthropic"
+      ? await generateDraftWithAnthropic({ prompt: fullPrompt })
+      : await generateDraftWithOpenAi({ prompt: fullPrompt });
+  const parsed = safeJsonParse(aiOut.text);
+  let items = [];
+  if (parsed && Array.isArray(parsed.items)) {
+    items = parsed.items.map((it, idx) => normalizeMarketingItem(it, channels[idx] || channels[0]));
+  } else {
+    items = channels.map((ch) =>
+      normalizeMarketingItem(
+        {
+          channel: ch,
+          title: `Post reklamowy: ${topic}`,
+          description: aiOut.text,
+          tags: [],
+          visual_prompt: `Grafika promująca temat: ${topic}`,
+        },
+        ch
+      )
+    );
+  }
+  res.json({
+    ok: true,
+    provider,
+    model: aiOut.model,
+    items,
   });
 }));
 

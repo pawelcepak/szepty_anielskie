@@ -110,6 +110,9 @@ let messagesLoadingOlder = false;
 let opMessagesScrollRaf = 0;
 let ownerAdvancedTabsShown = false;
 let ownerClientsActionsBound = false;
+let ownerAdvancedUnlocked = false;
+let ownerMarketingBound = false;
+let marketingSelectedChannels = new Set(["instagram", "tiktok"]);
 
 function showLogin(on) {
   viewLogin.classList.toggle("hidden", !on);
@@ -450,13 +453,14 @@ function applyRoleChrome() {
     sub.classList.add("hidden");
     bucketTabs?.classList.remove("hidden");
     ownerTabsEl?.classList.remove("hidden");
-    advWrap?.classList.remove("hidden");
+    advWrap?.classList.add("hidden");
     ownerAdvancedTabsShown = false;
+    ownerAdvancedUnlocked = false;
     document.querySelectorAll(".owner-tab--advanced").forEach((el) => el.classList.add("hidden"));
-    if (advBtn) advBtn.textContent = "Pokaż ukryte narzędzia właściciela";
+    if (advBtn) advBtn.textContent = "Narzędzia ukryte";
     ob?.classList.remove("hidden");
     linkClient?.classList.remove("hidden");
-    linkRecruit?.classList.remove("hidden");
+    linkRecruit?.classList.add("hidden");
     mainTitle.textContent = "Lista rozmów (administrator)";
     line1.textContent =
       "Lista wątków jest zawsze pod zakładkami. Monitor, zespół i klienci — w pasku u góry. Pracownicy nie widzą witryny klienta.";
@@ -490,10 +494,16 @@ function applyRoleChrome() {
       "owner-page-hr",
       "owner-page-kyc",
       "owner-page-clients",
+      "owner-page-marketing",
     ].forEach((id) => {
       document.getElementById(id)?.classList.add("hidden");
     });
   }
+}
+
+function applyOwnerAdvancedVisibility() {
+  const show = opRole === "owner" && ownerAdvancedUnlocked;
+  document.querySelectorAll(".owner-tab--advanced").forEach((el) => el.classList.toggle("hidden", !show));
 }
 
 function setClientAdminActions(meta) {
@@ -667,6 +677,7 @@ function setOwnerTab(tab) {
     "owner-page-hr",
     "owner-page-kyc",
     "owner-page-clients",
+    "owner-page-marketing",
   ]) {
     const key = id.replace("owner-page-", "");
     document.getElementById(id)?.classList.toggle("hidden", tab !== key);
@@ -683,6 +694,7 @@ function setOwnerTab(tab) {
   if (tab === "insights") refreshOwnerTeamInsights();
   if (tab === "team") refreshStaffList();
   if (tab === "clients") refreshOwnerClients();
+  if (tab === "marketing") refreshOwnerMarketing();
   if (tab === "hr" || tab === "kyc") {
     const which = tab;
     loadOwnerConsoleHints().then((h) => {
@@ -964,6 +976,83 @@ async function refreshOwnerClients() {
     }</tbody></table>`;
   } catch {
     body.innerHTML = "<p class=\"queue-empty\">Nie udało się wczytać listy klientów.</p>";
+  }
+}
+
+async function refreshOwnerMarketing() {
+  if (opRole !== "owner") return;
+  const channelsWrap = document.getElementById("mkt-channels");
+  const btn = document.getElementById("btn-mkt-generate");
+  const err = document.getElementById("mkt-err");
+  const out = document.getElementById("mkt-results");
+  if (!channelsWrap || !btn || !err || !out) return;
+  if (!ownerMarketingBound) {
+    ownerMarketingBound = true;
+    channelsWrap.addEventListener("click", (ev) => {
+      const b = ev.target.closest("[data-mkt-channel]");
+      if (!b) return;
+      const ch = b.getAttribute("data-mkt-channel");
+      if (!ch) return;
+      if (marketingSelectedChannels.has(ch)) {
+        if (marketingSelectedChannels.size > 1) marketingSelectedChannels.delete(ch);
+      } else {
+        marketingSelectedChannels.add(ch);
+      }
+      channelsWrap.querySelectorAll("[data-mkt-channel]").forEach((el) => {
+        const active = marketingSelectedChannels.has(el.getAttribute("data-mkt-channel"));
+        el.classList.toggle("owner-report-filter--active", active);
+      });
+    });
+    btn.addEventListener("click", async () => {
+      err.hidden = true;
+      err.textContent = "";
+      const topic = String(document.getElementById("mkt-topic")?.value || "").trim();
+      const offer = String(document.getElementById("mkt-offer")?.value || "").trim();
+      const audience = String(document.getElementById("mkt-audience")?.value || "").trim();
+      const custom_prompt = String(document.getElementById("mkt-custom-prompt")?.value || "").trim();
+      const provider = String(document.getElementById("mkt-ai-provider")?.value || "auto");
+      if (!topic) {
+        err.textContent = "Podaj temat kampanii.";
+        err.hidden = false;
+        return;
+      }
+      btn.disabled = true;
+      out.innerHTML = "";
+      try {
+        const r = await api("/api/op/marketing/generate", {
+          method: "POST",
+          body: JSON.stringify({
+            topic,
+            offer,
+            audience,
+            custom_prompt,
+            provider,
+            channels: [...marketingSelectedChannels],
+          }),
+        });
+        const items = r.items || [];
+        out.innerHTML = items
+          .map((it) => {
+            const tags = (it.tags || []).map((t) => `#${esc(t)}`).join(" ");
+            return `<article class="owner-insight-feed-row">
+              <header class="owner-insight-feed-head">
+                <strong>${esc(String(it.channel || "").replaceAll("_", " "))}</strong>
+                <span class="owner-insight-feed-who">${esc((r.provider || "") + " · " + (r.model || ""))}</span>
+              </header>
+              <p class="owner-report-meta"><strong>Tytuł:</strong> ${esc(it.title || "—")}</p>
+              <p class="owner-report-msg-body"><strong>Opis:</strong><br/>${esc(it.description || "—")}</p>
+              <p class="owner-report-meta"><strong>Tagi:</strong> ${esc(tags || "—")}</p>
+              <p class="owner-report-msg-body"><strong>Prompt graficzny:</strong><br/>${esc(it.visual_prompt || "—")}</p>
+            </article>`;
+          })
+          .join("");
+      } catch (e) {
+        err.textContent = e.message || String(e);
+        err.hidden = false;
+      } finally {
+        btn.disabled = false;
+      }
+    });
   }
 }
 
@@ -1882,15 +1971,26 @@ async function trySession() {
       });
       document.getElementById("owner-advanced-toggle")?.addEventListener("click", () => {
         ownerAdvancedTabsShown = !ownerAdvancedTabsShown;
-        document
-          .querySelectorAll(".owner-tab--advanced")
-          .forEach((el) => el.classList.toggle("hidden", !ownerAdvancedTabsShown));
+        ownerAdvancedUnlocked = ownerAdvancedTabsShown;
+        applyOwnerAdvancedVisibility();
         const b = document.getElementById("owner-advanced-toggle");
         if (b) {
           b.textContent = ownerAdvancedTabsShown
             ? "Ukryj narzędzia właściciela"
             : "Pokaż ukryte narzędzia właściciela";
         }
+      });
+      document.getElementById("op-logo-main")?.addEventListener("click", (ev) => {
+        if (opRole !== "owner") return;
+        if (!(ev.ctrlKey && ev.shiftKey)) return;
+        ev.preventDefault();
+        ownerAdvancedUnlocked = !ownerAdvancedUnlocked;
+        applyOwnerAdvancedVisibility();
+        alert(
+          ownerAdvancedUnlocked
+            ? "Ukryte narzędzia właściciela odblokowane."
+            : "Ukryte narzędzia właściciela ponownie ukryte."
+        );
       });
       document.getElementById("btn-change-password")?.addEventListener("click", () => {
         const dlg = document.getElementById("change-password-dialog");
