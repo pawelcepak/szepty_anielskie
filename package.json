@@ -7,10 +7,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "db:reset": "node scripts/reset-db.mjs",
     "pg:init": "node scripts/postgres-init.mjs",
-    "pg:migrate-from-sqlite": "node scripts/migrate-sqlite-to-postgres.mjs",
-    "pg:check": "node scripts/check-postgres.mjs"
+    "pg:migrate-from-sqlite": "node scripts/migrate-sqlite-to-postgres.mjs"
   },
   "engines": {
     "node": ">=18"

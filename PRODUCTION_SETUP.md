@@ -9,10 +9,9 @@
 ```bash
 npm run pg:init
 npm run pg:migrate-from-sqlite
-npm run pg:check
 ```
 
-`pg:check` should print connected DB and counts for `users` and `operators`.
+Po migracji sprawdź w panelu operatora (np. lista klientów) lub w Railway → Postgres → Query, czy w bazie są rekordy.
 
 ## 2) Operator panel URL (security by obscurity)
 
