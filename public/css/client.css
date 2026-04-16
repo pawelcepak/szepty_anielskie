@@ -1646,6 +1646,47 @@ body.page-panel .site-top {
   text-align: center;
 }
 
+.panel-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: rgba(14, 10, 24, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.panel-modal.hidden {
+  display: none;
+}
+
+.panel-modal-card {
+  width: min(100%, 32rem);
+  background: #fffdf8;
+  color: #2f261d;
+  border-radius: 18px;
+  border: 1px solid #d8c7b2;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.28);
+  padding: 1.1rem 1rem;
+}
+
+.panel-modal-card h2 {
+  margin: 0 0 0.55rem;
+  color: #2f261d;
+}
+
+.panel-modal-card .sub {
+  color: #5c5348;
+}
+
+.panel-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.65rem;
+}
+
 .client-toast.hidden {
   display: none;
 }
@@ -2586,6 +2627,30 @@ body.page-panel .panel-settings > summary {
   color: rgba(220, 205, 245, 0.9);
 }
 
+body.page-panel .panel-profile-strip,
+body.page-panel .panel-view-tabs,
+body.page-panel .browse-header,
+body.page-panel .browse-card,
+body.page-panel .panel-head,
+body.page-panel .composer,
+body.page-panel .panel-modal-card {
+  background: #fffaf3;
+  color: #2b2118;
+  border-color: #d9cab7;
+}
+
+body.page-panel .panel-profile-line,
+body.page-panel .panel-profile-summary,
+body.page-panel .panel-profile-summary-meta,
+body.page-panel .panel-settings-hint,
+body.page-panel .browse-lead,
+body.page-panel .browse-disclaimer,
+body.page-panel .panel-head p,
+body.page-panel .top-meta,
+body.page-panel .composer-foot .top-meta {
+  color: #5c5348;
+}
+
 body.page-panel .catalog-filter {
   border-color: rgba(255, 255, 255, 0.2);
   background: rgba(255, 255, 255, 0.08);
@@ -2607,6 +2672,24 @@ body.page-auth select {
   background: rgba(255, 255, 255, 0.1);
   border-color: rgba(255, 255, 255, 0.22);
   color: #fff;
+}
+
+body.page-panel .panel-profile-strip input,
+body.page-panel .panel-profile-strip textarea,
+body.page-panel .panel-profile-strip select,
+body.page-panel .panel-modal-card input,
+body.page-panel .panel-modal-card textarea,
+body.page-panel .panel-modal-card select,
+body.page-panel .composer textarea {
+  background: #fff;
+  border-color: #d4c3af;
+  color: #2b2118;
+}
+
+body.page-panel .panel-profile-strip input::placeholder,
+body.page-panel .panel-modal-card input::placeholder,
+body.page-panel .composer textarea::placeholder {
+  color: #9a8d7d;
 }
 
 body.page-panel input::placeholder,
@@ -2648,7 +2731,7 @@ body.page-panel .panel-view--browse {
 
 body.page-panel .messages {
   border-top: 1px solid rgba(255, 255, 255, 0.12);
-  background: linear-gradient(180deg, rgba(26, 18, 42, 0.92), rgba(18, 12, 30, 0.96));
+  background: linear-gradient(180deg, rgba(42, 24, 68, 0.9), rgba(28, 16, 46, 0.94));
 }
 
 body.page-panel .bubble {
@@ -2739,7 +2822,13 @@ body.page-panel .browse-card--active {
 }
 
 body.page-panel .panel-profile-line {
-  color: rgba(230, 215, 255, 0.95);
+  color: #5c5348;
+}
+
+body.page-panel #client-toast {
+  background: #fffaf3;
+  color: #2b2118;
+  border-color: #d9cab7;
 }
 
 body.page-panel .pkg-bar h2,

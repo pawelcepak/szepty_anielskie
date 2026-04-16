@@ -388,6 +388,16 @@ a {
   color: #334155;
 }
 
+.owner-insight-card img {
+  display: block;
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-top: 0.65rem;
+  border: 1px solid var(--line);
+}
+
 .owner-insight-bonus-tag {
   display: inline-block;
   margin-left: 0.25rem;

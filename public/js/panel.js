@@ -15,6 +15,7 @@ let browseFilter = "Wszystko";
 let browseSort = "online";
 let sessionKeepTimer = null;
 let pollTimer = null;
+const ONBOARDING_SNOOZE_KEY = "panel_onboarding_snooze_v1";
 
 const SEEN_PREFIX = "panel_seen_";
 const FALLBACK_PORTRAIT =
@@ -318,6 +319,39 @@ function triStateLabel(v) {
   return "—";
 }
 
+function onboardingNeeded() {
+  const u = me?.user;
+  if (!u) return false;
+  return [u.has_children, u.smokes, u.drinks_alcohol, u.has_car].every((v) => (v || "unknown") === "unknown");
+}
+
+function showOnboardingModal(on) {
+  const modal = document.getElementById("panel-onboarding-modal");
+  if (!modal) return;
+  modal.classList.toggle("hidden", !on);
+  modal.setAttribute("aria-hidden", on ? "false" : "true");
+}
+
+function maybeOpenOnboardingModal() {
+  if (!onboardingNeeded()) return;
+  try {
+    const snoozeUntil = Number(localStorage.getItem(ONBOARDING_SNOOZE_KEY) || 0);
+    if (Number.isFinite(snoozeUntil) && snoozeUntil > Date.now()) return;
+  } catch {
+    /* ignore */
+  }
+  const setVal = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.value = value || "unknown";
+  };
+  const u = me.user;
+  setVal("onboarding-has-children", u.has_children);
+  setVal("onboarding-smokes", u.smokes);
+  setVal("onboarding-drinks-alcohol", u.drinks_alcohol);
+  setVal("onboarding-has-car", u.has_car);
+  showOnboardingModal(true);
+}
+
 function renderProfileStrip() {
   const line = document.getElementById("panel-profile-line");
   const summaryMeta = document.getElementById("panel-profile-summary-meta");
@@ -416,6 +450,7 @@ async function loadMe() {
   refreshAccountSummary();
   startSessionKeepalive();
   startThreadPoll();
+  maybeOpenOnboardingModal();
 }
 
 function byCategory(list) {
@@ -594,6 +629,45 @@ document.getElementById("account-summary-toggle")?.addEventListener("click", () 
   if (!card) return;
   card.classList.toggle("hidden");
   refreshAccountSummary();
+});
+
+document.getElementById("panel-onboarding-later")?.addEventListener("click", () => {
+  try {
+    localStorage.setItem(ONBOARDING_SNOOZE_KEY, String(Date.now() + 12 * 60 * 60 * 1000));
+  } catch {
+    /* ignore */
+  }
+  showOnboardingModal(false);
+});
+
+document.getElementById("panel-onboarding-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const err = document.getElementById("panel-onboarding-err");
+  if (err) {
+    err.hidden = true;
+    err.textContent = "";
+  }
+  const payload = {
+    has_children: String(document.getElementById("onboarding-has-children")?.value || "unknown").trim(),
+    smokes: String(document.getElementById("onboarding-smokes")?.value || "unknown").trim(),
+    drinks_alcohol: String(document.getElementById("onboarding-drinks-alcohol")?.value || "unknown").trim(),
+    has_car: String(document.getElementById("onboarding-has-car")?.value || "unknown").trim(),
+  };
+  try {
+    const result = await api("/api/me", {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+    me.user = result.user;
+    renderProfileStrip();
+    showOnboardingModal(false);
+    showToast("Zapisano dodatkowe informacje w profilu.");
+  } catch (e) {
+    if (err) {
+      err.hidden = false;
+      err.textContent = e.message || String(e);
+    }
+  }
 });
 
 document.getElementById("btn-hide-thread")?.addEventListener("click", async () => {

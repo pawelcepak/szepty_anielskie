@@ -184,6 +184,17 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_payment_tx_user ON payment_transactions(user_id);
   CREATE INDEX IF NOT EXISTS idx_payment_tx_status ON payment_transactions(status);
+
+  CREATE TABLE IF NOT EXISTS marketing_assets (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL DEFAULT 'ad',
+    label TEXT NOT NULL,
+    image_url TEXT NOT NULL,
+    notes TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_marketing_assets_kind ON marketing_assets(kind);
 `);
 
 const threadColNames = new Set(

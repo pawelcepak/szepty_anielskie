@@ -184,6 +184,17 @@ CREATE TABLE IF NOT EXISTS payment_transactions (
 CREATE INDEX IF NOT EXISTS idx_payment_tx_user ON payment_transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_payment_tx_status ON payment_transactions(status);
 
+CREATE TABLE IF NOT EXISTS marketing_assets (
+  id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL DEFAULT 'ad',
+  label TEXT NOT NULL,
+  image_url TEXT NOT NULL,
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_marketing_assets_kind ON marketing_assets(kind);
+
 CREATE TABLE IF NOT EXISTS operator_payout_ledger (
   id TEXT PRIMARY KEY,
   operator_id TEXT NOT NULL REFERENCES operators(id) ON DELETE CASCADE,

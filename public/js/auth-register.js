@@ -10,20 +10,6 @@ function esc(s) {
 
 const err = document.getElementById("err");
 const success = document.getElementById("register-success");
-const avatarInput = document.getElementById("avatar");
-const previewWrap = document.getElementById("avatar-preview-wrap");
-const previewImg = document.getElementById("avatar-preview");
-
-let avatarDataUrl = "";
-
-function readFileAsDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(String(r.result || ""));
-    r.onerror = () => reject(new Error("Nie udało się odczytać pliku."));
-    r.readAsDataURL(file);
-  });
-}
 
 const params = new URLSearchParams(window.location.search);
 const mediumId = params.get("medium");
@@ -46,36 +32,6 @@ if (mediumId && loginLink) {
   }
 })();
 
-avatarInput?.addEventListener("change", async () => {
-  err.hidden = true;
-  avatarDataUrl = "";
-  previewWrap?.classList.add("hidden");
-  const f = avatarInput.files?.[0];
-  if (!f) return;
-  if (f.size > 420000) {
-    err.textContent = "Zdjęcie jest za duże — wybierz plik do ok. 400 KB.";
-    err.hidden = false;
-    avatarInput.value = "";
-    return;
-  }
-  try {
-    const url = await readFileAsDataUrl(f);
-    if (url.length > 450000) {
-      err.textContent = "Po zakodowaniu zdjęcie jest za duże — użyj mniejszego pliku.";
-      err.hidden = false;
-      avatarInput.value = "";
-      return;
-    }
-    avatarDataUrl = url;
-    if (previewImg) previewImg.src = url;
-    previewWrap?.classList.remove("hidden");
-  } catch {
-    err.textContent = "Nie udało się wczytać zdjęcia.";
-    err.hidden = false;
-    avatarInput.value = "";
-  }
-});
-
 for (const link of document.querySelectorAll(".legal-open-btn")) {
   link.addEventListener("click", (event) => {
     event.preventDefault();
@@ -96,18 +52,13 @@ document.getElementById("form").addEventListener("submit", async (e) => {
   const username = String(fd.get("username") || "").trim().toLowerCase();
   const first_name = String(fd.get("first_name") || "").trim();
   const city = String(fd.get("city") || "").trim();
-  const gender = String(fd.get("gender") || "").trim();
-  const has_children = String(fd.get("has_children") || "unknown").trim();
-  const smokes = String(fd.get("smokes") || "unknown").trim();
-  const drinks_alcohol = String(fd.get("drinks_alcohol") || "unknown").trim();
-  const has_car = String(fd.get("has_car") || "unknown").trim();
-  const birth_date = String(fd.get("birth_date") || "").trim();
   const email = String(fd.get("email") || "").trim();
   const password = String(fd.get("password") || "");
   const acceptTerms = fd.get("accept_terms") === "on";
   const acceptPrivacy = fd.get("accept_privacy") === "on";
-  if (!acceptTerms || !acceptPrivacy) {
-    err.textContent = "Aby kontynuować, zaakceptuj regulamin i politykę prywatności.";
+  const acceptAge = fd.get("accept_age") === "on";
+  if (!acceptTerms || !acceptPrivacy || !acceptAge) {
+    err.textContent = "Aby kontynuować, zaakceptuj regulamin, politykę prywatności i potwierdź pełnoletność.";
     err.hidden = false;
     if (submitBtn) submitBtn.disabled = false;
     return;
@@ -126,17 +77,11 @@ document.getElementById("form").addEventListener("submit", async (e) => {
         username,
         first_name,
         city,
-        gender,
-        has_children,
-        smokes,
-        drinks_alcohol,
-        has_car,
-        birth_date,
         email,
         password,
         accept_terms: acceptTerms,
         accept_privacy: acceptPrivacy,
-        avatar_url: avatarDataUrl || null,
+        accept_age: acceptAge,
         medium: mediumParam || null,
       }),
     });

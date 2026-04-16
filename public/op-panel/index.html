@@ -200,6 +200,9 @@
             <button type="button" class="owner-mkt-subbtn" data-mkt-subpage="images">
               Tworzenie obrazów AI
             </button>
+            <button type="button" class="owner-mkt-subbtn" data-mkt-subpage="assets">
+              Assety i wygląd medium
+            </button>
           </nav>
           <section class="owner-mkt-subpage owner-mkt-subpage--active" data-mkt-subpage-panel="prelaunch">
             <div class="owner-monitor">
@@ -300,6 +303,53 @@
                 <p class="err" id="mkt-image-err" hidden></p>
               </div>
               <div id="mkt-image-results" class="owner-image-results"></div>
+            </div>
+          </section>
+          <section class="owner-mkt-subpage" data-mkt-subpage-panel="assets">
+            <div class="owner-monitor">
+              <h3 class="owner-subtitle">Magazyn obrazów reklamowych</h3>
+              <p class="owner-monitor-hint">
+                Dodawaj obrazy do reklam TikTok/Instagram albo warianty wyglądu medium. Możesz wkleić URL albo data URL.
+              </p>
+              <div class="add-staff">
+                <input id="asset-label" type="text" placeholder="Nazwa assetu, np. Tarot pion 1" />
+                <select id="asset-kind" class="sel">
+                  <option value="ad">Reklama</option>
+                  <option value="medium">Medium</option>
+                  <option value="other">Inne</option>
+                </select>
+                <input id="asset-image-url" type="text" placeholder="Adres obrazu albo data:image/..." />
+                <textarea id="asset-notes" class="fact-value" rows="3" maxlength="1000" placeholder="Notatki do assetu"></textarea>
+                <button type="button" class="btn-primary-sm" id="btn-asset-save">Zapisz asset</button>
+                <p class="err" id="asset-err" hidden></p>
+              </div>
+              <div id="asset-list" class="owner-insights-cards" style="margin-top: 1rem"></div>
+            </div>
+            <div class="owner-monitor">
+              <h3 class="owner-subtitle">Wygląd medium</h3>
+              <p class="owner-monitor-hint">
+                Wybierz medium i zmień jego nazwę, krótki opis, talenty, dłuższy opis oraz obraz. Obraz możesz wkleić ręcznie albo
+                wybrać z zapisanych assetów typu „medium”.
+              </p>
+              <div class="add-staff">
+                <select id="editor-character-id" class="sel"></select>
+                <select id="editor-asset-preset" class="sel">
+                  <option value="">Wybierz zapisany asset medium (opcjonalnie)</option>
+                </select>
+                <input id="editor-character-name" type="text" placeholder="Nazwa medium" />
+                <input id="editor-character-tagline" type="text" placeholder="Krótki opis" />
+                <input id="editor-character-category" type="text" placeholder="Kategoria" />
+                <input id="editor-character-gender" type="text" placeholder="Płeć / typ postaci" />
+                <input id="editor-character-portrait" type="text" placeholder="Adres obrazu medium" />
+                <textarea id="editor-character-skills" class="fact-value" rows="3" maxlength="1200" placeholder="Talenty / styl pracy"></textarea>
+                <textarea id="editor-character-about" class="fact-value" rows="5" maxlength="5000" placeholder="Dłuższy opis medium"></textarea>
+                <div class="owner-reports-toolbar">
+                  <input id="editor-character-hours-from" type="text" placeholder="Od, np. 10:00" />
+                  <input id="editor-character-hours-to" type="text" placeholder="Do, np. 14:00" />
+                </div>
+                <button type="button" class="btn-primary-sm" id="btn-character-save">Zapisz medium</button>
+                <p class="err" id="character-editor-err" hidden></p>
+              </div>
             </div>
           </section>
           <div class="owner-monitor">

@@ -33,6 +33,46 @@
 
     <div id="panel-live-region" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
     <div id="client-toast" class="client-toast hidden" role="status"></div>
+    <div id="panel-onboarding-modal" class="panel-modal hidden" aria-hidden="true">
+      <div class="panel-modal-card" role="dialog" aria-modal="true" aria-labelledby="panel-onboarding-title">
+        <h2 id="panel-onboarding-title">Uzupełnij kilka informacji o sobie</h2>
+        <p class="sub">
+          Warto dodać dzieci, palenie, alkohol i auto. Medium zobaczy to w Twoim profilu, dzięki czemu łatwiej pominąć
+          zbędne pytania i szybciej przejść do rozmowy.
+        </p>
+        <form id="panel-onboarding-form" class="panel-settings-grid">
+          <label for="onboarding-has-children">Dzieci</label>
+          <select id="onboarding-has-children">
+            <option value="unknown">Nie podano</option>
+            <option value="yes">Tak</option>
+            <option value="no">Nie</option>
+          </select>
+          <label for="onboarding-smokes">Palenie</label>
+          <select id="onboarding-smokes">
+            <option value="unknown">Nie podano</option>
+            <option value="yes">Tak</option>
+            <option value="no">Nie</option>
+          </select>
+          <label for="onboarding-drinks-alcohol">Alkohol</label>
+          <select id="onboarding-drinks-alcohol">
+            <option value="unknown">Nie podano</option>
+            <option value="yes">Tak</option>
+            <option value="no">Nie</option>
+          </select>
+          <label for="onboarding-has-car">Auto</label>
+          <select id="onboarding-has-car">
+            <option value="unknown">Nie podano</option>
+            <option value="yes">Tak</option>
+            <option value="no">Nie</option>
+          </select>
+          <div class="panel-modal-actions">
+            <button type="submit" class="btn btn-primary btn-sm">Zapisz informacje</button>
+            <button type="button" class="btn btn-outline btn-sm" id="panel-onboarding-later">Później</button>
+          </div>
+          <p class="form-error" id="panel-onboarding-err" hidden></p>
+        </form>
+      </div>
+    </div>
     <section id="account-summary-card" class="auth-card auth-card--wide hidden" style="max-width: 980px; margin: 1rem auto 0">
       <h2 style="margin-top: 0">Twoje konto</h2>
       <p class="sub" id="summary-current-thread"></p>
@@ -191,5 +231,6 @@
     </div>
 
     <script type="module" src="/js/panel.js"></script>
+    <script type="module" src="/js/client-auth-banner.js"></script>
   </body>
 </html>

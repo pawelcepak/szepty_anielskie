@@ -608,21 +608,21 @@ app.post("/api/auth/register", registerJsonParser, async (req, res, next) => {
   try {
   const acceptTerms = req.body?.accept_terms === true || req.body?.accept_terms === "true";
   const acceptPrivacy = req.body?.accept_privacy === true || req.body?.accept_privacy === "true";
-  if (!acceptTerms || !acceptPrivacy) {
-    return res.status(400).json({ error: "Zaakceptuj regulamin i politykę prywatności." });
+  const acceptAge = req.body?.accept_age === true || req.body?.accept_age === "true";
+  if (!acceptTerms || !acceptPrivacy || !acceptAge) {
+    return res.status(400).json({ error: "Zaakceptuj regulamin, politykę prywatności i potwierdź pełnoletność." });
   }
   const email = String(req.body?.email || "").trim().toLowerCase();
   const password = String(req.body?.password || "");
   const username = String(req.body?.username || "").trim().toLowerCase();
   const first_name = String(req.body?.first_name || "").trim();
-  const birth_date = String(req.body?.birth_date || "").trim();
   const city = String(req.body?.city || "").trim();
-  const gender = String(req.body?.gender || "").trim();
-  const has_children = normalizeTriState(req.body?.has_children);
-  const smokes = normalizeTriState(req.body?.smokes);
-  const drinks_alcohol = normalizeTriState(req.body?.drinks_alcohol);
-  const has_car = normalizeTriState(req.body?.has_car);
-  const avatar_url = String(req.body?.avatar_url || "").trim() || null;
+  const gender = "";
+  const has_children = "unknown";
+  const smokes = "unknown";
+  const drinks_alcohol = "unknown";
+  const has_car = "unknown";
+  const avatar_url = null;
   let pending_open_character_id = String(req.body?.medium || "").trim() || null;
   if (pending_open_character_id) {
     const ch = await db.prepare("SELECT id FROM characters WHERE id = ?").get(pending_open_character_id);
@@ -645,27 +645,8 @@ app.post("/api/auth/register", registerJsonParser, async (req, res, next) => {
   if (first_name.length < 2 || first_name.length > 60) {
     return res.status(400).json({ error: "Imię: 2–60 znaków." });
   }
-  if (!new Set(["female", "male", "other"]).has(gender)) {
-    return res.status(400).json({ error: "Wybierz płeć." });
-  }
   if (city.length > 0 && (city.length < 2 || city.length > 80)) {
     return res.status(400).json({ error: "Miasto: opcjonalne; jeśli podasz — 2–80 znaków." });
-  }
-  const bd = parseBirthDate(birth_date);
-  if (!bd) return res.status(400).json({ error: "Data urodzenia: format RRRR-MM-DD." });
-  if (!birthDateAllowed(bd)) {
-    return res.status(400).json({
-      error: "Musisz mieć ukończone 18 lat — liczone od dzisiejszej daty i daty urodzenia (wymagane pełne 18 lat).",
-    });
-  }
-  if (avatar_url) {
-    if (avatar_url.startsWith("data:image/")) {
-      if (avatar_url.length > 450000) {
-        return res.status(400).json({ error: "Zdjęcie profilowe jest za duże (max ok. 400 KB po zakodowaniu)." });
-      }
-    } else if (avatar_url.length > 2000) {
-      return res.status(400).json({ error: "Nieprawidłowy adres zdjęcia." });
-    }
   }
   const exists = await db.prepare("SELECT id FROM users WHERE email = ?").get(email);
   if (exists) return res.status(409).json({ error: "Ten adres e-mail jest już zarejestrowany." });
@@ -694,7 +675,7 @@ app.post("/api/auth/register", registerJsonParser, async (req, res, next) => {
     display_name,
     username,
     first_name,
-    birth_date,
+    null,
     city || null,
     gender,
     has_children,
@@ -1761,6 +1742,148 @@ app.get(
       });
     }
     res.json({ campaigns: out });
+  })
+);
+
+function validateImageLikeUrl(raw) {
+  const value = String(raw || "").trim();
+  if (!value) return "";
+  if (value.startsWith("data:image/")) {
+    if (value.length > 900000) throw new Error("Obraz jest za duży do zapisania.");
+    return value;
+  }
+  if (/^https?:\/\//i.test(value)) {
+    if (value.length > 2000) throw new Error("Adres obrazu jest zbyt długi.");
+    return value;
+  }
+  throw new Error("Podaj poprawny adres obrazu lub data URL.");
+}
+
+app.get(
+  "/api/op/assets",
+  requireOperator,
+  requireOwner,
+  asyncRoute(async (_req, res) => {
+    const assets = await db
+      .prepare(
+        `SELECT id, kind, label, image_url, notes, datetime(created_at) AS created_at, datetime(updated_at) AS updated_at
+         FROM marketing_assets ORDER BY datetime(updated_at) DESC, datetime(created_at) DESC`
+      )
+      .all();
+    res.json({ assets });
+  })
+);
+
+app.post(
+  "/api/op/assets",
+  requireOperator,
+  requireOwner,
+  asyncRoute(async (req, res) => {
+    const label = String(req.body?.label || "").trim();
+    const kind = String(req.body?.kind || "ad").trim().toLowerCase();
+    const notes = String(req.body?.notes || "").trim().slice(0, 1000);
+    if (!label || label.length > 120) {
+      return res.status(400).json({ error: "Etykieta assetu jest wymagana (1-120 znaków)." });
+    }
+    if (!new Set(["ad", "medium", "other"]).has(kind)) {
+      return res.status(400).json({ error: "Kind assetu: ad, medium albo other." });
+    }
+    let image_url = "";
+    try {
+      image_url = validateImageLikeUrl(req.body?.image_url);
+    } catch (e) {
+      return res.status(400).json({ error: e.message || "Nieprawidłowy obraz." });
+    }
+    const id = uuidv4();
+    await db
+      .prepare(
+        `INSERT INTO marketing_assets (id, kind, label, image_url, notes, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))`
+      )
+      .run(id, kind, label, image_url, notes || null);
+    const asset = await db
+      .prepare(
+        `SELECT id, kind, label, image_url, notes, datetime(created_at) AS created_at, datetime(updated_at) AS updated_at
+         FROM marketing_assets WHERE id = ?`
+      )
+      .get(id);
+    res.status(201).json({ ok: true, asset });
+  })
+);
+
+app.delete(
+  "/api/op/assets/:assetId",
+  requireOperator,
+  requireOwner,
+  asyncRoute(async (req, res) => {
+    const assetId = String(req.params.assetId || "").trim();
+    const existing = await db.prepare(`SELECT id FROM marketing_assets WHERE id = ?`).get(assetId);
+    if (!existing) return res.status(404).json({ error: "Nie znaleziono assetu." });
+    await db.prepare(`DELETE FROM marketing_assets WHERE id = ?`).run(assetId);
+    res.json({ ok: true });
+  })
+);
+
+app.get(
+  "/api/op/characters",
+  requireOperator,
+  requireOwner,
+  asyncRoute(async (_req, res) => {
+    const characters = await db
+      .prepare(
+        `SELECT id, name, tagline, category, sort_order, portrait_url, gender, skills, about, typical_hours_from, typical_hours_to
+         FROM characters ORDER BY sort_order ASC, name ASC`
+      )
+      .all();
+    res.json({ characters });
+  })
+);
+
+app.patch(
+  "/api/op/characters/:characterId",
+  requireOperator,
+  requireOwner,
+  asyncRoute(async (req, res) => {
+    const characterId = String(req.params.characterId || "").trim();
+    const current = await db
+      .prepare(
+        `SELECT id, name, tagline, category, sort_order, portrait_url, gender, skills, about, typical_hours_from, typical_hours_to
+         FROM characters WHERE id = ?`
+      )
+      .get(characterId);
+    if (!current) return res.status(404).json({ error: "Nie znaleziono medium." });
+    const name = String(req.body?.name ?? current.name).trim();
+    const tagline = String(req.body?.tagline ?? current.tagline).trim();
+    const category = String(req.body?.category ?? current.category).trim();
+    const gender = String(req.body?.gender ?? current.gender ?? "").trim();
+    const skills = String(req.body?.skills ?? current.skills ?? "").trim();
+    const about = String(req.body?.about ?? current.about ?? "").trim();
+    const typical_hours_from = String(req.body?.typical_hours_from ?? current.typical_hours_from ?? "").trim() || null;
+    const typical_hours_to = String(req.body?.typical_hours_to ?? current.typical_hours_to ?? "").trim() || null;
+    if (!name || name.length > 120) return res.status(400).json({ error: "Nazwa medium: 1-120 znaków." });
+    if (!tagline || tagline.length > 220) return res.status(400).json({ error: "Krótki opis: 1-220 znaków." });
+    if (!category || category.length > 40) return res.status(400).json({ error: "Kategoria medium jest wymagana." });
+    let portrait_url = String(current.portrait_url || "").trim() || null;
+    try {
+      if (req.body?.portrait_url != null) portrait_url = validateImageLikeUrl(req.body?.portrait_url) || null;
+    } catch (e) {
+      return res.status(400).json({ error: e.message || "Nieprawidłowy obraz medium." });
+    }
+    await db
+      .prepare(
+        `UPDATE characters
+         SET name = ?, tagline = ?, category = ?, portrait_url = ?, gender = ?, skills = ?, about = ?,
+             typical_hours_from = ?, typical_hours_to = ?
+         WHERE id = ?`
+      )
+      .run(name, tagline, category, portrait_url, gender, skills, about, typical_hours_from, typical_hours_to, characterId);
+    const character = await db
+      .prepare(
+        `SELECT id, name, tagline, category, sort_order, portrait_url, gender, skills, about, typical_hours_from, typical_hours_to
+         FROM characters WHERE id = ?`
+      )
+      .get(characterId);
+    res.json({ ok: true, character });
   })
 );
 

@@ -1147,6 +1147,26 @@ async function refreshOwnerMarketing() {
   const imgBtn = document.getElementById("btn-mkt-image-generate");
   const imgErr = document.getElementById("mkt-image-err");
   const imgOut = document.getElementById("mkt-image-results");
+  const assetListEl = document.getElementById("asset-list");
+  const assetErrEl = document.getElementById("asset-err");
+  const assetKindEl = document.getElementById("asset-kind");
+  const assetLabelEl = document.getElementById("asset-label");
+  const assetImageUrlEl = document.getElementById("asset-image-url");
+  const assetNotesEl = document.getElementById("asset-notes");
+  const assetSaveBtn = document.getElementById("btn-asset-save");
+  const charSel = document.getElementById("editor-character-id");
+  const charAssetSel = document.getElementById("editor-asset-preset");
+  const charErrEl = document.getElementById("character-editor-err");
+  const charSaveBtn = document.getElementById("btn-character-save");
+  const charNameEl = document.getElementById("editor-character-name");
+  const charTaglineEl = document.getElementById("editor-character-tagline");
+  const charCategoryEl = document.getElementById("editor-character-category");
+  const charGenderEl = document.getElementById("editor-character-gender");
+  const charPortraitEl = document.getElementById("editor-character-portrait");
+  const charSkillsEl = document.getElementById("editor-character-skills");
+  const charAboutEl = document.getElementById("editor-character-about");
+  const charHoursFromEl = document.getElementById("editor-character-hours-from");
+  const charHoursToEl = document.getElementById("editor-character-hours-to");
   const subButtons = Array.from(document.querySelectorAll("#owner-page-marketing [data-mkt-subpage]"));
   const subPages = Array.from(document.querySelectorAll("#owner-page-marketing [data-mkt-subpage-panel]"));
   const activateMarketingSubpage = (key) => {
@@ -1161,6 +1181,53 @@ async function refreshOwnerMarketing() {
     });
   };
   activateMarketingSubpage(subButtons.find((b) => b.classList.contains("owner-mkt-subbtn--active"))?.getAttribute("data-mkt-subpage") || "prelaunch");
+  const [assetsData, charactersData] = await Promise.all([
+    api("/api/op/assets").catch(() => ({ assets: [] })),
+    api("/api/op/characters").catch(() => ({ characters: [] })),
+  ]);
+  const assets = assetsData.assets || [];
+  const editableCharacters = charactersData.characters || [];
+  const fillCharacterForm = (id) => {
+    const row = editableCharacters.find((c) => c.id === id);
+    if (!row) return;
+    if (charNameEl) charNameEl.value = row.name || "";
+    if (charTaglineEl) charTaglineEl.value = row.tagline || "";
+    if (charCategoryEl) charCategoryEl.value = row.category || "";
+    if (charGenderEl) charGenderEl.value = row.gender || "";
+    if (charPortraitEl) charPortraitEl.value = row.portrait_url || "";
+    if (charSkillsEl) charSkillsEl.value = row.skills || "";
+    if (charAboutEl) charAboutEl.value = row.about || "";
+    if (charHoursFromEl) charHoursFromEl.value = row.typical_hours_from || "";
+    if (charHoursToEl) charHoursToEl.value = row.typical_hours_to || "";
+  };
+  if (assetListEl) {
+    assetListEl.innerHTML = assets.length
+      ? assets
+          .map(
+            (asset) => `<article class="owner-insight-card">
+              <h4 class="owner-insight-card-title">${esc(asset.label || "Asset")}</h4>
+              <p class="owner-insight-card-body">${esc(asset.kind || "ad")}${asset.notes ? " · " + esc(String(asset.notes).slice(0, 120)) : ""}</p>
+              <img src="${esc(asset.image_url || "")}" alt="${esc(asset.label || "Asset")}" loading="lazy" />
+              <button type="button" class="btn-mon btn-mon--danger" data-asset-delete="${esc(asset.id)}">Usuń</button>
+            </article>`
+          )
+          .join("")
+      : `<p class="queue-empty">Brak zapisanych assetów.</p>`;
+  }
+  if (charSel) {
+    charSel.dataset.rows = JSON.stringify(editableCharacters);
+    charSel.innerHTML = editableCharacters
+      .map((c) => `<option value="${esc(c.id)}">${esc(c.name)} (${esc(c.category || "medium")})</option>`)
+      .join("");
+    if (charSel.value) fillCharacterForm(charSel.value);
+  }
+  if (charAssetSel) {
+    const mediumAssets = assets.filter((asset) => String(asset.kind || "") === "medium");
+    charAssetSel.dataset.assets = JSON.stringify(mediumAssets);
+    charAssetSel.innerHTML =
+      `<option value="">Wybierz zapisany asset medium (opcjonalnie)</option>` +
+      mediumAssets.map((asset) => `<option value="${esc(asset.id)}">${esc(asset.label)}</option>`).join("");
+  }
   if (imgApiKeyEl && !imgApiKeyEl.dataset.restored) {
     try {
       imgApiKeyEl.value = localStorage.getItem(MKT_IMAGE_KEY_STORAGE) || "";
@@ -1308,6 +1375,19 @@ async function refreshOwnerMarketing() {
         activateMarketingSubpage(sub.getAttribute("data-mkt-subpage") || "prelaunch");
         return;
       }
+      const delBtn = ev.target.closest("[data-asset-delete]");
+      if (delBtn) {
+        const assetId = delBtn.getAttribute("data-asset-delete") || "";
+        api(`/api/op/assets/${encodeURIComponent(assetId)}`, { method: "DELETE" })
+          .then(() => refreshOwnerMarketing())
+          .catch((e) => {
+            if (assetErrEl) {
+              assetErrEl.hidden = false;
+              assetErrEl.textContent = e.message || String(e);
+            }
+          });
+        return;
+      }
       const p = ev.target.closest("[data-mkt-preset]");
       if (!p) return;
       const name = p.getAttribute("data-mkt-preset") || "";
@@ -1331,6 +1411,81 @@ async function refreshOwnerMarketing() {
       if (/bez linku|zapowiedź|obserwowanie|tiktok|instagram|follow/i.test(name)) {
         if (offer) offer.value = "Bez linku do strony. CTA: obserwuj profil po kolejne treści.";
         if (audience) audience.value = "osoby z TikTok i Instagram, które jeszcze Cię nie znają";
+      }
+    });
+    assetSaveBtn?.addEventListener("click", async () => {
+      if (!assetErrEl || !assetKindEl || !assetLabelEl || !assetImageUrlEl) return;
+      assetErrEl.hidden = true;
+      assetErrEl.textContent = "";
+      try {
+        await api("/api/op/assets", {
+          method: "POST",
+          body: JSON.stringify({
+            kind: String(assetKindEl.value || "ad"),
+            label: String(assetLabelEl.value || "").trim(),
+            image_url: String(assetImageUrlEl.value || "").trim(),
+            notes: String(assetNotesEl?.value || "").trim(),
+          }),
+        });
+        assetLabelEl.value = "";
+        assetImageUrlEl.value = "";
+        if (assetNotesEl) assetNotesEl.value = "";
+        refreshOwnerMarketing();
+      } catch (e) {
+        assetErrEl.hidden = false;
+        assetErrEl.textContent = e.message || String(e);
+      }
+    });
+    charSel?.addEventListener("change", () => {
+      try {
+        const rows = JSON.parse(String(charSel.dataset.rows || "[]"));
+        const row = rows.find((item) => item.id === String(charSel.value || ""));
+        if (!row) return;
+        if (charNameEl) charNameEl.value = row.name || "";
+        if (charTaglineEl) charTaglineEl.value = row.tagline || "";
+        if (charCategoryEl) charCategoryEl.value = row.category || "";
+        if (charGenderEl) charGenderEl.value = row.gender || "";
+        if (charPortraitEl) charPortraitEl.value = row.portrait_url || "";
+        if (charSkillsEl) charSkillsEl.value = row.skills || "";
+        if (charAboutEl) charAboutEl.value = row.about || "";
+        if (charHoursFromEl) charHoursFromEl.value = row.typical_hours_from || "";
+        if (charHoursToEl) charHoursToEl.value = row.typical_hours_to || "";
+      } catch {
+        /* ignore */
+      }
+    });
+    charAssetSel?.addEventListener("change", () => {
+      try {
+        const rows = JSON.parse(String(charAssetSel.dataset.assets || "[]"));
+        const asset = rows.find((row) => row.id === String(charAssetSel.value || ""));
+        if (asset && charPortraitEl) charPortraitEl.value = asset.image_url || "";
+      } catch {
+        /* ignore */
+      }
+    });
+    charSaveBtn?.addEventListener("click", async () => {
+      if (!charSel || !charErrEl) return;
+      charErrEl.hidden = true;
+      charErrEl.textContent = "";
+      try {
+        await api(`/api/op/characters/${encodeURIComponent(charSel.value)}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            name: String(charNameEl?.value || "").trim(),
+            tagline: String(charTaglineEl?.value || "").trim(),
+            category: String(charCategoryEl?.value || "").trim(),
+            gender: String(charGenderEl?.value || "").trim(),
+            portrait_url: String(charPortraitEl?.value || "").trim(),
+            skills: String(charSkillsEl?.value || "").trim(),
+            about: String(charAboutEl?.value || "").trim(),
+            typical_hours_from: String(charHoursFromEl?.value || "").trim(),
+            typical_hours_to: String(charHoursToEl?.value || "").trim(),
+          }),
+        });
+        refreshOwnerMarketing();
+      } catch (e) {
+        charErrEl.hidden = false;
+        charErrEl.textContent = e.message || String(e);
       }
     });
   }
