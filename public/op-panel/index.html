@@ -221,6 +221,43 @@
             <div id="mkt-growth-list" class="owner-insights-cards"></div>
           </div>
           <div id="mkt-results" class="owner-insights-cards" style="margin-top: 1rem"></div>
+          <div class="owner-monitor" style="margin-top: 1rem">
+            <h3 class="owner-subtitle">Generowanie obrazu (AI)</h3>
+            <p class="owner-monitor-hint">
+              Domyślnie działa tryb darmowy. Jeśli chcesz wyższą jakość, możesz wkleić własny API key i wybrać OpenAI.
+            </p>
+            <div class="add-staff">
+              <textarea
+                id="mkt-image-prompt"
+                class="fact-value"
+                rows="3"
+                maxlength="4000"
+                placeholder="Prompt obrazu, np. mistyczna karta tarota, złote światło, styl cinematic"
+              ></textarea>
+              <div class="owner-reports-toolbar">
+                <select id="mkt-image-provider" class="sel" style="max-width: 220px">
+                  <option value="free">Darmowy (bez API key)</option>
+                  <option value="openai">OpenAI (własny API key)</option>
+                </select>
+                <select id="mkt-image-size" class="sel" style="max-width: 170px">
+                  <option value="1024x1024">1024x1024</option>
+                  <option value="1536x1024">1536x1024</option>
+                  <option value="1024x1536">1024x1536</option>
+                </select>
+              </div>
+              <input
+                id="mkt-image-api-key"
+                type="password"
+                autocomplete="off"
+                placeholder="Opcjonalny API key do obrazów (zapisywany lokalnie w tej przeglądarce)"
+              />
+              <div class="owner-reports-toolbar">
+                <button type="button" class="btn-primary-sm" id="btn-mkt-image-generate">Generuj obraz</button>
+              </div>
+              <p class="err" id="mkt-image-err" hidden></p>
+            </div>
+            <div id="mkt-image-results" class="owner-image-results"></div>
+          </div>
         </div>
       </div>
 
@@ -469,7 +506,9 @@
                 <h2 class="side-name" id="cl-name"></h2>
                 <p class="side-meta" id="cl-city" hidden></p>
                 <p class="side-meta" id="cl-birth" hidden></p>
+                <p class="side-meta" id="cl-gender" hidden></p>
                 <p class="side-meta" id="cl-email"></p>
+                <p class="side-meta side-meta--extra" id="cl-extra" hidden></p>
                 <p class="side-thread-start hidden" id="side-thread-start" aria-live="polite"></p>
               </div>
             </div>

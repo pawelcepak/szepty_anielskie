@@ -114,6 +114,7 @@ let ownerAdvancedUnlocked = false;
 let ownerMarketingBound = false;
 let marketingSelectedChannels = new Set(["instagram", "tiktok"]);
 const TEASER_TEMPLATES_KEY = "owner-teaser-templates-v1";
+const MKT_IMAGE_KEY_STORAGE = "owner-mkt-image-openai-key-v1";
 const DEFAULT_TEASER_TEMPLATES = [
   "Witaj! Jeśli chcesz, mogę pomóc Ci spojrzeć spokojnie na Twoją obecną sytuację i podpowiedzieć pierwszy krok.",
   "Cześć! Widzę, że możesz potrzebować wsparcia. Napisz 2-3 zdania o tym, co teraz jest dla Ciebie najważniejsze.",
@@ -971,6 +972,12 @@ function ownerTriStateLabel(v) {
   return "—";
 }
 
+function clientTriStateLabel(v) {
+  if (v === "yes") return "Tak";
+  if (v === "no") return "Nie";
+  return "—";
+}
+
 function ownerMonthLabel(iso) {
   const d = new Date(iso);
   if (!Number.isFinite(d.getTime())) return "";
@@ -1133,6 +1140,21 @@ async function refreshOwnerMarketing() {
   if (!channelsWrap || !btn || !err || !out) return;
   const starterEl = document.getElementById("mkt-starter-list");
   const growthEl = document.getElementById("mkt-growth-list");
+  const imgPromptEl = document.getElementById("mkt-image-prompt");
+  const imgProviderEl = document.getElementById("mkt-image-provider");
+  const imgSizeEl = document.getElementById("mkt-image-size");
+  const imgApiKeyEl = document.getElementById("mkt-image-api-key");
+  const imgBtn = document.getElementById("btn-mkt-image-generate");
+  const imgErr = document.getElementById("mkt-image-err");
+  const imgOut = document.getElementById("mkt-image-results");
+  if (imgApiKeyEl && !imgApiKeyEl.dataset.restored) {
+    try {
+      imgApiKeyEl.value = localStorage.getItem(MKT_IMAGE_KEY_STORAGE) || "";
+    } catch {
+      /* ignore */
+    }
+    imgApiKeyEl.dataset.restored = "1";
+  }
   function renderPresetCards() {
     const mk = (arr, kind) =>
       arr
@@ -1213,6 +1235,57 @@ async function refreshOwnerMarketing() {
         err.hidden = false;
       } finally {
         btn.disabled = false;
+      }
+    });
+    imgBtn?.addEventListener("click", async () => {
+      if (!imgPromptEl || !imgProviderEl || !imgSizeEl || !imgErr || !imgOut) return;
+      const prompt = String(imgPromptEl.value || "").trim();
+      const provider = String(imgProviderEl.value || "free").trim().toLowerCase();
+      const size = String(imgSizeEl.value || "1024x1024").trim();
+      const apiKey = String(imgApiKeyEl?.value || "").trim();
+      imgErr.hidden = true;
+      imgErr.textContent = "";
+      if (prompt.length < 8) {
+        imgErr.textContent = "Prompt obrazu jest za krótki (min. 8 znaków).";
+        imgErr.hidden = false;
+        return;
+      }
+      if (imgApiKeyEl) {
+        try {
+          localStorage.setItem(MKT_IMAGE_KEY_STORAGE, apiKey);
+        } catch {
+          /* ignore */
+        }
+      }
+      imgBtn.disabled = true;
+      imgOut.innerHTML = "";
+      try {
+        const r = await api("/api/op/marketing/generate-image", {
+          method: "POST",
+          body: JSON.stringify({
+            prompt,
+            provider,
+            size,
+            api_key: apiKey || null,
+          }),
+        });
+        const first = Array.isArray(r.images) && r.images[0] ? r.images[0] : null;
+        const url = String(first?.url || "").trim();
+        if (!url) throw new Error("Brak obrazu w odpowiedzi.");
+        const safeUrl = esc(url);
+        imgOut.innerHTML = `<article class="owner-insight-feed-row">
+          <header class="owner-insight-feed-head">
+            <strong>Wygenerowany obraz</strong>
+            <span class="owner-insight-feed-who">${esc((r.provider || provider) + (r.model ? " · " + r.model : ""))}</span>
+          </header>
+          <img src="${safeUrl}" alt="Wygenerowany obraz AI" loading="lazy" />
+          <a class="composer-foot-link" href="${safeUrl}" target="_blank" rel="noopener noreferrer">Otwórz obraz w nowej karcie</a>
+        </article>`;
+      } catch (e) {
+        imgErr.textContent = e.message || String(e);
+        imgErr.hidden = false;
+      } finally {
+        imgBtn.disabled = false;
       }
     });
     document.getElementById("owner-page-marketing")?.addEventListener("click", (ev) => {
@@ -2736,6 +2809,13 @@ async function openThread(id) {
     clBirth.textContent = birthStr ? `Data urodzenia: ${birthStr}` : "";
     clBirth.hidden = !birthStr;
   }
+  const clGender = document.getElementById("cl-gender");
+  if (clGender) {
+    const g =
+      cp.gender === "female" ? "Kobieta" : cp.gender === "male" ? "Mężczyzna" : cp.gender === "other" ? "Inna" : "";
+    clGender.textContent = g ? `Płeć: ${g}` : "";
+    clGender.hidden = !g;
+  }
   const clEmail = document.getElementById("cl-email");
   if (clEmail) {
     if (opRole === "owner") {
@@ -2745,6 +2825,13 @@ async function openThread(id) {
       clEmail.textContent = "";
       clEmail.hidden = true;
     }
+  }
+  const clExtra = document.getElementById("cl-extra");
+  if (clExtra) {
+    clExtra.textContent = `Dzieci: ${clientTriStateLabel(cp.has_children)} · Palenie: ${clientTriStateLabel(
+      cp.smokes
+    )} · Alkohol: ${clientTriStateLabel(cp.drinks_alcohol)} · Auto: ${clientTriStateLabel(cp.has_car)}`;
+    clExtra.hidden = false;
   }
 
   setClientAdminActions(m);

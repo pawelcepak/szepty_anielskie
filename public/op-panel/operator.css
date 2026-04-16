@@ -295,6 +295,24 @@ a {
   font-weight: 700;
 }
 
+.owner-image-results {
+  margin-top: 0.85rem;
+}
+
+.owner-image-results img {
+  width: min(100%, 520px);
+  height: auto;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  display: block;
+}
+
+.owner-image-results a {
+  display: inline-block;
+  margin-top: 0.45rem;
+  font-size: 12px;
+}
+
 .owner-clients-upsell-hint {
   font-size: 12px !important;
   opacity: 0.92;
@@ -961,6 +979,12 @@ a {
 .client-profile-text .side-name,
 .client-profile-text .side-meta {
   text-align: right;
+}
+
+.client-profile-text .side-meta--extra {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #334155;
 }
 
 .side-card {

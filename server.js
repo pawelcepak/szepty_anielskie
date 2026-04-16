@@ -224,6 +224,48 @@ async function generateDraftWithAnthropic({ prompt }) {
   return { text: txt, model };
 }
 
+async function generateImageWithOpenAi({ prompt, size = "1024x1024", apiKey }) {
+  const key = String(apiKey || openAiKey() || "").trim();
+  if (!key) throw new Error("Brak OPENAI_API_KEY dla generowania obrazów.");
+  const model = String(process.env.OPENAI_IMAGE_MODEL || "gpt-image-1").trim();
+  const allowed = new Set(["1024x1024", "1536x1024", "1024x1536"]);
+  const imgSize = allowed.has(size) ? size : "1024x1024";
+  const r = await fetch("https://api.openai.com/v1/images/generations", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      prompt,
+      size: imgSize,
+    }),
+  });
+  const raw = await r.text();
+  let data = {};
+  try {
+    data = raw ? JSON.parse(raw) : {};
+  } catch {
+    data = { message: raw.slice(0, 800) };
+  }
+  if (!r.ok) {
+    const msg = extractApiErrorMessage(data, `OpenAI Images HTTP ${r.status}`);
+    console.error("[openai] images/generations", r.status, raw.slice(0, 1500));
+    const err = new Error(msg);
+    err.status = 502;
+    throw err;
+  }
+  const first = Array.isArray(data?.data) && data.data[0] ? data.data[0] : null;
+  const imageUrl = String(first?.url || "").trim();
+  const imageB64 = String(first?.b64_json || "").trim();
+  if (!imageUrl && !imageB64) {
+    throw new Error("OpenAI nie zwrócił obrazu.");
+  }
+  const finalUrl = imageUrl || `data:image/png;base64,${imageB64}`;
+  return { model, url: finalUrl };
+}
+
 function safeJsonParse(input) {
   try {
     return JSON.parse(String(input || ""));
@@ -2009,6 +2051,43 @@ app.post("/api/op/marketing/generate", requireOperator, requireOwner, asyncRoute
   });
 }));
 
+app.post("/api/op/marketing/generate-image", requireOperator, requireOwner, asyncRoute(async (req, res) => {
+  const prompt = String(req.body?.prompt || "").trim();
+  const provider = String(req.body?.provider || "free").trim().toLowerCase();
+  const size = String(req.body?.size || "1024x1024").trim();
+  const apiKey = String(req.body?.api_key || "").trim();
+  if (prompt.length < 8 || prompt.length > 4000) {
+    return res.status(400).json({ error: "Prompt obrazu: 8-4000 znaków." });
+  }
+  if (provider === "free") {
+    const seed = Math.floor(Date.now() / 1000);
+    const [wRaw, hRaw] = size.split("x");
+    const w = Math.max(512, Math.min(1536, Number(wRaw) || 1024));
+    const h = Math.max(512, Math.min(1536, Number(hRaw) || 1024));
+    const freeUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${w}&height=${h}&seed=${seed}&nologo=true`;
+    return res.json({
+      ok: true,
+      provider: "free",
+      model: "pollinations",
+      images: [{ url: freeUrl }],
+    });
+  }
+  if (provider !== "openai") {
+    return res.status(400).json({ error: "Nieznany provider obrazów. Użyj: free lub openai." });
+  }
+  const img = await generateImageWithOpenAi({
+    prompt,
+    size,
+    apiKey: apiKey || undefined,
+  });
+  res.json({
+    ok: true,
+    provider: "openai",
+    model: img.model,
+    images: [{ url: img.url }],
+  });
+}));
+
 app.post("/api/op/inbox/:threadId/touch", requireOperator, asyncRoute(async (req, res) => {
   const threadId = req.params.threadId;
   if (!(await threadVisibleToOperator(db, threadId, req.operator.id, req.operator.role))) {
@@ -2036,7 +2115,9 @@ app.get("/api/op/inbox/:threadId/messages", requireOperator, asyncRoute(async (r
   const raw = await db.prepare(
       `SELECT t.id, u.id AS user_id, u.email AS user_email, u.display_name AS user_display_name,
               u.username AS client_username, u.first_name AS client_first_name,
-              u.birth_date AS client_birth_date, u.city AS client_city, u.avatar_url AS client_avatar_url, u.blocked_at AS client_blocked_at,
+              u.birth_date AS client_birth_date, u.city AS client_city, u.gender AS client_gender,
+              u.has_children AS client_has_children, u.smokes AS client_smokes, u.drinks_alcohol AS client_drinks_alcohol, u.has_car AS client_has_car,
+              u.avatar_url AS client_avatar_url, u.blocked_at AS client_blocked_at,
               c.name AS character_name, c.id AS character_id,
               c.tagline AS character_tagline, c.portrait_url AS character_portrait_url,
               c.gender AS character_gender, c.skills AS character_skills, c.about AS character_about,
@@ -2070,6 +2151,11 @@ app.get("/api/op/inbox/:threadId/messages", requireOperator, asyncRoute(async (r
       first_name: raw.client_first_name,
       birth_date: raw.client_birth_date,
       city: raw.client_city || "",
+      gender: raw.client_gender || "",
+      has_children: raw.client_has_children || "unknown",
+      smokes: raw.client_smokes || "unknown",
+      drinks_alcohol: raw.client_drinks_alcohol || "unknown",
+      has_car: raw.client_has_car || "unknown",
       avatar_url: raw.client_avatar_url,
       blocked_at: raw.client_blocked_at,
     },
