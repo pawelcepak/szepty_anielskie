@@ -1147,6 +1147,20 @@ async function refreshOwnerMarketing() {
   const imgBtn = document.getElementById("btn-mkt-image-generate");
   const imgErr = document.getElementById("mkt-image-err");
   const imgOut = document.getElementById("mkt-image-results");
+  const subButtons = Array.from(document.querySelectorAll("#owner-page-marketing [data-mkt-subpage]"));
+  const subPages = Array.from(document.querySelectorAll("#owner-page-marketing [data-mkt-subpage-panel]"));
+  const activateMarketingSubpage = (key) => {
+    const wanted = String(key || "prelaunch");
+    subButtons.forEach((b) => {
+      const isActive = b.getAttribute("data-mkt-subpage") === wanted;
+      b.classList.toggle("owner-mkt-subbtn--active", isActive);
+    });
+    subPages.forEach((p) => {
+      const isActive = p.getAttribute("data-mkt-subpage-panel") === wanted;
+      p.classList.toggle("owner-mkt-subpage--active", isActive);
+    });
+  };
+  activateMarketingSubpage(subButtons.find((b) => b.classList.contains("owner-mkt-subbtn--active"))?.getAttribute("data-mkt-subpage") || "prelaunch");
   if (imgApiKeyEl && !imgApiKeyEl.dataset.restored) {
     try {
       imgApiKeyEl.value = localStorage.getItem(MKT_IMAGE_KEY_STORAGE) || "";
@@ -1289,6 +1303,11 @@ async function refreshOwnerMarketing() {
       }
     });
     document.getElementById("owner-page-marketing")?.addEventListener("click", (ev) => {
+      const sub = ev.target.closest("[data-mkt-subpage]");
+      if (sub) {
+        activateMarketingSubpage(sub.getAttribute("data-mkt-subpage") || "prelaunch");
+        return;
+      }
       const p = ev.target.closest("[data-mkt-preset]");
       if (!p) return;
       const name = p.getAttribute("data-mkt-preset") || "";
@@ -1308,6 +1327,10 @@ async function refreshOwnerMarketing() {
       if (custom) {
         custom.value =
           "Skup się głównie na Instagram i TikTok. Podaj krótki hook, zwięzły opis i praktyczne hashtagi.";
+      }
+      if (/bez linku|zapowiedź|obserwowanie|tiktok|instagram|follow/i.test(name)) {
+        if (offer) offer.value = "Bez linku do strony. CTA: obserwuj profil po kolejne treści.";
+        if (audience) audience.value = "osoby z TikTok i Instagram, które jeszcze Cię nie znają";
       }
     });
   }

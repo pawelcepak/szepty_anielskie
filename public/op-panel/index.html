@@ -187,6 +187,121 @@
           <p class="owner-monitor-hint">
             Wybierz kanały, wpisz temat i prompt — dostaniesz propozycje tytułów, opisów, tagów i promptu graficznego.
           </p>
+          <nav class="owner-mkt-subnav" aria-label="Sekcje panelu reklamowego">
+            <button type="button" class="owner-mkt-subbtn owner-mkt-subbtn--active" data-mkt-subpage="prelaunch">
+              Teksty startowe (bez linku)
+            </button>
+            <button type="button" class="owner-mkt-subbtn" data-mkt-subpage="social">
+              TikTok / Instagram (follow)
+            </button>
+            <button type="button" class="owner-mkt-subbtn" data-mkt-subpage="retention">
+              Nowi klienci + utrzymanie
+            </button>
+            <button type="button" class="owner-mkt-subbtn" data-mkt-subpage="images">
+              Tworzenie obrazów AI
+            </button>
+          </nav>
+          <section class="owner-mkt-subpage owner-mkt-subpage--active" data-mkt-subpage-panel="prelaunch">
+            <div class="owner-monitor">
+              <h3 class="owner-subtitle">Teksty na start (gdy nie chcesz jeszcze podawać linku)</h3>
+              <p class="owner-monitor-hint">
+                Gotowe kierunki: budowanie ciekawości, CTA na obserwowanie profilu i lekkie wejście w temat bez publikacji URL.
+              </p>
+              <div class="owner-insights-cards">
+                <article class="owner-insight-card">
+                  <h4 class="owner-insight-card-title">Budowanie ciekawości (bez linku)</h4>
+                  <p class="owner-insight-card-body">
+                    Komunikacja „już działamy, pełna strona za chwilę”. CTA: obserwuj i czekaj na premierę.
+                  </p>
+                  <button type="button" class="btn-mon" data-mkt-preset="Start bez linku: zaciekawienie + zapowiedź" data-mkt-kind="starter">Użyj tego startera</button>
+                </article>
+                <article class="owner-insight-card">
+                  <h4 class="owner-insight-card-title">Aktywność społeczności</h4>
+                  <p class="owner-insight-card-body">
+                    Treści pod komentarze, lajki i zapisania (save). Cel: sygnał aktywności przed launch.
+                  </p>
+                  <button type="button" class="btn-mon" data-mkt-preset="Start bez linku: komentarze, lajki, zapisania" data-mkt-kind="starter">Użyj tego startera</button>
+                </article>
+              </div>
+            </div>
+          </section>
+          <section class="owner-mkt-subpage" data-mkt-subpage-panel="social">
+            <div class="owner-monitor">
+              <h3 class="owner-subtitle">TikTok / Instagram — wejścia na profil i obserwacje</h3>
+              <p class="owner-monitor-hint">
+                Użyj, gdy celem jest ruch na profilach social, obserwowanie i budowanie zaufania przed wdrożeniem linku.
+              </p>
+              <div class="owner-insights-cards">
+                <article class="owner-insight-card">
+                  <h4 class="owner-insight-card-title">Hook + CTA follow</h4>
+                  <p class="owner-insight-card-body">
+                    Krótkie formaty: 5-15 sekund, 1 problem = 1 obietnica. CTA: „obserwuj po więcej”.
+                  </p>
+                  <button type="button" class="btn-mon" data-mkt-preset="TikTok/IG: hook + CTA na obserwowanie" data-mkt-kind="starter">Użyj tego startera</button>
+                </article>
+                <article class="owner-insight-card">
+                  <h4 class="owner-insight-card-title">Seria codzienna</h4>
+                  <p class="owner-insight-card-body">
+                    Propozycje „codziennych mini treści” pod regularność publikacji i utrzymanie zasięgu.
+                  </p>
+                  <button type="button" class="btn-mon" data-mkt-preset="TikTok/IG: codzienna seria mini treści" data-mkt-kind="starter">Użyj tego startera</button>
+                </article>
+              </div>
+            </div>
+          </section>
+          <section class="owner-mkt-subpage" data-mkt-subpage-panel="retention">
+            <div class="owner-monitor">
+              <h3 class="owner-subtitle">Pozyskanie nowych klientów + utrzymanie obecnych</h3>
+              <p class="owner-monitor-hint">
+                Sekcja pod kampanie mieszane: nowi odbiorcy oraz powroty klientów, którzy już korzystali z rozmów.
+              </p>
+            </div>
+            <div class="owner-monitor">
+              <h3 class="owner-subtitle">Startery kampanii (na start: 10)</h3>
+              <div id="mkt-starter-list" class="owner-insights-cards"></div>
+              <h3 class="owner-subtitle">Startery kampanii (gdy są już klienci: 20)</h3>
+              <div id="mkt-growth-list" class="owner-insights-cards"></div>
+            </div>
+          </section>
+          <section class="owner-mkt-subpage" data-mkt-subpage-panel="images">
+            <div class="owner-monitor" style="margin-top: 1rem">
+              <h3 class="owner-subtitle">Tworzenie obrazów AI</h3>
+              <p class="owner-monitor-hint">
+                Domyślnie działa tryb darmowy. Jeśli chcesz wyższą jakość, możesz wkleić własny API key i wybrać OpenAI.
+              </p>
+              <div class="add-staff">
+                <textarea
+                  id="mkt-image-prompt"
+                  class="fact-value"
+                  rows="3"
+                  maxlength="4000"
+                  placeholder="Prompt obrazu, np. mistyczna karta tarota, złote światło, styl cinematic"
+                ></textarea>
+                <div class="owner-reports-toolbar">
+                  <select id="mkt-image-provider" class="sel" style="max-width: 220px">
+                    <option value="free">Darmowy (bez API key)</option>
+                    <option value="openai">OpenAI (własny API key)</option>
+                  </select>
+                  <select id="mkt-image-size" class="sel" style="max-width: 170px">
+                    <option value="1024x1024">1024x1024</option>
+                    <option value="1536x1024">1536x1024</option>
+                    <option value="1024x1536">1024x1536</option>
+                  </select>
+                </div>
+                <input
+                  id="mkt-image-api-key"
+                  type="password"
+                  autocomplete="off"
+                  placeholder="Opcjonalny API key do obrazów (zapisywany lokalnie w tej przeglądarce)"
+                />
+                <div class="owner-reports-toolbar">
+                  <button type="button" class="btn-primary-sm" id="btn-mkt-image-generate">Generuj obraz</button>
+                </div>
+                <p class="err" id="mkt-image-err" hidden></p>
+              </div>
+              <div id="mkt-image-results" class="owner-image-results"></div>
+            </div>
+          </section>
           <div class="owner-monitor">
             <div class="add-staff">
               <input id="mkt-topic" type="text" placeholder="Temat kampanii (np. Wróżba partnerska na weekend)" />
@@ -214,50 +329,7 @@
             </div>
             <p class="err" id="mkt-err" hidden></p>
           </div>
-          <div class="owner-monitor">
-            <h3 class="owner-subtitle">Startery kampanii (na start: 10)</h3>
-            <div id="mkt-starter-list" class="owner-insights-cards"></div>
-            <h3 class="owner-subtitle">Startery kampanii (gdy są już klienci: 20)</h3>
-            <div id="mkt-growth-list" class="owner-insights-cards"></div>
-          </div>
           <div id="mkt-results" class="owner-insights-cards" style="margin-top: 1rem"></div>
-          <div class="owner-monitor" style="margin-top: 1rem">
-            <h3 class="owner-subtitle">Generowanie obrazu (AI)</h3>
-            <p class="owner-monitor-hint">
-              Domyślnie działa tryb darmowy. Jeśli chcesz wyższą jakość, możesz wkleić własny API key i wybrać OpenAI.
-            </p>
-            <div class="add-staff">
-              <textarea
-                id="mkt-image-prompt"
-                class="fact-value"
-                rows="3"
-                maxlength="4000"
-                placeholder="Prompt obrazu, np. mistyczna karta tarota, złote światło, styl cinematic"
-              ></textarea>
-              <div class="owner-reports-toolbar">
-                <select id="mkt-image-provider" class="sel" style="max-width: 220px">
-                  <option value="free">Darmowy (bez API key)</option>
-                  <option value="openai">OpenAI (własny API key)</option>
-                </select>
-                <select id="mkt-image-size" class="sel" style="max-width: 170px">
-                  <option value="1024x1024">1024x1024</option>
-                  <option value="1536x1024">1536x1024</option>
-                  <option value="1024x1536">1024x1536</option>
-                </select>
-              </div>
-              <input
-                id="mkt-image-api-key"
-                type="password"
-                autocomplete="off"
-                placeholder="Opcjonalny API key do obrazów (zapisywany lokalnie w tej przeglądarce)"
-              />
-              <div class="owner-reports-toolbar">
-                <button type="button" class="btn-primary-sm" id="btn-mkt-image-generate">Generuj obraz</button>
-              </div>
-              <p class="err" id="mkt-image-err" hidden></p>
-            </div>
-            <div id="mkt-image-results" class="owner-image-results"></div>
-          </div>
         </div>
       </div>
 

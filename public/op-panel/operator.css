@@ -1941,6 +1941,44 @@ kbd {
   color: var(--muted);
 }
 
+.owner-mkt-subnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0.7rem 0 0.85rem;
+}
+
+.owner-mkt-subbtn {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #1e293b;
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  cursor: pointer;
+}
+
+.owner-mkt-subbtn:hover {
+  border-color: #a5b4fc;
+  color: #312e81;
+}
+
+.owner-mkt-subbtn--active {
+  background: linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%);
+  border-color: #1e3a8a;
+  color: #fff;
+}
+
+.owner-mkt-subpage {
+  display: none;
+}
+
+.owner-mkt-subpage.owner-mkt-subpage--active {
+  display: block;
+}
+
 .mon-table {
   width: 100%;
   border-collapse: collapse;
