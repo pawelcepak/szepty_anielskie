@@ -1206,8 +1206,51 @@ body.page-panel .site-top {
   border-bottom: 1px solid #c9bba8;
 }
 
-.panel-profile-line {
+.panel-profile-details {
   margin: 0;
+}
+
+.panel-profile-summary {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.35rem 0.8rem;
+  align-items: center;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #4a433a;
+}
+
+.panel-profile-summary::-webkit-details-marker {
+  display: none;
+}
+
+.panel-profile-summary-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.panel-profile-summary-title::before {
+  content: "▾";
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+.panel-profile-details:not([open]) .panel-profile-summary-title::before {
+  content: "▸";
+}
+
+.panel-profile-summary-meta {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.panel-profile-line {
+  margin: 0.55rem 0 0;
   font-size: 0.9rem;
   line-height: 1.5;
   color: #4a433a;
@@ -2255,6 +2298,18 @@ body.page-panel .panel-main > .messages {
   margin: 0 0 0.9rem;
 }
 
+body.page-panel #panel-catalog-filters {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  padding-bottom: 0.2rem;
+}
+
+body.page-panel #panel-catalog-filters .catalog-filter {
+  flex: 0 0 auto;
+}
+
 .catalog-filter {
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.08);
@@ -2273,7 +2328,8 @@ body.page-panel .panel-main > .messages {
 
 .tarot-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(190px, 190px));
+  justify-content: center;
   gap: 0.9rem;
 }
 

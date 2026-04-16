@@ -1047,6 +1047,41 @@ app.get("/api/public/site-config", (_req, res) => {
   });
 });
 
+app.post("/api/public/contact", asyncRoute(async (req, res) => {
+  const name = String(req.body?.name || "").trim();
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  const message = String(req.body?.message || "").trim();
+  const company = String(req.body?.company || "").trim(); // honeypot
+  if (company) return res.status(400).json({ error: "Nieprawidłowe dane formularza." });
+  if (!name || name.length < 2 || name.length > 120) {
+    return res.status(400).json({ error: "Podaj poprawne imię lub nazwę (2-120 znaków)." });
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: "Podaj poprawny adres e-mail." });
+  }
+  if (!message || message.length < 10 || message.length > 3000) {
+    return res.status(400).json({ error: "Wiadomość powinna mieć od 10 do 3000 znaków." });
+  }
+  const to = String(process.env.CONTACT_FORM_TO || "noreply@localhost").trim() || "noreply@localhost";
+  const subject = `Formularz kontaktowy: ${name}`;
+  const text =
+    `Nowe zgłoszenie z formularza kontaktowego.\n\n` +
+    `Nadawca: ${name}\n` +
+    `E-mail: ${email}\n\n` +
+    `Wiadomość:\n${message}\n`;
+  if (isMailConfigured()) {
+    await sendOperatorEmailToUser({ to, subject, text });
+    return res.json({ ok: true, delivered: true });
+  }
+  console.warn("[contact-form] Mail nie jest skonfigurowany. Zgłoszenie nie zostało wysłane.", {
+    to,
+    name,
+    email,
+    preview: message.slice(0, 140),
+  });
+  res.json({ ok: true, delivered: false });
+}));
+
 app.get("/api/public/payments-config", (_req, res) => {
   res.json({
     p24: {
@@ -1272,6 +1307,9 @@ app.get("/sitemap.xml", (_req, res) => {
   const base = publicBaseUrl();
   const urls = [
     "/",
+    "/o-nas.html",
+    "/kontakt.html",
+    "/nota-prawna.html",
     "/informacje-ceny.html",
     "/regulamin.html",
     "/polityka-prywatnosci.html",

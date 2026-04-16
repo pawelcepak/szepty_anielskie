@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kontakt — Szepty Anielskie</title>
+    <meta
+      name="description"
+      content="Skontaktuj się z zespołem Szepty Anielskie przez formularz kontaktowy."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,600&family=Source+Sans+3:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/css/client.css" />
+  </head>
+  <body class="page-auth">
+    <header class="site-top">
+      <div class="site-top-inner">
+        <a class="logo" href="/">Szepty Anielskie</a>
+        <nav class="nav-actions nav-actions--stack">
+          <div class="auth-banner-wrap" data-auth-banner></div>
+          <div class="nav-actions-links">
+            <a href="/">Strona główna</a>
+            <a href="/o-nas.html">O nas</a>
+            <a href="/logowanie.html">Logowanie</a>
+          </div>
+        </nav>
+      </div>
+    </header>
+
+    <main class="auth-main">
+      <section class="auth-card auth-card--wide">
+        <h1>Kontakt</h1>
+        <p class="sub">
+          Napisz do nas przez formularz. Docelowy adres odbiorczy jest już przygotowany w konfiguracji i będzie można go
+          później łatwo podmienić.
+        </p>
+        <form id="contact-form" class="auth-grid" novalidate>
+          <label for="contact-name">Imię lub nazwa</label>
+          <input id="contact-name" name="name" type="text" maxlength="120" required />
+          <label for="contact-email">Twój e-mail</label>
+          <input id="contact-email" name="email" type="email" maxlength="180" required />
+          <label for="contact-message">Wiadomość</label>
+          <textarea id="contact-message" name="message" rows="7" maxlength="3000" required></textarea>
+          <input
+            type="text"
+            name="company"
+            id="contact-company"
+            autocomplete="off"
+            tabindex="-1"
+            class="visually-hidden"
+            aria-hidden="true"
+          />
+          <button type="submit" class="btn btn-primary">Wyślij wiadomość</button>
+          <p class="form-error" id="contact-form-error" hidden></p>
+          <p class="sub" id="contact-form-ok" hidden>Dziękujemy, wiadomość została zapisana.</p>
+        </form>
+      </section>
+    </main>
+    <script type="module" src="/js/contact.js"></script>
+    <script type="module" src="/js/client-auth-banner.js"></script>
+  </body>
+</html>

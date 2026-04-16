@@ -42,7 +42,11 @@
     </section>
 
     <div class="panel-app">
-      <section class="panel-profile-strip" id="panel-profile-strip" aria-label="Twój profil w skrócie">
+      <details class="panel-profile-strip panel-profile-details" id="panel-settings" aria-label="Profil i ustawienia">
+        <summary class="panel-profile-summary">
+          <span class="panel-profile-summary-title">Profil i ustawienia konta</span>
+          <span class="panel-profile-summary-meta" id="panel-profile-summary-meta"></span>
+        </summary>
         <p class="panel-profile-line" id="panel-profile-line"></p>
         <form id="panel-city-form" class="panel-city-form hidden">
           <label class="panel-city-label" for="panel-city-input">Uzupełnij miasto</label>
@@ -58,12 +62,10 @@
           </div>
           <p class="form-error" id="panel-city-err" hidden></p>
         </form>
-        <details class="panel-settings" id="panel-settings">
-          <summary>Ustawienia konta</summary>
-          <p class="sub panel-settings-hint">
-            Dodatkowe informacje mogą ułatwić rozmowę i oszczędzić pytań — konsultant zobaczy je w Twoim profilu.
-          </p>
-          <form id="panel-settings-form" class="panel-settings-grid">
+        <p class="sub panel-settings-hint">
+          Dodatkowe informacje mogą ułatwić rozmowę i oszczędzić pytań — konsultant zobaczy je w Twoim profilu.
+        </p>
+        <form id="panel-settings-form" class="panel-settings-grid">
             <label for="settings-city">Miasto (opcjonalnie)</label>
             <input id="settings-city" type="text" maxlength="80" placeholder="Puste = nie podano" />
             <label for="settings-has-children">Dzieci</label>
@@ -94,23 +96,22 @@
             <input id="settings-avatar" type="file" accept="image/jpeg,image/png,image/webp" />
             <button type="submit" class="btn btn-outline btn-sm">Zapisz profil</button>
             <p class="form-error" id="settings-profile-err" hidden></p>
-          </form>
-          <form id="panel-password-form" class="panel-settings-grid">
+        </form>
+        <form id="panel-password-form" class="panel-settings-grid">
             <label for="settings-current-pass">Aktualne hasło</label>
             <input id="settings-current-pass" type="password" autocomplete="current-password" />
             <label for="settings-new-pass">Nowe hasło</label>
             <input id="settings-new-pass" type="password" autocomplete="new-password" />
             <button type="submit" class="btn btn-outline btn-sm">Zmień hasło</button>
             <p class="form-error" id="settings-password-err" hidden></p>
-          </form>
-          <form id="panel-email-form" class="panel-settings-grid">
+        </form>
+        <form id="panel-email-form" class="panel-settings-grid">
             <label for="settings-new-email">Nowy e-mail</label>
             <input id="settings-new-email" type="email" autocomplete="email" />
             <button type="submit" class="btn btn-outline btn-sm">Zmień e-mail (potwierdzenie)</button>
             <p class="form-error" id="settings-email-err" hidden></p>
-          </form>
-        </details>
-      </section>
+        </form>
+      </details>
       <nav class="panel-view-tabs" aria-label="Widok panelu">
         <button type="button" class="panel-tab panel-tab--active" id="tab-browse" data-view="browse">
           Konsultanci

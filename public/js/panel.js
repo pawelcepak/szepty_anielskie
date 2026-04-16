@@ -320,6 +320,7 @@ function triStateLabel(v) {
 
 function renderProfileStrip() {
   const line = document.getElementById("panel-profile-line");
+  const summaryMeta = document.getElementById("panel-profile-summary-meta");
   const form = document.getElementById("panel-city-form");
   const inp = document.getElementById("panel-city-input");
   if (!me || !line) return;
@@ -337,6 +338,10 @@ function renderProfileStrip() {
   )}</strong> · płeć <strong>${esc(gen)}</strong> · miasto <strong>${city ? esc(city) : "—"}</strong> · data urodzenia <strong>${esc(
     bd
   )}</strong> · ${extras}.`;
+  if (summaryMeta) {
+    const shortMeta = [u.first_name || "@?", city || "miasto —", gen].join(" · ");
+    summaryMeta.textContent = shortMeta;
+  }
   if (form) {
     const need = !city;
     form.classList.toggle("hidden", !need);
