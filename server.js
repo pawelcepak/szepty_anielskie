@@ -77,6 +77,26 @@ const CUSTOMER_SESSION_IDLE_MINUTES = Math.min(
   Math.max(1, Number(process.env.CUSTOMER_SESSION_IDLE_MINUTES || 10))
 );
 const CUSTOMER_SESSION_IDLE_MS = CUSTOMER_SESSION_IDLE_MINUTES * 60 * 1000;
+const PROMO_SYSTEM_ENABLED = ["1", "true", "yes"].includes(
+  String(process.env.PROMO_SYSTEM_ENABLED || "false").toLowerCase()
+);
+const SEO_INDEXABLE = ["1", "true", "yes"].includes(String(process.env.SEO_INDEXABLE || "false").toLowerCase());
+const P24_ENABLED = ["1", "true", "yes"].includes(String(process.env.P24_ENABLED || "false").toLowerCase());
+const P24_SANDBOX = ["1", "true", "yes"].includes(String(process.env.P24_SANDBOX || "true").toLowerCase());
+
+function isP24Configured() {
+  const merchantId = String(process.env.P24_MERCHANT_ID || "").trim();
+  const posId = String(process.env.P24_POS_ID || "").trim();
+  const crc = String(process.env.P24_CRC || "").trim();
+  return P24_ENABLED && !!merchantId && !!posId && !!crc;
+}
+
+function promoConfigPublic() {
+  return {
+    enabled: PROMO_SYSTEM_ENABLED,
+    popup_enabled: ["1", "true", "yes"].includes(String(process.env.PROMO_POPUP_ENABLED || "false").toLowerCase()),
+  };
+}
 
 function defaultClientPkgPln(amount) {
   const pkg = APP_CONFIG.pricing.clientPackages.find((item) => Number(item.amount) === Number(amount));
@@ -104,6 +124,15 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: "512kb" }));
 app.use(cookieParser());
 const registerJsonParser = express.json({ limit: "1mb" });
+
+if (!SEO_INDEXABLE) {
+  app.use((req, res, next) => {
+    if (req.method === "GET" && !String(req.path || "").startsWith("/api")) {
+      res.setHeader("X-Robots-Tag", "noindex, nofollow, noarchive");
+    }
+    next();
+  });
+}
 
 function openAiKey() {
   return String(process.env.OPENAI_API_KEY || "").trim();
@@ -495,6 +524,35 @@ function normalizeTriState(v) {
   const s = String(v || "").trim().toLowerCase();
   if (s === "yes" || s === "no" || s === "unknown") return s;
   return "unknown";
+}
+
+function promoIsActiveNow(campaign) {
+  if (!campaign || Number(campaign.is_active || 0) !== 1) return false;
+  const now = Date.now();
+  const startAt = String(campaign.start_at || "").trim();
+  const endAt = String(campaign.end_at || "").trim();
+  const startOk = !startAt || (Number.isFinite(new Date(startAt).getTime()) && new Date(startAt).getTime() <= now);
+  const endOk = !endAt || (Number.isFinite(new Date(endAt).getTime()) && new Date(endAt).getTime() >= now);
+  return startOk && endOk;
+}
+
+function normalizePromoKey(raw) {
+  return String(raw || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 60);
+}
+
+function buildPromoCode(prefix) {
+  const cleanPrefix = String(prefix || "SZEPT")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 10) || "SZEPT";
+  const body = crypto.randomBytes(4).toString("hex").toUpperCase();
+  return `${cleanPrefix}-${body}`;
 }
 
 /** --- Klient: rejestracja / logowanie --- */
@@ -989,6 +1047,115 @@ app.get("/api/public/site-config", (_req, res) => {
   });
 });
 
+app.get("/api/public/payments-config", (_req, res) => {
+  res.json({
+    p24: {
+      enabled: isP24Configured(),
+      sandbox: P24_SANDBOX,
+      currency: APP_CONFIG.pricing.currency,
+    },
+  });
+});
+
+app.get("/api/public/promo/bootstrap", asyncRoute(async (req, res) => {
+  const cfg = promoConfigPublic();
+  if (!cfg.enabled) {
+    return res.json({ enabled: false, popup_enabled: false, campaign: null });
+  }
+  const key = normalizePromoKey(req.query.campaign || req.query.camp || req.query.ref || "");
+  if (!key) {
+    return res.json({ enabled: true, popup_enabled: cfg.popup_enabled, campaign: null });
+  }
+  const row = await db
+    .prepare(
+      `SELECT id, campaign_key, label, discount_percent, start_at, end_at, is_active, capture_email,
+              code_prefix, max_codes, total_claimed
+       FROM promo_campaigns WHERE campaign_key = ?`
+    )
+    .get(key);
+  if (!row || !promoIsActiveNow(row)) {
+    return res.json({ enabled: true, popup_enabled: cfg.popup_enabled, campaign: null });
+  }
+  res.json({
+    enabled: true,
+    popup_enabled: cfg.popup_enabled,
+    campaign: {
+      key: row.campaign_key,
+      label: row.label,
+      discount_percent: Number(row.discount_percent || 0),
+      capture_email: Number(row.capture_email || 0) === 1,
+      end_at: row.end_at || null,
+    },
+  });
+}));
+
+app.post("/api/public/promo/claim-code", asyncRoute(async (req, res) => {
+  if (!PROMO_SYSTEM_ENABLED) {
+    return res.status(404).json({ error: "Promocje są obecnie wyłączone." });
+  }
+  const key = normalizePromoKey(req.body?.campaign_key || req.body?.campaign || "");
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  if (!key) return res.status(400).json({ error: "Brak kampanii promocyjnej." });
+  let result = null;
+  await db.transaction(async (tx) => {
+    const campaign = await tx
+      .prepare(
+        `SELECT id, campaign_key, label, discount_percent, start_at, end_at, is_active, capture_email,
+                code_prefix, max_codes, total_claimed
+         FROM promo_campaigns WHERE campaign_key = ?`
+      )
+      .get(key);
+    if (!campaign || !promoIsActiveNow(campaign)) {
+      throw Object.assign(new Error("Ta promocja nie jest aktywna."), { status: 404 });
+    }
+    if (Number(campaign.capture_email || 0) === 1 && !emailOk(email)) {
+      throw Object.assign(new Error("Podaj poprawny e-mail, aby odebrać kod."), { status: 400 });
+    }
+    const maxCodes = Number(campaign.max_codes || 0);
+    const totalClaimed = Number(campaign.total_claimed || 0);
+    if (maxCodes > 0 && totalClaimed >= maxCodes) {
+      throw Object.assign(new Error("Limit kodów dla tej kampanii został wyczerpany."), { status: 409 });
+    }
+    let code = "";
+    for (let i = 0; i < 6; i++) {
+      const candidate = buildPromoCode(campaign.code_prefix);
+      const exists = await tx.prepare(`SELECT id FROM promo_codes WHERE code = ?`).get(candidate);
+      if (!exists) {
+        code = candidate;
+        break;
+      }
+    }
+    if (!code) throw Object.assign(new Error("Nie udało się wygenerować kodu rabatowego."), { status: 500 });
+    const cid = uuidv4();
+    const expiresAt = campaign.end_at ? String(campaign.end_at) : null;
+    await tx
+      .prepare(
+        `INSERT INTO promo_codes (id, campaign_id, email, code, status, claimed_at, expires_at, meta_json)
+         VALUES (?, ?, ?, ?, 'claimed', datetime('now'), ?, ?)`
+      )
+      .run(
+        cid,
+        campaign.id,
+        email || null,
+        code,
+        expiresAt,
+        JSON.stringify({ source: "public_popup" })
+      );
+    await tx
+      .prepare(`UPDATE promo_campaigns SET total_claimed = COALESCE(total_claimed, 0) + 1 WHERE id = ?`)
+      .run(campaign.id);
+    result = {
+      code,
+      campaign: campaign.campaign_key,
+      discount_percent: Number(campaign.discount_percent || 0),
+      expires_at: expiresAt,
+    };
+  }).catch((e) => {
+    throw e;
+  });
+  res.json({ ok: true, ...result });
+}));
+
 app.post(
   "/api/test/purchase",
   requireCustomer,
@@ -1013,6 +1180,117 @@ app.post(
     });
   })
 );
+
+app.post(
+  "/api/payments/p24/create",
+  requireCustomer,
+  asyncRoute(async (req, res) => {
+    const amount = Number(req.body?.amount);
+    if (!PKG_AMOUNTS.has(amount)) {
+      return res.status(400).json({ error: "Dozwolone pakiety: 10, 20, 50 lub 100 wiadomości." });
+    }
+    if (!isP24Configured()) {
+      return res.status(503).json({
+        error:
+          "Płatności Przelewy24 nie są jeszcze skonfigurowane. Uzupełnij zmienne P24_* i włącz P24_ENABLED=true.",
+      });
+    }
+    const txId = uuidv4();
+    const txSession = `p24-${Date.now()}-${txId.slice(0, 8)}`;
+    const pkg = pricingPackagesForClient().find((p) => Number(p.amount) === amount);
+    const pricePln = Number(pkg?.price_pln || 0);
+    const amountGro = Math.round(pricePln * 100);
+    await db
+      .prepare(
+        `INSERT INTO payment_transactions (
+          id, user_id, gateway, external_id, amount, currency, status, package_amount, payload_json
+        ) VALUES (?, ?, 'p24', ?, ?, ?, 'created', ?, ?)`
+      )
+      .run(
+        txId,
+        req.customer.id,
+        txSession,
+        amountGro,
+        APP_CONFIG.pricing.currency,
+        amount,
+        JSON.stringify({
+          amount_messages: amount,
+          amount_pln: pricePln,
+          sandbox: P24_SANDBOX,
+          not_implemented: true,
+        })
+      );
+    return res.status(501).json({
+      error:
+        "Szkielet P24 jest gotowy, ale finalna rejestracja transakcji i callback nie są jeszcze podpięte. Wdrożymy to po utworzeniu konta P24.",
+      tx_id: txId,
+      session_id: txSession,
+      amount_messages: amount,
+      amount_grosze: amountGro,
+    });
+  })
+);
+
+app.post(
+  "/api/payments/p24/webhook",
+  asyncRoute(async (req, res) => {
+    if (!isP24Configured()) {
+      return res.status(503).json({ error: "P24 nie jest skonfigurowane." });
+    }
+    const sessionId = String(req.body?.p24_session_id || req.body?.sessionId || "").trim();
+    if (!sessionId) return res.status(400).json({ error: "Brak p24_session_id." });
+    const tx = await db
+      .prepare(`SELECT id, status FROM payment_transactions WHERE gateway = 'p24' AND external_id = ?`)
+      .get(sessionId);
+    if (!tx) return res.status(404).json({ error: "Nie znaleziono transakcji." });
+    await db
+      .prepare(
+        `UPDATE payment_transactions
+         SET status = ?, updated_at = datetime('now'),
+             payload_json = ?
+         WHERE id = ?`
+      )
+      .run("webhook_received", JSON.stringify(req.body || {}), tx.id);
+    res.json({ ok: true, status: "webhook_received", tx_id: tx.id });
+  })
+);
+
+app.get("/robots.txt", (_req, res) => {
+  res.type("text/plain; charset=utf-8");
+  if (!SEO_INDEXABLE) {
+    return res.send("User-agent: *\nDisallow: /\n");
+  }
+  const base = publicBaseUrl();
+  const sitemapUrl = `${base}/sitemap.xml`;
+  res.send(`User-agent: *\nAllow: /\nSitemap: ${sitemapUrl}\n`);
+});
+
+app.get("/sitemap.xml", (_req, res) => {
+  if (!SEO_INDEXABLE) {
+    return res.status(404).type("application/xml").send("<?xml version=\"1.0\" encoding=\"UTF-8\"?><urlset/>");
+  }
+  const base = publicBaseUrl();
+  const urls = [
+    "/",
+    "/informacje-ceny.html",
+    "/regulamin.html",
+    "/polityka-prywatnosci.html",
+    "/rekrutacja.html",
+    "/logowanie.html",
+    "/rejestracja.html",
+    "/panel-doladowanie.html",
+  ];
+  const now = new Date().toISOString();
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls
+    .map(
+      (u) =>
+        `  <url><loc>${base}${u}</loc><lastmod>${now}</lastmod><changefreq>weekly</changefreq><priority>${
+          u === "/" ? "1.0" : "0.6"
+        }</priority></url>`
+    )
+    .join("\n")}\n</urlset>`;
+  res.type("application/xml").send(xml);
+});
 
 app.get(
   "/api/characters",
@@ -1341,6 +1619,111 @@ function requireOwner(req, res, next) {
   }
   next();
 }
+
+app.get(
+  "/api/op/promo/campaigns",
+  requireOperator,
+  requireOwner,
+  asyncRoute(async (_req, res) => {
+    if (!PROMO_SYSTEM_ENABLED) {
+      return res.status(404).json({ error: "Moduł promocji jest wyłączony (PROMO_SYSTEM_ENABLED=false)." });
+    }
+    const rows = await db
+      .prepare(
+        `SELECT id, campaign_key, label, discount_percent, start_at, end_at, is_active, capture_email,
+                code_prefix, max_codes, total_claimed, created_at
+         FROM promo_campaigns ORDER BY datetime(created_at) DESC`
+      )
+      .all();
+    res.json({ campaigns: rows, popup_enabled: promoConfigPublic().popup_enabled });
+  })
+);
+
+app.post(
+  "/api/op/promo/campaigns",
+  requireOperator,
+  requireOwner,
+  asyncRoute(async (req, res) => {
+    if (!PROMO_SYSTEM_ENABLED) {
+      return res.status(404).json({ error: "Moduł promocji jest wyłączony (PROMO_SYSTEM_ENABLED=false)." });
+    }
+    const campaign_key = normalizePromoKey(req.body?.campaign_key || req.body?.key || "");
+    const label = String(req.body?.label || "").trim();
+    const discount_percent = Math.max(0, Math.min(100, Number(req.body?.discount_percent || 0) || 0));
+    const start_at = String(req.body?.start_at || "").trim() || null;
+    const end_at = String(req.body?.end_at || "").trim() || null;
+    const is_active = req.body?.is_active ? 1 : 0;
+    const capture_email = req.body?.capture_email ? 1 : 0;
+    const code_prefix =
+      String(req.body?.code_prefix || "SZEPT")
+        .trim()
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "")
+        .slice(0, 10) || "SZEPT";
+    const max_codes = Math.max(0, Math.floor(Number(req.body?.max_codes || 0) || 0));
+    if (!campaign_key || !label) {
+      return res.status(400).json({ error: "Podaj campaign_key i label." });
+    }
+    if (start_at && Number.isNaN(new Date(start_at).getTime())) {
+      return res.status(400).json({ error: "Nieprawidłowe start_at (ISO date/time)." });
+    }
+    if (end_at && Number.isNaN(new Date(end_at).getTime())) {
+      return res.status(400).json({ error: "Nieprawidłowe end_at (ISO date/time)." });
+    }
+    const id = uuidv4();
+    await db
+      .prepare(
+        `INSERT INTO promo_campaigns (
+          id, campaign_key, label, discount_percent, start_at, end_at, is_active, capture_email, code_prefix, max_codes, total_claimed
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`
+      )
+      .run(id, campaign_key, label, discount_percent, start_at, end_at, is_active, capture_email, code_prefix, max_codes);
+    const row = await db
+      .prepare(
+        `SELECT id, campaign_key, label, discount_percent, start_at, end_at, is_active, capture_email,
+                code_prefix, max_codes, total_claimed, created_at
+         FROM promo_campaigns WHERE id = ?`
+      )
+      .get(id);
+    res.status(201).json({ ok: true, campaign: row });
+  })
+);
+
+app.get(
+  "/api/op/promo/stats",
+  requireOperator,
+  requireOwner,
+  asyncRoute(async (_req, res) => {
+    if (!PROMO_SYSTEM_ENABLED) {
+      return res.status(404).json({ error: "Moduł promocji jest wyłączony (PROMO_SYSTEM_ENABLED=false)." });
+    }
+    const campaigns = await db
+      .prepare(
+        `SELECT id, campaign_key, label, discount_percent, start_at, end_at, is_active, capture_email,
+                code_prefix, max_codes, total_claimed, created_at
+         FROM promo_campaigns ORDER BY datetime(created_at) DESC`
+      )
+      .all();
+    const out = [];
+    for (const c of campaigns) {
+      const agg = await db
+        .prepare(
+          `SELECT COUNT(*) AS generated,
+                  SUM(CASE WHEN used_at IS NOT NULL THEN 1 ELSE 0 END) AS used,
+                  SUM(CASE WHEN email IS NOT NULL AND trim(email) <> '' THEN 1 ELSE 0 END) AS with_email
+           FROM promo_codes WHERE campaign_id = ?`
+        )
+        .get(c.id);
+      out.push({
+        ...c,
+        generated: Number(agg?.generated || 0),
+        used: Number(agg?.used || 0),
+        with_email: Number(agg?.with_email || 0),
+      });
+    }
+    res.json({ campaigns: out });
+  })
+);
 
 app.get(
   "/api/op/staff",

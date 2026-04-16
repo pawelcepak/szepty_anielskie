@@ -136,6 +136,54 @@ CREATE TABLE IF NOT EXISTS app_kv (
   value TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS promo_campaigns (
+  id TEXT PRIMARY KEY,
+  campaign_key TEXT NOT NULL UNIQUE,
+  label TEXT NOT NULL,
+  discount_percent INTEGER NOT NULL DEFAULT 0,
+  start_at TEXT,
+  end_at TEXT,
+  is_active INTEGER NOT NULL DEFAULT 0,
+  capture_email INTEGER NOT NULL DEFAULT 0,
+  code_prefix TEXT NOT NULL DEFAULT 'SZEPT',
+  max_codes INTEGER NOT NULL DEFAULT 0,
+  total_claimed INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS promo_codes (
+  id TEXT PRIMARY KEY,
+  campaign_id TEXT NOT NULL REFERENCES promo_campaigns(id) ON DELETE CASCADE,
+  email TEXT,
+  code TEXT NOT NULL UNIQUE,
+  status TEXT NOT NULL DEFAULT 'claimed',
+  claimed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TEXT,
+  used_at TEXT,
+  meta_json TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_promo_codes_campaign ON promo_codes(campaign_id);
+CREATE INDEX IF NOT EXISTS idx_promo_codes_email ON promo_codes(email);
+
+CREATE TABLE IF NOT EXISTS payment_transactions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  gateway TEXT NOT NULL,
+  external_id TEXT,
+  amount INTEGER NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'PLN',
+  status TEXT NOT NULL DEFAULT 'created',
+  package_amount INTEGER,
+  redirect_url TEXT,
+  payload_json TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  paid_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_payment_tx_user ON payment_transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_payment_tx_status ON payment_transactions(status);
+
 CREATE TABLE IF NOT EXISTS operator_payout_ledger (
   id TEXT PRIMARY KEY,
   operator_id TEXT NOT NULL REFERENCES operators(id) ON DELETE CASCADE,
