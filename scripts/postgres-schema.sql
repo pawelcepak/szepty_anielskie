@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
   birth_date TEXT,
   avatar_url TEXT,
   city TEXT,
+  gender TEXT,
   blocked_at TEXT,
   email_verified_at TEXT,
   email_verification_token TEXT,

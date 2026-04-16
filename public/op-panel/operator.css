@@ -243,6 +243,53 @@ a {
   margin-left: 24px;
 }
 
+.owner-clients-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.owner-clients-toolbar label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted, #64748b);
+}
+
+.owner-clients-toolbar .sel {
+  min-width: 200px;
+  max-width: 100%;
+}
+
+.owner-clients-month-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.8rem;
+}
+
+.owner-clients-month-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #f8fafc;
+  padding: 0.2rem 0.55rem;
+  font-size: 12px;
+  color: #334155;
+}
+
+.owner-clients-month-chip b {
+  color: #0f172a;
+}
+
+.owner-clients-upsell-hint {
+  font-size: 12px !important;
+  opacity: 0.92;
+}
+
 .owner-full-page {
   flex: 1;
   min-height: 0;

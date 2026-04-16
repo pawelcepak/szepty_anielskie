@@ -57,15 +57,20 @@
             required
           />
 
-          <label for="city">Miasto</label>
+          <fieldset class="reg-gender-fieldset">
+            <legend class="reg-gender-legend">Płeć</legend>
+            <label class="reg-radio"><input type="radio" name="gender" value="female" required /> Kobieta</label>
+            <label class="reg-radio"><input type="radio" name="gender" value="male" required /> Mężczyzna</label>
+            <label class="reg-radio"><input type="radio" name="gender" value="other" required /> Inna / wolę nie podawać</label>
+          </fieldset>
+
+          <label for="city">Miasto (opcjonalnie)</label>
           <input
             id="city"
             name="city"
             type="text"
             autocomplete="address-level2"
-            minlength="2"
             maxlength="80"
-            required
             placeholder="Np. Warszawa"
           />
 

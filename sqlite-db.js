@@ -295,6 +295,11 @@ db.prepare(
   `UPDATE users SET email_verified_at = datetime('now') WHERE email_verified_at IS NULL AND email_verification_token IS NULL`
 ).run();
 
+const userColsGender = new Set(db.prepare("PRAGMA table_info(users)").all().map((c) => c.name));
+if (!userColsGender.has("gender")) {
+  db.exec("ALTER TABLE users ADD COLUMN gender TEXT");
+}
+
 /** Jednorazowa migracja starych kluczy notatek klienta → nowe kategorie. */
 if (!db.prepare("SELECT 1 FROM app_kv WHERE key = ?").get("facts_schema_v2_migrated")) {
   const stmts = [

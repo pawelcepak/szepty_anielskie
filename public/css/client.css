@@ -1026,6 +1026,34 @@ select:focus {
   margin-top: 1.25rem;
 }
 
+.reg-gender-fieldset {
+  margin: 0 0 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.reg-gender-legend {
+  padding: 0 0.35rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.reg-radio {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0.35rem 0 0;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.reg-radio input {
+  width: auto;
+  margin: 0;
+}
+
 .form-error {
   margin: 0.75rem 0 0;
   font-size: 0.9rem;

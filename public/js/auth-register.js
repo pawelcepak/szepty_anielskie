@@ -96,6 +96,7 @@ document.getElementById("form").addEventListener("submit", async (e) => {
   const username = String(fd.get("username") || "").trim().toLowerCase();
   const first_name = String(fd.get("first_name") || "").trim();
   const city = String(fd.get("city") || "").trim();
+  const gender = String(fd.get("gender") || "").trim();
   const birth_date = String(fd.get("birth_date") || "").trim();
   const email = String(fd.get("email") || "").trim();
   const password = String(fd.get("password") || "");
@@ -121,6 +122,7 @@ document.getElementById("form").addEventListener("submit", async (e) => {
         username,
         first_name,
         city,
+        gender,
         birth_date,
         email,
         password,

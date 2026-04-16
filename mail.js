@@ -26,6 +26,22 @@ export function isMailConfigured() {
   return hasBrevoApi() || !!(String(process.env.SMTP_USER || "").trim() && String(process.env.SMTP_PASS || "").trim());
 }
 
+/** Ważność linków w mailach (weryfikacja konta, zmiana e-mail) — spójna z tokenami w bazie (MAIL_LINK_EXPIRY_HOURS). */
+export function mailLinkExpiryHours() {
+  const h = Number(process.env.MAIL_LINK_EXPIRY_HOURS || 48);
+  return Number.isFinite(h) && h > 0 && h <= 720 ? Math.floor(h) : 48;
+}
+
+export function mailVerificationTtlMs() {
+  return mailLinkExpiryHours() * 60 * 60 * 1000;
+}
+
+function mailTpl(raw, vars) {
+  return String(raw || "").replace(/\{\{(\w+)\}\}/g, (_, key) =>
+    vars[key] != null && vars[key] !== undefined ? String(vars[key]) : ""
+  );
+}
+
 function envMs(name, fallback) {
   const raw = Number(process.env[name]);
   return Number.isFinite(raw) && raw > 0 ? raw : fallback;
@@ -143,11 +159,29 @@ async function sendMailMessage({ to, subject, text, html }) {
 
 export async function sendVerificationEmail({ to, verifyUrl, displayName }) {
   const name = displayName || "użytkowniku";
+  const hours = mailLinkExpiryHours();
+  const subject =
+    String(process.env.MAIL_SUBJECT_EMAIL_VERIFICATION || "").trim() || "Potwierdź adres e-mail — Szepty Anielskie";
+  const vars = {
+    name,
+    nameHtml: escapeHtml(name),
+    verifyUrl,
+    hours: String(hours),
+  };
+  const textTpl =
+    String(process.env.MAIL_TEXT_EMAIL_VERIFICATION || "").trim() ||
+    `Cześć {{name}},\n\nOtwórz link, aby potwierdzić konto:\n{{verifyUrl}}\n\nLink jest ważny {{hours}} godzin.\n`;
+  const htmlTpl = String(process.env.MAIL_HTML_EMAIL_VERIFICATION || "").trim();
+  const text = mailTpl(textTpl, vars);
+  const html =
+    htmlTpl !== ""
+      ? mailTpl(htmlTpl, vars)
+      : `<p>Cześć ${escapeHtml(name)},</p><p><a href="${verifyUrl}">Potwierdź adres e-mail</a></p><p>Link jest ważny ${hours} godzin.</p>`;
   return sendMailMessage({
     to: String(to || "").trim(),
-    subject: "Potwierdź adres e-mail — Szepty Anielskie",
-    text: `Cześć ${name},\n\nOtwórz link, aby potwierdzić konto:\n${verifyUrl}\n\nLink jest ważny 48 godzin.\n`,
-    html: `<p>Cześć ${escapeHtml(name)},</p><p><a href="${verifyUrl}">Potwierdź adres e-mail</a></p><p>Link jest ważny 48 godzin.</p>`,
+    subject: mailTpl(subject, vars),
+    text,
+    html,
   });
 }
 
@@ -165,10 +199,28 @@ export async function sendOperatorEmailToUser({ to, subject, text, html }) {
 
 export async function sendEmailChangeConfirmation({ to, confirmUrl, displayName }) {
   const name = displayName || "użytkowniku";
+  const hours = mailLinkExpiryHours();
+  const subject =
+    String(process.env.MAIL_SUBJECT_EMAIL_CHANGE || "").trim() || "Potwierdź zmianę adresu e-mail — Szepty Anielskie";
+  const vars = {
+    name,
+    nameHtml: escapeHtml(name),
+    confirmUrl,
+    hours: String(hours),
+  };
+  const textTpl =
+    String(process.env.MAIL_TEXT_EMAIL_CHANGE || "").trim() ||
+    `Cześć {{name}},\n\nPotwierdź zmianę adresu e-mail klikając link:\n{{confirmUrl}}\n\nLink jest ważny {{hours}} godzin.\n`;
+  const htmlTpl = String(process.env.MAIL_HTML_EMAIL_CHANGE || "").trim();
+  const text = mailTpl(textTpl, vars);
+  const html =
+    htmlTpl !== ""
+      ? mailTpl(htmlTpl, vars)
+      : `<p>Cześć ${escapeHtml(name)},</p><p><a href="${confirmUrl}">Potwierdź zmianę adresu e-mail</a></p><p>Link jest ważny ${hours} godzin.</p>`;
   return sendMailMessage({
     to: String(to || "").trim(),
-    subject: "Potwierdź zmianę adresu e-mail — Szepty Anielskie",
-    text: `Cześć ${name},\n\nPotwierdź zmianę adresu e-mail klikając link:\n${confirmUrl}\n\nLink jest ważny 48 godzin.\n`,
-    html: `<p>Cześć ${escapeHtml(name)},</p><p><a href="${confirmUrl}">Potwierdź zmianę adresu e-mail</a></p><p>Link jest ważny 48 godzin.</p>`,
+    subject: mailTpl(subject, vars),
+    text,
+    html,
   });
 }

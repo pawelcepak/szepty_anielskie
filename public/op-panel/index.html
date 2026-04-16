@@ -154,7 +154,29 @@
       <div id="owner-page-clients" class="owner-full-page hidden" aria-label="Klienci">
         <div class="owner-full-inner">
           <h2 class="owner-page-title">Zarejestrowani klienci</h2>
-          <p class="owner-monitor-hint">E-maile i salda kredytów wiadomości — tylko dla właściciela.</p>
+          <p class="owner-monitor-hint">
+            E-maile i salda kredytów wiadomości — tylko dla właściciela. Filtr płci dotyczy nowych rejestracji z polem
+            „płeć”; starsze konta mogą mieć puste.
+          </p>
+          <p class="owner-monitor-hint owner-clients-upsell-hint">
+            Automatyczne propozycje pakietów w panelu klienta (np. przy niskim saldzie) — do osobnego wdrożenia z
+            bramką płatności i zasadami RODO; tu tylko podgląd danych.
+          </p>
+          <div class="owner-clients-toolbar">
+            <label for="owner-clients-gender-filter">Płeć</label>
+            <select id="owner-clients-gender-filter" class="sel">
+              <option value="">Wszyscy</option>
+              <option value="female">Kobieta</option>
+              <option value="male">Mężczyzna</option>
+              <option value="other">Inna / nie podaję</option>
+            </select>
+            <label for="owner-clients-sort">Rejestracja</label>
+            <select id="owner-clients-sort" class="sel">
+              <option value="newest">Najnowsi → najstarsi</option>
+              <option value="oldest">Najstarsi → najnowsi</option>
+            </select>
+          </div>
+          <div id="owner-clients-month-stats" class="owner-clients-month-stats"></div>
           <div id="owner-clients-body" class="owner-monitor-body"></div>
         </div>
       </div>

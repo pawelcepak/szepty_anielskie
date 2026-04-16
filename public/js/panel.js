@@ -305,6 +305,13 @@ function startThreadPoll() {
 
 let panelCityFormBound = false;
 
+function genderLabelClient(g) {
+  if (g === "female") return "Kobieta";
+  if (g === "male") return "Mężczyzna";
+  if (g === "other") return "Inna / nie podaję";
+  return "—";
+}
+
 function renderProfileStrip() {
   const line = document.getElementById("panel-profile-line");
   const form = document.getElementById("panel-city-form");
@@ -313,9 +320,10 @@ function renderProfileStrip() {
   const u = me.user;
   const city = (u.city || "").trim();
   const bd = u.birth_date ? String(u.birth_date).slice(0, 10) : "—";
+  const gen = genderLabelClient(u.gender);
   line.innerHTML = `Profil: <strong>@${esc(u.username || "?")}</strong> · imię <strong>${esc(
     u.first_name || "?"
-  )}</strong> · miasto <strong>${city ? esc(city) : "—"}</strong> · data urodzenia <strong>${esc(bd)}</strong>.`;
+  )}</strong> · płeć <strong>${esc(gen)}</strong> · miasto <strong>${city ? esc(city) : "—"}</strong> · data urodzenia <strong>${esc(bd)}</strong>.`;
   if (form) {
     const need = !city;
     form.classList.toggle("hidden", !need);

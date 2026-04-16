@@ -958,10 +958,34 @@ function renderMediumSidebar(meta) {
   el.hidden = false;
 }
 
+function ownerGenderLabel(g) {
+  if (g === "female") return "Kobieta";
+  if (g === "male") return "Mężczyzna";
+  if (g === "other") return "Inna";
+  return "—";
+}
+
+function ownerMonthLabel(iso) {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "";
+  return d.toLocaleString("pl-PL", { month: "long", year: "numeric" });
+}
+
+let ownerClientsFilterBound = false;
+
 async function refreshOwnerClients() {
   if (opRole !== "owner") return;
   const body = document.getElementById("owner-clients-body");
   if (!body) return;
+  if (!ownerClientsFilterBound) {
+    ownerClientsFilterBound = true;
+    document.getElementById("owner-clients-gender-filter")?.addEventListener("change", () => {
+      refreshOwnerClients();
+    });
+    document.getElementById("owner-clients-sort")?.addEventListener("change", () => {
+      refreshOwnerClients();
+    });
+  }
   if (!ownerClientsActionsBound) {
     ownerClientsActionsBound = true;
     body.addEventListener("click", async (ev) => {
@@ -1023,8 +1047,30 @@ async function refreshOwnerClients() {
     });
   }
   try {
-    const data = await api("/api/op/clients");
-    const rows = (data.clients || [])
+    const g = String(document.getElementById("owner-clients-gender-filter")?.value || "").trim();
+    const sortDir = String(document.getElementById("owner-clients-sort")?.value || "newest").trim();
+    const statsEl = document.getElementById("owner-clients-month-stats");
+    const url = g ? `/api/op/clients?gender=${encodeURIComponent(g)}` : "/api/op/clients";
+    const data = await api(url);
+    const clients = [...(data.clients || [])];
+    clients.sort((a, b) => {
+      const ta = new Date(String(a?.created_at || "")).getTime() || 0;
+      const tb = new Date(String(b?.created_at || "")).getTime() || 0;
+      return sortDir === "oldest" ? ta - tb : tb - ta;
+    });
+    const byMonth = new Map();
+    for (const c of clients) {
+      const key = ownerMonthLabel(c?.created_at);
+      if (!key) continue;
+      byMonth.set(key, (byMonth.get(key) || 0) + 1);
+    }
+    if (statsEl) {
+      const statsHtml = [...byMonth.entries()]
+        .map(([label, count]) => `<span class="owner-clients-month-chip">${esc(label)}: <b>${count}</b></span>`)
+        .join("");
+      statsEl.innerHTML = statsHtml || `<span class="owner-clients-month-chip">Brak danych miesięcznych</span>`;
+    }
+    const rows = clients
       .map(
         (c) => {
           const blocked = !!c.blocked_at;
@@ -1046,15 +1092,15 @@ async function refreshOwnerClients() {
           )}">Usuń konto</button>`;
           return (
           `<tr><td>${esc(c.username || "—")}</td><td>${esc(c.first_name || c.display_name || "—")}</td><td>${esc(
-            c.city || "—"
-          )}</td><td>${esc(c.email)}</td><td>${esc(String(c.birth_date || "").slice(0, 10))}</td><td>${esc(
+            ownerGenderLabel(c.gender)
+          )}</td><td>${esc(c.city || "—")}</td><td>${esc(c.email)}</td><td>${esc(String(c.birth_date || "").slice(0, 10))}</td><td>${esc(
             formatOpPlTime(c.created_at)
           )}</td><td>${blocked ? "zablokowany" : "aktywny"}</td><td>${esc(verifyStatus)}</td><td>${verifyAction}<br/>${blockAction}<br/>${deleteAction}</td><td>${c.thread_count ?? 0}</td><td>${c.messages_balance ?? 0}</td></tr>`
           );
         }
       )
       .join("");
-    body.innerHTML = `<table class="mon-table"><thead><tr><th>Nick</th><th>Imię</th><th>Miasto</th><th>E-mail</th><th>Ur.</th><th>Rejestracja</th><th>Status konta</th><th>Status e-mail</th><th>Akcje</th><th>Wątki</th><th>Saldo</th></tr></thead><tbody>${
+    body.innerHTML = `<table class="mon-table"><thead><tr><th>Nick</th><th>Imię</th><th>Płeć</th><th>Miasto</th><th>E-mail</th><th>Ur.</th><th>Rejestracja</th><th>Status konta</th><th>Status e-mail</th><th>Akcje</th><th>Wątki</th><th>Saldo</th></tr></thead><tbody>${
       rows || ""
     }</tbody></table>`;
   } catch {

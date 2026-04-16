@@ -51,7 +51,6 @@
               id="panel-city-input"
               type="text"
               maxlength="80"
-              minlength="2"
               autocomplete="address-level2"
               placeholder="Np. Gdańsk"
             />
@@ -62,8 +61,8 @@
         <details class="panel-settings" id="panel-settings">
           <summary>Ustawienia konta</summary>
           <form id="panel-settings-form" class="panel-settings-grid">
-            <label for="settings-city">Miasto</label>
-            <input id="settings-city" type="text" minlength="2" maxlength="80" />
+            <label for="settings-city">Miasto (opcjonalnie)</label>
+            <input id="settings-city" type="text" maxlength="80" placeholder="Puste = nie podano" />
             <label for="settings-avatar">Zdjęcie profilowe (opcjonalnie)</label>
             <input id="settings-avatar" type="file" accept="image/jpeg,image/png,image/webp" />
             <button type="submit" class="btn btn-outline btn-sm">Zapisz profil</button>

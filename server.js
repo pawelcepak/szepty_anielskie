@@ -39,6 +39,7 @@ import { APP_CONFIG } from "./app-config.js";
 import {
   sendEmailChangeConfirmation,
   isMailConfigured,
+  mailVerificationTtlMs,
   publicBaseUrl,
   sendOperatorEmailToUser,
   sendVerificationEmail,
@@ -317,7 +318,7 @@ const requireCustomer = asyncRoute(async (req, res, next) => {
   }
   const row = await db
     .prepare(
-      `SELECT s.id AS session_id, u.id, u.email, u.display_name, u.username, u.first_name, u.birth_date, u.city, u.avatar_url
+      `SELECT s.id AS session_id, u.id, u.email, u.display_name, u.username, u.first_name, u.birth_date, u.city, u.gender, u.avatar_url
               , u.blocked_at, u.email_verified_at
        FROM customer_sessions s
        JOIN users u ON u.id = s.user_id
@@ -347,6 +348,7 @@ const requireCustomer = asyncRoute(async (req, res, next) => {
     first_name: row.first_name,
     birth_date: row.birth_date,
     city: row.city || "",
+    gender: row.gender || "",
     avatar_url: row.avatar_url,
   };
   next();
@@ -500,6 +502,7 @@ app.post("/api/auth/register", registerJsonParser, async (req, res, next) => {
   const first_name = String(req.body?.first_name || "").trim();
   const birth_date = String(req.body?.birth_date || "").trim();
   const city = String(req.body?.city || "").trim();
+  const gender = String(req.body?.gender || "").trim();
   const avatar_url = String(req.body?.avatar_url || "").trim() || null;
   let pending_open_character_id = String(req.body?.medium || "").trim() || null;
   if (pending_open_character_id) {
@@ -523,8 +526,11 @@ app.post("/api/auth/register", registerJsonParser, async (req, res, next) => {
   if (first_name.length < 2 || first_name.length > 60) {
     return res.status(400).json({ error: "Imię: 2–60 znaków." });
   }
-  if (city.length < 2 || city.length > 80) {
-    return res.status(400).json({ error: "Miasto: 2–80 znaków (wymagane)." });
+  if (!new Set(["female", "male", "other"]).has(gender)) {
+    return res.status(400).json({ error: "Wybierz płeć." });
+  }
+  if (city.length > 0 && (city.length < 2 || city.length > 80)) {
+    return res.status(400).json({ error: "Miasto: opcjonalne; jeśli podasz — 2–80 znaków." });
   }
   const bd = parseBirthDate(birth_date);
   if (!bd) return res.status(400).json({ error: "Data urodzenia: format RRRR-MM-DD." });
@@ -557,11 +563,11 @@ app.post("/api/auth/register", registerJsonParser, async (req, res, next) => {
   const hash = bcrypt.hashSync(password, 12);
   const display_name = first_name;
   const verifyToken = tokenBytes();
-  const verifyExpires = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+  const verifyExpires = new Date(Date.now() + mailVerificationTtlMs()).toISOString();
   await db.prepare(
-    `INSERT INTO users (id, email, password_hash, display_name, username, first_name, birth_date, city, avatar_url,
+    `INSERT INTO users (id, email, password_hash, display_name, username, first_name, birth_date, city, gender, avatar_url,
         email_verified_at, email_verification_token, email_verification_expires_at, pending_open_character_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`
   ).run(
     id,
     email,
@@ -570,7 +576,8 @@ app.post("/api/auth/register", registerJsonParser, async (req, res, next) => {
     username,
     first_name,
     birth_date,
-    city,
+    city || null,
+    gender,
     avatar_url,
     verifyToken,
     verifyExpires,
@@ -683,7 +690,7 @@ app.post("/api/auth/resend-verification", registerJsonParser, async (req, res) =
     return res.json({ ok: true, sent: false, already_verified: true });
   }
   const verifyToken = tokenBytes();
-  const verifyExpires = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+  const verifyExpires = new Date(Date.now() + mailVerificationTtlMs()).toISOString();
   await db.prepare(
     `UPDATE users
      SET email_verification_token = ?, email_verification_expires_at = ?
@@ -716,7 +723,7 @@ app.post(
     const password = String(req.body?.password || "");
     const row = await db
       .prepare(
-        `SELECT id, email, display_name, password_hash, username, first_name, birth_date, city, avatar_url, blocked_at, email_verified_at
+        `SELECT id, email, display_name, password_hash, username, first_name, birth_date, city, gender, avatar_url, blocked_at, email_verified_at
        FROM users WHERE email = ?`
       )
       .get(email);
@@ -739,6 +746,7 @@ app.post(
         first_name: row.first_name,
         birth_date: row.birth_date,
         city: row.city || "",
+        gender: row.gender || "",
         avatar_url: row.avatar_url,
       },
       messages_remaining: await messagesBalance(row.id),
@@ -769,6 +777,7 @@ app.get(
         first_name: req.customer.first_name,
         birth_date: req.customer.birth_date,
         city: req.customer.city || "",
+        gender: req.customer.gender || "",
         avatar_url: req.customer.avatar_url,
       },
       messages_remaining: await messagesBalance(req.customer.id),
@@ -785,8 +794,8 @@ app.patch(
   asyncRoute(async (req, res) => {
     const city = String(req.body?.city ?? req.customer.city ?? "").trim();
     const avatar_url = String(req.body?.avatar_url ?? "").trim() || req.customer.avatar_url || null;
-    if (city.length < 2 || city.length > 80) {
-      return res.status(400).json({ error: "Miasto: 2–80 znaków." });
+    if (city.length > 0 && (city.length < 2 || city.length > 80)) {
+      return res.status(400).json({ error: "Miasto: opcjonalne; jeśli podasz — 2–80 znaków." });
     }
     if (avatar_url) {
       if (avatar_url.startsWith("data:image/")) {
@@ -809,6 +818,7 @@ app.patch(
         first_name: req.customer.first_name,
         birth_date: req.customer.birth_date,
         city,
+        gender: req.customer.gender || "",
         avatar_url,
       },
     });
@@ -853,7 +863,7 @@ app.post(
       return res.status(503).json({ error: "Brak konfiguracji wysyłki e-mail na serwerze." });
     }
     const token = tokenBytes();
-    const exp = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+    const exp = new Date(Date.now() + mailVerificationTtlMs()).toISOString();
     await db
       .prepare(
         `UPDATE users
@@ -1535,18 +1545,26 @@ app.get("/api/op/inbox", requireOperator, asyncRoute(async (req, res) => {
   res.json({ threads: rows, bucket });
 }));
 
-app.get("/api/op/clients", requireOperator, requireOwner, asyncRoute(async (_req, res) => {
-  const rows = await db.prepare(
-      `SELECT u.id, u.email, u.username, u.first_name, u.display_name, u.birth_date, u.city, u.blocked_at,
+app.get("/api/op/clients", requireOperator, requireOwner, asyncRoute(async (req, res) => {
+  const g = String(req.query.gender || "").trim().toLowerCase();
+  const genderFilter = new Set(["female", "male", "other"]);
+  if (g && !genderFilter.has(g)) {
+    return res.status(400).json({ error: "Filtr płci: female, male, other lub pusty (wszyscy)." });
+  }
+  let sql = `SELECT u.id, u.email, u.username, u.first_name, u.display_name, u.birth_date, u.city, u.gender, u.blocked_at,
               u.email_verified_at,
               u.email_verification_token,
               datetime(u.created_at) AS created_at,
               (SELECT COUNT(*) FROM threads t WHERE t.user_id = u.id) AS thread_count,
               (SELECT COALESCE(SUM(delta), 0) FROM ledger l WHERE l.user_id = u.id) AS messages_balance
-       FROM users u
-       ORDER BY datetime(u.created_at) DESC`
-    )
-    .all();
+       FROM users u`;
+  const params = [];
+  if (g) {
+    sql += ` WHERE u.gender = ?`;
+    params.push(g);
+  }
+  sql += ` ORDER BY datetime(u.created_at) DESC`;
+  const rows = await db.prepare(sql).all(...params);
   res.json({ clients: rows });
 }));
 
@@ -1566,7 +1584,7 @@ app.post("/api/op/clients/:clientId/verification-link", requireOperator, require
   let expiresAt = row.email_verification_expires_at;
   if (!token || regenerate) {
     token = tokenBytes();
-    expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+    expiresAt = new Date(Date.now() + mailVerificationTtlMs()).toISOString();
     await db.prepare(
       `UPDATE users SET email_verification_token = ?, email_verification_expires_at = ? WHERE id = ?`
     ).run(token, expiresAt, clientId);
