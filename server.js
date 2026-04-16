@@ -1313,6 +1313,7 @@ app.get("/sitemap.xml", (_req, res) => {
     "/informacje-ceny.html",
     "/regulamin.html",
     "/polityka-prywatnosci.html",
+    "/polityka-cookies.html",
     "/rekrutacja.html",
     "/logowanie.html",
     "/rejestracja.html",
