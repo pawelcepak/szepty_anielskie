@@ -965,6 +965,12 @@ function ownerGenderLabel(g) {
   return "—";
 }
 
+function ownerTriStateLabel(v) {
+  if (v === "yes") return "Tak";
+  if (v === "no") return "Nie";
+  return "—";
+}
+
 function ownerMonthLabel(iso) {
   const d = new Date(iso);
   if (!Number.isFinite(d.getTime())) return "";
@@ -1090,17 +1096,27 @@ async function refreshOwnerClients() {
           const deleteAction = `<button type="button" class="btn-mon btn-mon--danger" data-client-delete data-client-id="${esc(
             c.id
           )}">Usuń konto</button>`;
+          const profileBlock = `<div class="owner-client-profile-block">
+            <div><strong>nazwa:</strong> ${esc(c.first_name || c.display_name || "—")}</div>
+            <div><strong>email:</strong> ${esc(c.email || "—")}</div>
+            <div><strong>miasto:</strong> ${esc(c.city || "—")}</div>
+            <div><strong>płeć:</strong> ${esc(ownerGenderLabel(c.gender))}</div>
+          </div>`;
+          const extraBlock = `<div class="owner-client-profile-block">
+            <div><strong>dzieci:</strong> ${esc(ownerTriStateLabel(c.has_children))}</div>
+            <div><strong>palenie:</strong> ${esc(ownerTriStateLabel(c.smokes))}</div>
+            <div><strong>alkohol:</strong> ${esc(ownerTriStateLabel(c.drinks_alcohol))}</div>
+            <div><strong>auto:</strong> ${esc(ownerTriStateLabel(c.has_car))}</div>
+          </div>`;
           return (
-          `<tr><td>${esc(c.username || "—")}</td><td>${esc(c.first_name || c.display_name || "—")}</td><td>${esc(
-            ownerGenderLabel(c.gender)
-          )}</td><td>${esc(c.city || "—")}</td><td>${esc(c.email)}</td><td>${esc(String(c.birth_date || "").slice(0, 10))}</td><td>${esc(
+          `<tr><td>${esc(c.username || "—")}</td><td>${profileBlock}</td><td>${extraBlock}</td><td>${esc(String(c.birth_date || "").slice(0, 10))}</td><td>${esc(
             formatOpPlTime(c.created_at)
           )}</td><td>${blocked ? "zablokowany" : "aktywny"}</td><td>${esc(verifyStatus)}</td><td>${verifyAction}<br/>${blockAction}<br/>${deleteAction}</td><td>${c.thread_count ?? 0}</td><td>${c.messages_balance ?? 0}</td></tr>`
           );
         }
       )
       .join("");
-    body.innerHTML = `<table class="mon-table"><thead><tr><th>Nick</th><th>Imię</th><th>Płeć</th><th>Miasto</th><th>E-mail</th><th>Ur.</th><th>Rejestracja</th><th>Status konta</th><th>Status e-mail</th><th>Akcje</th><th>Wątki</th><th>Saldo</th></tr></thead><tbody>${
+    body.innerHTML = `<table class="mon-table"><thead><tr><th>Nick</th><th>Profil</th><th>Dodatkowe info</th><th>Ur.</th><th>Rejestracja</th><th>Status konta</th><th>Status e-mail</th><th>Akcje</th><th>Wątki</th><th>Saldo</th></tr></thead><tbody>${
       rows || ""
     }</tbody></table>`;
   } catch {

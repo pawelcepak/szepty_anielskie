@@ -285,6 +285,16 @@ a {
   color: #0f172a;
 }
 
+.owner-client-profile-block {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 180px;
+}
+
+.owner-client-profile-block strong {
+  font-weight: 700;
+}
+
 .owner-clients-upsell-hint {
   font-size: 12px !important;
   opacity: 0.92;

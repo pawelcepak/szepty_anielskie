@@ -60,9 +60,36 @@
         </form>
         <details class="panel-settings" id="panel-settings">
           <summary>Ustawienia konta</summary>
+          <p class="sub panel-settings-hint">
+            Dodatkowe informacje mogą ułatwić rozmowę i oszczędzić pytań — konsultant zobaczy je w Twoim profilu.
+          </p>
           <form id="panel-settings-form" class="panel-settings-grid">
             <label for="settings-city">Miasto (opcjonalnie)</label>
             <input id="settings-city" type="text" maxlength="80" placeholder="Puste = nie podano" />
+            <label for="settings-has-children">Dzieci</label>
+            <select id="settings-has-children">
+              <option value="unknown">Nie podano</option>
+              <option value="yes">Tak</option>
+              <option value="no">Nie</option>
+            </select>
+            <label for="settings-smokes">Palenie</label>
+            <select id="settings-smokes">
+              <option value="unknown">Nie podano</option>
+              <option value="yes">Tak</option>
+              <option value="no">Nie</option>
+            </select>
+            <label for="settings-drinks-alcohol">Alkohol</label>
+            <select id="settings-drinks-alcohol">
+              <option value="unknown">Nie podano</option>
+              <option value="yes">Tak</option>
+              <option value="no">Nie</option>
+            </select>
+            <label for="settings-has-car">Auto</label>
+            <select id="settings-has-car">
+              <option value="unknown">Nie podano</option>
+              <option value="yes">Tak</option>
+              <option value="no">Nie</option>
+            </select>
             <label for="settings-avatar">Zdjęcie profilowe (opcjonalnie)</label>
             <input id="settings-avatar" type="file" accept="image/jpeg,image/png,image/webp" />
             <button type="submit" class="btn btn-outline btn-sm">Zapisz profil</button>

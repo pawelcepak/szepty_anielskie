@@ -1054,6 +1054,20 @@ select:focus {
   margin: 0;
 }
 
+.reg-extra-fieldset {
+  margin: 0 0 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(248, 250, 252, 0.55);
+}
+
+.reg-extra-hint {
+  margin: 0 0 0.45rem;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
 .form-error {
   margin: 0.75rem 0 0;
   font-size: 0.9rem;
@@ -1214,6 +1228,13 @@ body.page-panel .site-top {
   display: grid;
   gap: 0.35rem;
   max-width: 28rem;
+}
+
+.panel-settings-hint {
+  margin: 0.35rem 0 0.45rem;
+  font-size: 0.86rem;
+  color: var(--ink-muted);
+  max-width: 36rem;
 }
 
 .panel-sort-row {

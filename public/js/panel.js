@@ -312,6 +312,12 @@ function genderLabelClient(g) {
   return "—";
 }
 
+function triStateLabel(v) {
+  if (v === "yes") return "Tak";
+  if (v === "no") return "Nie";
+  return "—";
+}
+
 function renderProfileStrip() {
   const line = document.getElementById("panel-profile-line");
   const form = document.getElementById("panel-city-form");
@@ -321,9 +327,16 @@ function renderProfileStrip() {
   const city = (u.city || "").trim();
   const bd = u.birth_date ? String(u.birth_date).slice(0, 10) : "—";
   const gen = genderLabelClient(u.gender);
+  const extras = `dzieci <strong>${esc(triStateLabel(u.has_children))}</strong> · palenie <strong>${esc(
+    triStateLabel(u.smokes)
+  )}</strong> · alkohol <strong>${esc(triStateLabel(u.drinks_alcohol))}</strong> · auto <strong>${esc(
+    triStateLabel(u.has_car)
+  )}</strong>`;
   line.innerHTML = `Profil: <strong>@${esc(u.username || "?")}</strong> · imię <strong>${esc(
     u.first_name || "?"
-  )}</strong> · płeć <strong>${esc(gen)}</strong> · miasto <strong>${city ? esc(city) : "—"}</strong> · data urodzenia <strong>${esc(bd)}</strong>.`;
+  )}</strong> · płeć <strong>${esc(gen)}</strong> · miasto <strong>${city ? esc(city) : "—"}</strong> · data urodzenia <strong>${esc(
+    bd
+  )}</strong> · ${extras}.`;
   if (form) {
     const need = !city;
     form.classList.toggle("hidden", !need);
@@ -331,6 +344,14 @@ function renderProfileStrip() {
   }
   const settingsCity = document.getElementById("settings-city");
   if (settingsCity) settingsCity.value = city;
+  const setSel = (id, v) => {
+    const el = document.getElementById(id);
+    if (el) el.value = v || "unknown";
+  };
+  setSel("settings-has-children", u.has_children);
+  setSel("settings-smokes", u.smokes);
+  setSel("settings-drinks-alcohol", u.drinks_alcohol);
+  setSel("settings-has-car", u.has_car);
 }
 
 function bindPanelCityFormOnce() {
@@ -635,6 +656,10 @@ document.getElementById("panel-settings-form")?.addEventListener("submit", async
   const err = document.getElementById("settings-profile-err");
   if (err) err.hidden = true;
   const city = String(document.getElementById("settings-city")?.value || "").trim();
+  const has_children = String(document.getElementById("settings-has-children")?.value || "unknown").trim();
+  const smokes = String(document.getElementById("settings-smokes")?.value || "unknown").trim();
+  const drinks_alcohol = String(document.getElementById("settings-drinks-alcohol")?.value || "unknown").trim();
+  const has_car = String(document.getElementById("settings-has-car")?.value || "unknown").trim();
   const avatarFile = document.getElementById("settings-avatar")?.files?.[0];
   let avatar_url = undefined;
   if (avatarFile) {
@@ -653,7 +678,7 @@ document.getElementById("panel-settings-form")?.addEventListener("submit", async
     });
   }
   try {
-    const payload = { city };
+    const payload = { city, has_children, smokes, drinks_alcohol, has_car };
     if (avatar_url) payload.avatar_url = avatar_url;
     const r = await api("/api/me", { method: "PATCH", body: JSON.stringify(payload) });
     me.user = r.user;

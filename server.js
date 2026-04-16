@@ -318,7 +318,7 @@ const requireCustomer = asyncRoute(async (req, res, next) => {
   }
   const row = await db
     .prepare(
-      `SELECT s.id AS session_id, u.id, u.email, u.display_name, u.username, u.first_name, u.birth_date, u.city, u.gender, u.avatar_url
+      `SELECT s.id AS session_id, u.id, u.email, u.display_name, u.username, u.first_name, u.birth_date, u.city, u.gender, u.has_children, u.smokes, u.drinks_alcohol, u.has_car, u.avatar_url
               , u.blocked_at, u.email_verified_at
        FROM customer_sessions s
        JOIN users u ON u.id = s.user_id
@@ -349,6 +349,10 @@ const requireCustomer = asyncRoute(async (req, res, next) => {
     birth_date: row.birth_date,
     city: row.city || "",
     gender: row.gender || "",
+    has_children: row.has_children || "unknown",
+    smokes: row.smokes || "unknown",
+    drinks_alcohol: row.drinks_alcohol || "unknown",
+    has_car: row.has_car || "unknown",
     avatar_url: row.avatar_url,
   };
   next();
@@ -445,6 +449,12 @@ function birthDateAllowed(d) {
   return true;
 }
 
+function normalizeTriState(v) {
+  const s = String(v || "").trim().toLowerCase();
+  if (s === "yes" || s === "no" || s === "unknown") return s;
+  return "unknown";
+}
+
 /** --- Klient: rejestracja / logowanie --- */
 
 app.get(
@@ -454,7 +464,7 @@ app.get(
     if (!token) return res.json({ logged_in: false });
     const row = await db
       .prepare(
-        `SELECT s.id AS session_id, u.id, u.email, u.display_name, u.username, u.first_name, u.city
+        `SELECT s.id AS session_id, u.id, u.email, u.display_name, u.username, u.first_name, u.city, u.gender, u.has_children, u.smokes, u.drinks_alcohol, u.has_car
               , u.blocked_at, u.email_verified_at
        FROM customer_sessions s
        JOIN users u ON u.id = s.user_id
@@ -484,6 +494,11 @@ app.get(
         username: row.username,
         first_name: row.first_name,
         city: row.city || "",
+        gender: row.gender || "",
+        has_children: row.has_children || "unknown",
+        smokes: row.smokes || "unknown",
+        drinks_alcohol: row.drinks_alcohol || "unknown",
+        has_car: row.has_car || "unknown",
       },
     });
   })
@@ -503,6 +518,10 @@ app.post("/api/auth/register", registerJsonParser, async (req, res, next) => {
   const birth_date = String(req.body?.birth_date || "").trim();
   const city = String(req.body?.city || "").trim();
   const gender = String(req.body?.gender || "").trim();
+  const has_children = normalizeTriState(req.body?.has_children);
+  const smokes = normalizeTriState(req.body?.smokes);
+  const drinks_alcohol = normalizeTriState(req.body?.drinks_alcohol);
+  const has_car = normalizeTriState(req.body?.has_car);
   const avatar_url = String(req.body?.avatar_url || "").trim() || null;
   let pending_open_character_id = String(req.body?.medium || "").trim() || null;
   if (pending_open_character_id) {
@@ -565,9 +584,9 @@ app.post("/api/auth/register", registerJsonParser, async (req, res, next) => {
   const verifyToken = tokenBytes();
   const verifyExpires = new Date(Date.now() + mailVerificationTtlMs()).toISOString();
   await db.prepare(
-    `INSERT INTO users (id, email, password_hash, display_name, username, first_name, birth_date, city, gender, avatar_url,
+    `INSERT INTO users (id, email, password_hash, display_name, username, first_name, birth_date, city, gender, has_children, smokes, drinks_alcohol, has_car, avatar_url,
         email_verified_at, email_verification_token, email_verification_expires_at, pending_open_character_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`
   ).run(
     id,
     email,
@@ -578,6 +597,10 @@ app.post("/api/auth/register", registerJsonParser, async (req, res, next) => {
     birth_date,
     city || null,
     gender,
+    has_children,
+    smokes,
+    drinks_alcohol,
+    has_car,
     avatar_url,
     verifyToken,
     verifyExpires,
@@ -723,7 +746,7 @@ app.post(
     const password = String(req.body?.password || "");
     const row = await db
       .prepare(
-        `SELECT id, email, display_name, password_hash, username, first_name, birth_date, city, gender, avatar_url, blocked_at, email_verified_at
+        `SELECT id, email, display_name, password_hash, username, first_name, birth_date, city, gender, has_children, smokes, drinks_alcohol, has_car, avatar_url, blocked_at, email_verified_at
        FROM users WHERE email = ?`
       )
       .get(email);
@@ -747,6 +770,10 @@ app.post(
         birth_date: row.birth_date,
         city: row.city || "",
         gender: row.gender || "",
+        has_children: row.has_children || "unknown",
+        smokes: row.smokes || "unknown",
+        drinks_alcohol: row.drinks_alcohol || "unknown",
+        has_car: row.has_car || "unknown",
         avatar_url: row.avatar_url,
       },
       messages_remaining: await messagesBalance(row.id),
@@ -778,6 +805,10 @@ app.get(
         birth_date: req.customer.birth_date,
         city: req.customer.city || "",
         gender: req.customer.gender || "",
+        has_children: req.customer.has_children || "unknown",
+        smokes: req.customer.smokes || "unknown",
+        drinks_alcohol: req.customer.drinks_alcohol || "unknown",
+        has_car: req.customer.has_car || "unknown",
         avatar_url: req.customer.avatar_url,
       },
       messages_remaining: await messagesBalance(req.customer.id),
@@ -793,6 +824,10 @@ app.patch(
   requireCustomer,
   asyncRoute(async (req, res) => {
     const city = String(req.body?.city ?? req.customer.city ?? "").trim();
+    const has_children = normalizeTriState(req.body?.has_children ?? req.customer.has_children);
+    const smokes = normalizeTriState(req.body?.smokes ?? req.customer.smokes);
+    const drinks_alcohol = normalizeTriState(req.body?.drinks_alcohol ?? req.customer.drinks_alcohol);
+    const has_car = normalizeTriState(req.body?.has_car ?? req.customer.has_car);
     const avatar_url = String(req.body?.avatar_url ?? "").trim() || req.customer.avatar_url || null;
     if (city.length > 0 && (city.length < 2 || city.length > 80)) {
       return res.status(400).json({ error: "Miasto: opcjonalne; jeśli podasz — 2–80 znaków." });
@@ -806,8 +841,14 @@ app.patch(
         return res.status(400).json({ error: "Nieprawidłowy adres zdjęcia." });
       }
     }
-    await db.prepare(`UPDATE users SET city = ?, avatar_url = ? WHERE id = ?`).run(city, avatar_url, req.customer.id);
+    await db
+      .prepare(`UPDATE users SET city = ?, has_children = ?, smokes = ?, drinks_alcohol = ?, has_car = ?, avatar_url = ? WHERE id = ?`)
+      .run(city, has_children, smokes, drinks_alcohol, has_car, avatar_url, req.customer.id);
     req.customer.city = city;
+    req.customer.has_children = has_children;
+    req.customer.smokes = smokes;
+    req.customer.drinks_alcohol = drinks_alcohol;
+    req.customer.has_car = has_car;
     req.customer.avatar_url = avatar_url;
     res.json({
       user: {
@@ -819,6 +860,10 @@ app.patch(
         birth_date: req.customer.birth_date,
         city,
         gender: req.customer.gender || "",
+        has_children,
+        smokes,
+        drinks_alcohol,
+        has_car,
         avatar_url,
       },
     });
@@ -1551,7 +1596,7 @@ app.get("/api/op/clients", requireOperator, requireOwner, asyncRoute(async (req,
   if (g && !genderFilter.has(g)) {
     return res.status(400).json({ error: "Filtr płci: female, male, other lub pusty (wszyscy)." });
   }
-  let sql = `SELECT u.id, u.email, u.username, u.first_name, u.display_name, u.birth_date, u.city, u.gender, u.blocked_at,
+  let sql = `SELECT u.id, u.email, u.username, u.first_name, u.display_name, u.birth_date, u.city, u.gender, u.has_children, u.smokes, u.drinks_alcohol, u.has_car, u.blocked_at,
               u.email_verified_at,
               u.email_verification_token,
               datetime(u.created_at) AS created_at,

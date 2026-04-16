@@ -299,6 +299,16 @@ const userColsGender = new Set(db.prepare("PRAGMA table_info(users)").all().map(
 if (!userColsGender.has("gender")) {
   db.exec("ALTER TABLE users ADD COLUMN gender TEXT");
 }
+for (const [col, sqlt] of [
+  ["has_children", "TEXT"],
+  ["smokes", "TEXT"],
+  ["drinks_alcohol", "TEXT"],
+  ["has_car", "TEXT"],
+]) {
+  if (!userColsGender.has(col)) {
+    db.exec(`ALTER TABLE users ADD COLUMN ${col} ${sqlt}`);
+  }
+}
 
 /** Jednorazowa migracja starych kluczy notatek klienta → nowe kategorie. */
 if (!db.prepare("SELECT 1 FROM app_kv WHERE key = ?").get("facts_schema_v2_migrated")) {

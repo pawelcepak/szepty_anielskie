@@ -74,6 +74,37 @@
             placeholder="Np. Warszawa"
           />
 
+          <fieldset class="reg-extra-fieldset">
+            <legend class="reg-gender-legend">Dodatkowe informacje (opcjonalnie)</legend>
+            <p class="reg-extra-hint">
+              To może ułatwić rozmowę i oszczędzić pytań — konsultant widzi te dane w Twoim profilu.
+            </p>
+            <label for="extra-children">Dzieci</label>
+            <select id="extra-children" name="has_children">
+              <option value="unknown" selected>Nie podano</option>
+              <option value="yes">Tak</option>
+              <option value="no">Nie</option>
+            </select>
+            <label for="extra-smoking">Palenie</label>
+            <select id="extra-smoking" name="smokes">
+              <option value="unknown" selected>Nie podano</option>
+              <option value="yes">Tak</option>
+              <option value="no">Nie</option>
+            </select>
+            <label for="extra-alcohol">Alkohol</label>
+            <select id="extra-alcohol" name="drinks_alcohol">
+              <option value="unknown" selected>Nie podano</option>
+              <option value="yes">Tak</option>
+              <option value="no">Nie</option>
+            </select>
+            <label for="extra-car">Auto</label>
+            <select id="extra-car" name="has_car">
+              <option value="unknown" selected>Nie podano</option>
+              <option value="yes">Tak</option>
+              <option value="no">Nie</option>
+            </select>
+          </fieldset>
+
           <label for="birth_date">Data urodzenia</label>
           <input id="birth_date" name="birth_date" type="date" required />
 
