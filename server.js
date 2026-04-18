@@ -149,6 +149,35 @@ app.use(express.json({ limit: "512kb" }));
 app.use(cookieParser());
 const registerJsonParser = express.json({ limit: "1mb" });
 
+// --- Visit tracking (GDPR-safe: no IPs stored, only daily totals) ---
+const OWNER_IPS = new Set(
+  String(process.env.OWNER_IPS || "").split(",").map((s) => s.trim()).filter(Boolean)
+);
+const _visitHashSet = new Set(); // in-memory only, SHA-256(ip+date), cleared on restart
+const _visitEnsureDay = db.prepare(
+  "INSERT OR IGNORE INTO visit_stats (date, visits, uniques) VALUES (?, 0, 0)"
+);
+const _visitBump = db.prepare("UPDATE visit_stats SET visits = visits + 1 WHERE date = ?");
+const _visitBumpUnique = db.prepare("UPDATE visit_stats SET uniques = uniques + 1 WHERE date = ?");
+const PAGE_EXT_RE = /\.(css|js|jpg|jpeg|png|gif|svg|ico|woff2?|ttf|map|webp|json)$/i;
+app.use((req, res, next) => {
+  if (req.method !== "GET") return next();
+  const p = req.path || "/";
+  if (p.startsWith("/api") || p.startsWith("/op-panel") || PAGE_EXT_RE.test(p)) return next();
+  const ip = String(req.ip || req.socket?.remoteAddress || "");
+  if (OWNER_IPS.has(ip)) return next();
+  const today = new Date().toISOString().slice(0, 10);
+  const hash = crypto.createHash("sha256").update(ip + today + (process.env.SESSION_SECRET || "x")).digest("hex");
+  const isNew = !_visitHashSet.has(hash);
+  if (isNew) _visitHashSet.add(hash);
+  try {
+    _visitEnsureDay.run(today);
+    _visitBump.run(today);
+    if (isNew) _visitBumpUnique.run(today);
+  } catch (_) {}
+  next();
+});
+
 if (!SEO_INDEXABLE) {
   app.use((req, res, next) => {
     if (req.method === "GET" && !String(req.path || "").startsWith("/api")) {
@@ -1767,6 +1796,17 @@ function requireOwner(req, res, next) {
   }
   next();
 }
+
+app.get("/api/op/visits", requireOperator, requireOwner, (_req, res) => {
+  const rows = db
+    .prepare("SELECT date, visits, uniques FROM visit_stats ORDER BY date DESC LIMIT 30")
+    .all();
+  const today = new Date().toISOString().slice(0, 10);
+  const todayRow = rows.find((r) => r.date === today) || { date: today, visits: 0, uniques: 0 };
+  const total = rows.reduce((s, r) => s + r.visits, 0);
+  const ownerIpsList = [...OWNER_IPS];
+  res.json({ rows: rows.reverse(), today: todayRow, total_30d: total, owner_ips: ownerIpsList });
+});
 
 app.get(
   "/api/op/promo/campaigns",

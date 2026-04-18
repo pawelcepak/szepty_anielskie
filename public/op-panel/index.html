@@ -60,6 +60,7 @@
         <button type="button" class="owner-tab owner-tab--advanced hidden" data-owner-tab="hr">Obsługa pracowników</button>
         <button type="button" class="owner-tab owner-tab--advanced hidden" data-owner-tab="kyc">Weryfikacja tożsamości</button>
         <button type="button" class="owner-tab owner-tab--trail" data-owner-tab="marketing">Reklama</button>
+        <button type="button" class="owner-tab" data-owner-tab="traffic">Ruch</button>
       </nav>
       <header class="op-header op-header--main">
         <a class="op-logo" href="./" id="op-logo-main" title="Panel pracy — Szepty Anielskie">Szept</a>
@@ -700,8 +701,48 @@
           </menu>
         </form>
       </dialog>
+
+      <div id="owner-page-traffic" class="owner-full-page hidden" aria-label="Ruch na stronie">
+        <div class="owner-full-inner">
+          <h2 class="owner-page-title">Ruch na stronie</h2>
+          <p class="owner-monitor-hint">
+            Zliczane są tylko wejścia z adresów IP spoza listy <code>OWNER_IPS</code> w pliku <code>.env</code>.
+            Żaden adres IP nie jest zapisywany — wyłącznie dzienny licznik odwiedzin.
+          </p>
+          <div id="traffic-summary" class="traffic-summary">
+            <div class="traffic-card">
+              <div class="traffic-card-label">Dziś</div>
+              <div class="traffic-card-val" id="traffic-today-val">—</div>
+              <div class="traffic-card-sub" id="traffic-today-uniq">unikalnych: —</div>
+            </div>
+            <div class="traffic-card">
+              <div class="traffic-card-label">Ostatnie 30 dni</div>
+              <div class="traffic-card-val" id="traffic-30d-val">—</div>
+            </div>
+            <div class="traffic-card">
+              <div class="traffic-card-label">Twoje IP (ignorowane)</div>
+              <div class="traffic-card-sub" id="traffic-ownerip-val" style="font-size:0.78rem;word-break:break-all">nie ustawione</div>
+            </div>
+          </div>
+          <div class="traffic-chart-wrap">
+            <canvas id="traffic-chart" height="180"></canvas>
+          </div>
+          <table class="traffic-table" id="traffic-table">
+            <thead>
+              <tr><th>Data</th><th>Wejścia ogółem</th><th>Unikalne</th></tr>
+            </thead>
+            <tbody id="traffic-tbody"></tbody>
+          </table>
+          <p class="owner-monitor-hint" style="margin-top:1.2rem">
+            Aby zignorować swoje wejścia, dodaj do <code>.env</code> na serwerze:<br>
+            <code>OWNER_IPS=twoje.ip.tu</code> — możesz podać kilka po przecinku.<br>
+            Swoje IP znajdziesz na: <a href="https://whatismyip.com" target="_blank" rel="noopener noreferrer">whatismyip.com</a>
+          </p>
+        </div>
+      </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <script type="module" src="operator.js"></script>
   </body>
 </html>

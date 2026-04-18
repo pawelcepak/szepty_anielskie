@@ -745,6 +745,7 @@ function setOwnerTab(tab) {
     "owner-page-kyc",
     "owner-page-clients",
     "owner-page-marketing",
+    "owner-page-traffic",
   ]) {
     const key = id.replace("owner-page-", "");
     document.getElementById(id)?.classList.toggle("hidden", tab !== key);
@@ -762,6 +763,7 @@ function setOwnerTab(tab) {
   if (tab === "team") refreshStaffList();
   if (tab === "clients") refreshOwnerClients();
   if (tab === "marketing") refreshOwnerMarketing();
+  if (tab === "traffic") refreshOwnerTraffic();
   if (tab === "hr" || tab === "kyc") {
     const which = tab;
     loadOwnerConsoleHints().then((h) => {
@@ -1128,9 +1130,92 @@ async function refreshOwnerClients() {
   }
 }
 
-async function refreshOwnerMarketing() {
+let _trafficChart = null;
+
+async function refreshOwnerTraffic() {
   if (opRole !== "owner") return;
-  const channelsWrap = document.getElementById("mkt-channels");
+  const todayVal = document.getElementById("traffic-today-val");
+  const todayUniq = document.getElementById("traffic-today-uniq");
+  const total30d = document.getElementById("traffic-30d-val");
+  const ownerIpEl = document.getElementById("traffic-ownerip-val");
+  const tbody = document.getElementById("traffic-tbody");
+  const canvas = document.getElementById("traffic-chart");
+  if (!todayVal || !tbody) return;
+
+  let data;
+  try {
+    data = await api("/api/op/visits");
+  } catch (e) {
+    if (todayVal) todayVal.textContent = "Błąd ładowania";
+    return;
+  }
+
+  if (todayVal) todayVal.textContent = String(data.today?.visits ?? 0);
+  if (todayUniq) todayUniq.textContent = `unikalnych: ${data.today?.uniques ?? 0}`;
+  if (total30d) total30d.textContent = String(data.total_30d ?? 0);
+  if (ownerIpEl) {
+    ownerIpEl.textContent = data.owner_ips?.length
+      ? data.owner_ips.join(", ")
+      : "nie ustawione — dodaj OWNER_IPS do .env";
+  }
+
+  const rows = data.rows || [];
+  if (tbody) {
+    tbody.innerHTML = rows
+      .slice()
+      .reverse()
+      .map(
+        (r) =>
+          `<tr><td>${r.date}</td><td>${r.visits}</td><td>${r.uniques}</td></tr>`
+      )
+      .join("") || `<tr><td colspan="3" style="text-align:center;opacity:.5">Brak danych</td></tr>`;
+  }
+
+  if (canvas) {
+    const labels = rows.map((r) => r.date.slice(5));
+    const visits = rows.map((r) => r.visits);
+    const uniques = rows.map((r) => r.uniques);
+    if (_trafficChart) { _trafficChart.destroy(); _trafficChart = null; }
+    const ctx = canvas.getContext("2d");
+    _trafficChart = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Wejścia",
+            data: visits,
+            backgroundColor: "rgba(212,175,101,0.55)",
+            borderColor: "rgba(212,175,101,1)",
+            borderWidth: 1,
+            borderRadius: 3,
+          },
+          {
+            label: "Unikalne",
+            data: uniques,
+            backgroundColor: "rgba(180,120,200,0.45)",
+            borderColor: "rgba(180,120,200,0.9)",
+            borderWidth: 1,
+            borderRadius: 3,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { labels: { color: "#ccc", font: { size: 12 } } },
+          tooltip: { mode: "index" },
+        },
+        scales: {
+          x: { ticks: { color: "#aaa", font: { size: 10 } }, grid: { color: "rgba(255,255,255,0.06)" } },
+          y: { beginAtZero: true, ticks: { color: "#aaa", font: { size: 11 }, stepSize: 1 }, grid: { color: "rgba(255,255,255,0.08)" } },
+        },
+      },
+    });
+  }
+}
+
+async function refreshOwnerMarketing() {
   const btn = document.getElementById("btn-mkt-generate");
   const err = document.getElementById("mkt-err");
   const out = document.getElementById("mkt-results");

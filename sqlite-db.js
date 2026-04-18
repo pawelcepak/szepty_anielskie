@@ -467,6 +467,12 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_message_reports_status ON message_reports(status);
   CREATE INDEX IF NOT EXISTS idx_message_reports_thread ON message_reports(thread_id);
   CREATE INDEX IF NOT EXISTS idx_message_reports_message ON message_reports(message_id);
+
+  CREATE TABLE IF NOT EXISTS visit_stats (
+    date TEXT NOT NULL PRIMARY KEY,
+    visits INTEGER NOT NULL DEFAULT 0,
+    uniques INTEGER NOT NULL DEFAULT 0
+  );
 `);
 
 db.prepare("INSERT OR IGNORE INTO app_kv (key, value) VALUES ('assign_rr', '0')").run();
