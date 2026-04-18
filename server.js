@@ -863,6 +863,9 @@ app.post("/api/auth/reset-password", registerJsonParser, asyncRoute(async (req, 
   await db.prepare(`DELETE FROM password_reset_tokens WHERE user_id = ?`).run(row.user_id);
   res.json({ ok: true });
 }));
+
+app.post(
+  "/api/auth/login",
   asyncRoute(async (req, res) => {
     const email = String(req.body?.email || "").trim().toLowerCase();
     const password = String(req.body?.password || "");
