@@ -873,6 +873,55 @@ body.page-auth .auth-card--wide {
   max-width: 44rem;
 }
 
+.legal-text {
+  margin-top: 1rem;
+  font-size: 0.93rem;
+  line-height: 1.7;
+  color: #3b2f20;
+}
+.legal-text p {
+  margin: 0 0 0.7rem;
+}
+.legal-text h3 {
+  margin: 1.5rem 0 0.4rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #5b3e26;
+}
+.legal-text h3:first-child {
+  margin-top: 0;
+}
+.legal-text ul {
+  margin: 0.2rem 0 0.7rem 1.4rem;
+  padding: 0;
+}
+.legal-text ul li {
+  margin-bottom: 0.2rem;
+}
+.legal-meta {
+  font-size: 0.82rem;
+  color: #9e8672;
+  margin-bottom: 1.2rem !important;
+}
+.legal-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.87rem;
+  margin: 0.4rem 0 0.8rem;
+}
+.legal-table th {
+  background: #f5ede3;
+  font-weight: 700;
+  text-align: left;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid #ddd0c0;
+}
+.legal-table td {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid #ddd0c0;
+  vertical-align: top;
+}
+
 .legal-h2 {
   font-family: var(--font-display);
   font-size: 1.15rem;
