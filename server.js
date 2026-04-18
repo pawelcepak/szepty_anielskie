@@ -52,11 +52,7 @@ await ensureBootstrapOperator(db);
 
 const PORT = Number(process.env.PORT) || 3000;
 const DATABASE_URL = String(process.env.DATABASE_URL || "").trim();
-if (process.env.NODE_ENV === "production" && !DATABASE_URL) {
-  throw new Error(
-    "Brak DATABASE_URL w produkcji. Skonfiguruj Railway Postgres i uruchom migracje: npm run pg:init && npm run pg:migrate-from-sqlite."
-  );
-}
+// SQLite jest dozwolony w produkcji gdy DATABASE_URL nie jest ustawiony (VPS z lokalną bazą)
 const ALLOW_FAKE_PURCHASE =
   String(process.env.ALLOW_FAKE_PURCHASE || "true").toLowerCase() === "true";
 
