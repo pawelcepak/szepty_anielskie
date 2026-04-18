@@ -298,6 +298,7 @@ body.page-auth .avatar-preview-wrap img {
   border-radius: var(--radius);
   border: 1px solid transparent;
   cursor: pointer;
+  color: black;
   text-decoration: none;
   transition: filter var(--transition), background var(--transition), border-color var(--transition), box-shadow var(--transition), color var(--transition), transform var(--transition);
 }
@@ -921,6 +922,7 @@ body.page-auth .auth-card--wide {
 .legal-text a:hover {
   color: #fff;
 }
+.legal-meta {
   font-size: 0.82rem;
   opacity: 0.65;
   margin-bottom: 1.2rem !important;
@@ -1271,12 +1273,13 @@ body.page-panel.page-panel--simple {
   font-family: var(--font-display);
   font-size: 1.45rem;
   margin: 0 0 0.65rem;
+  color: black;
 }
 
 .panel-simple-lead {
   margin: 0 0 1rem;
   font-size: 0.95rem;
-  color: var(--ink-muted);
+  color: black;
   line-height: 1.55;
 }
 
@@ -1710,7 +1713,7 @@ body.page-panel .site-top {
   text-transform: uppercase;
   letter-spacing: 0.09em;
   font-weight: 700;
-  color: var(--accent);
+  color: goldenrod;
   opacity: 0.75;
 }
 
@@ -2987,7 +2990,7 @@ body.page-panel .browse-card-tag,
 body.page-panel .browse-card-skills,
 body.page-panel .browse-card-about,
 body.page-panel .browse-card-hours {
-  color: #5c5248;
+  color: black;
 }
 
 /* Okno modalne profilu — jasne dla czytelności */
@@ -3235,7 +3238,7 @@ body.page-panel .panel-simple-lead,
 body.page-panel .browse-card-tag,
 body.page-panel .browse-card-skills,
 body.page-panel .browse-card-about {
-  color: rgba(220, 205, 245, 0.88);
+  color: black;
 }
 
 body.page-panel .browse-card--active {
@@ -3749,6 +3752,6 @@ body.page-panel .medium-popup-hours { color: rgba(220, 205, 245, 0.65); }
 
 /* browse-card about label override for panel */
 body.page-panel .browse-card-about-label {
-  color: rgba(212, 175, 101, 0.7);
+  color: goldenrod;
 }
 
