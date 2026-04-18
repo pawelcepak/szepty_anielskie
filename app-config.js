@@ -16,7 +16,7 @@ export const APP_CONFIG = {
       { amount: 50, price_pln: 65.99 },
       { amount: 100, price_pln: 119.99 },
     ],
-    paymentOperator: "Przelewy24 (DialCom24 Sp. z o.o.)",
+    paymentOperator: "PayU S.A.",
   },
   legal: {
     complaintsEmail: "cepakpawel94@gmail.com",
