@@ -211,7 +211,7 @@ img {
 
 .top-meta--strong {
   font-weight: 600;
-  color: var(--ink);
+  color: pink;
 }
 
 .auth-banner-wrap {
@@ -225,12 +225,12 @@ img {
   border-radius: 999px;
   font-size: 0.78rem;
   font-weight: 600;
-  color: yellowgreen
+  color: yellowgreen;
 }
 
 .auth-badge--guest {
   background: rgba(0, 0, 0, 0.06);
-  color: var(--ink-muted);
+  color: yellowgreen;
   border: 1px solid var(--line);
 }
 
@@ -1133,6 +1133,7 @@ body.page-auth .form-info--warn {
   padding: 0;
   text-decoration: underline;
   cursor: pointer;
+  color: pink;
 }
 
 /* ——— Panel klienta ——— */
@@ -3303,7 +3304,6 @@ body.page-auth .chosen-medium-text {
   font-family: var(--font-display);
   font-size: 1rem;
   font-weight: 700;
-  color: black;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3348,7 +3348,7 @@ body.page-panel .panel-head-messenger {
 }
 
 body.page-panel .panel-head-name-sm {
-  color: #fff;
+  color: black;
 }
 
 body.page-panel .panel-thread-vis {
