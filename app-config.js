@@ -11,10 +11,10 @@ export const APP_CONFIG = {
   pricing: {
     currency: "PLN",
     clientPackages: [
-      { amount: 10, price_pln: 19.99 },
-      { amount: 20, price_pln: 34.99 },
-      { amount: 50, price_pln: 74.99 },
-      { amount: 100, price_pln: 139.99 },
+      { amount: 10, price_pln: 14.99 },
+      { amount: 20, price_pln: 24.99 },
+      { amount: 50, price_pln: 65.99 },
+      { amount: 100, price_pln: 119.99 },
     ],
     paymentOperator: "Przelewy24 (DialCom24 Sp. z o.o.)",
   },

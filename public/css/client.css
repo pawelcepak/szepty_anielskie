@@ -877,7 +877,7 @@ body.page-auth .auth-card--wide {
   margin-top: 1rem;
   font-size: 0.93rem;
   line-height: 1.7;
-  color: #3b2f20;
+  color: inherit;
 }
 .legal-text p {
   margin: 0 0 0.7rem;
@@ -886,7 +886,7 @@ body.page-auth .auth-card--wide {
   margin: 1.5rem 0 0.4rem;
   font-size: 0.95rem;
   font-weight: 700;
-  color: #5b3e26;
+  color: var(--accent, #d4af65);
 }
 .legal-text h3:first-child {
   margin-top: 0;
@@ -900,7 +900,7 @@ body.page-auth .auth-card--wide {
 }
 .legal-meta {
   font-size: 0.82rem;
-  color: #9e8672;
+  opacity: 0.65;
   margin-bottom: 1.2rem !important;
 }
 .legal-table {
@@ -910,16 +910,18 @@ body.page-auth .auth-card--wide {
   margin: 0.4rem 0 0.8rem;
 }
 .legal-table th {
-  background: #f5ede3;
+  background: rgba(212, 175, 101, 0.15);
   font-weight: 700;
   text-align: left;
   padding: 0.35rem 0.6rem;
-  border: 1px solid #ddd0c0;
+  border: 1px solid rgba(212, 175, 101, 0.25);
+  color: var(--accent, #d4af65);
 }
 .legal-table td {
   padding: 0.3rem 0.6rem;
-  border: 1px solid #ddd0c0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   vertical-align: top;
+  color: inherit;
 }
 
 .legal-h2 {
