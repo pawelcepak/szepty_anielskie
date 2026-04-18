@@ -4,7 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
-import { CHARACTER_PORTRAITS, CHAR_ABOUT, DEFAULT_TYPICAL_HOURS, EXTRA_OR_BASE_ROWS } from "./character-catalog.js";
+import { CHARACTER_PORTRAITS, CHAR_ABOUT, DEFAULT_TYPICAL_HOURS, EXTRA_OR_BASE_ROWS, ORIGINAL_SEED_IDS } from "./character-catalog.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -530,6 +530,39 @@ db.transaction(() => {
     ensureCharRow.run(...r, url, m.gender, m.skills, m.about, hp[0], hp[1]);
   }
 })();
+
+// Remove original seed characters
+if (ORIGINAL_SEED_IDS.length > 0) {
+  const placeholders = ORIGINAL_SEED_IDS.map(() => "?").join(",");
+  db.prepare(`DELETE FROM characters WHERE id IN (${placeholders})`).run(...ORIGINAL_SEED_IDS);
+}
+
+// Assign portrait photos to user-added characters that have none
+const PORTRAIT_POOL = [
+  "https://i.pravatar.cc/400?img=47",
+  "https://i.pravatar.cc/400?img=48",
+  "https://i.pravatar.cc/400?img=49",
+  "https://i.pravatar.cc/400?img=50",
+  "https://i.pravatar.cc/400?img=51",
+  "https://i.pravatar.cc/400?img=52",
+  "https://i.pravatar.cc/400?img=53",
+  "https://i.pravatar.cc/400?img=54",
+  "https://i.pravatar.cc/400?img=55",
+  "https://i.pravatar.cc/400?img=56",
+  "https://i.pravatar.cc/400?img=57",
+  "https://i.pravatar.cc/400?img=58",
+];
+const noPortraitRows = db
+  .prepare("SELECT id FROM characters WHERE portrait_url IS NULL OR portrait_url = '' ORDER BY sort_order ASC, name ASC")
+  .all();
+if (noPortraitRows.length > 0) {
+  const setPortrait = db.prepare("UPDATE characters SET portrait_url = ? WHERE id = ?");
+  db.transaction(() => {
+    noPortraitRows.forEach((row, i) => {
+      setPortrait.run(PORTRAIT_POOL[i % PORTRAIT_POOL.length], row.id);
+    });
+  })();
+}
 
 export function createSqliteDatabase() {
   return db;
