@@ -1698,9 +1698,61 @@ body.page-panel .site-top {
   background: #fffdf8;
   color: #2f261d;
   border-radius: 18px;
-  border: 1px solid #d8c7b2;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.28);
-  padding: 1.1rem 1rem;
+  border: 1px solid rgba(212, 175, 101, 0.3);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(212, 175, 101, 0.15);
+  padding: 1.25rem 1.1rem;
+}
+
+.panel-modal-card--wide {
+  width: min(100%, 46rem);
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 1.5rem 1.5rem 1.75rem;
+}
+
+.panel-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.panel-modal-header h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  color: #2f261d;
+}
+
+.panel-modal-divider {
+  height: 1px;
+  background: rgba(212, 175, 101, 0.2);
+  margin: 1.1rem 0;
+}
+
+.panel-modal-section-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-muted);
+}
+
+.profile-modal-summary {
+  background: rgba(212, 175, 101, 0.06);
+  border: 1px solid rgba(212, 175, 101, 0.18);
+  border-radius: var(--radius);
+  padding: 0.75rem 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+.profile-modal-summary .sub {
+  margin: 0.2rem 0;
+  font-size: 0.88rem;
+  color: #524a42;
+  line-height: 1.45;
 }
 
 .panel-modal-card h2 {
@@ -2706,21 +2758,37 @@ body.page-panel .link-panel-topup:hover {
   color: #fff;
 }
 
-body.page-auth .auth-card,
-body.page-panel .panel-simple-card,
-body.page-panel .browse-header,
-body.page-panel .browse-card,
-body.page-panel .panel-profile-strip,
 body.page-panel .panel-view-tabs,
 body.page-panel .composer,
-body.page-panel .messages,
-body.page-panel .panel-head,
-body.page-panel .pkg-bar,
 body.page-panel #account-summary-card.auth-card {
   background: linear-gradient(165deg, rgba(38, 26, 62, 0.95), rgba(22, 14, 38, 0.98));
   color: #f5f0ff;
   border: 1px solid rgba(255, 255, 255, 0.14);
   box-shadow: 0 14px 38px rgba(8, 5, 16, 0.45);
+}
+
+/* Tab bar — dark consistent */
+body.page-panel .panel-view-tabs {
+  background: rgba(10, 6, 24, 0.92);
+  border-bottom: 1px solid rgba(212, 175, 101, 0.18);
+  color: #f0e8ff;
+  box-shadow: none;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  border-radius: 0;
+}
+
+/* Composer — jasne dla czytelności tekstu */
+body.page-panel .composer {
+  background: #fffaf3;
+  color: #2b2118;
+  border-top: 1px solid rgba(212, 175, 101, 0.25);
+  box-shadow: none;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  border-radius: 0;
 }
 
 body.page-panel .browse-disclaimer {
@@ -2729,20 +2797,15 @@ body.page-panel .browse-disclaimer {
   color: rgba(245, 235, 255, 0.88);
 }
 
-body.page-panel .browse-title,
-body.page-panel .browse-card-name,
-body.page-panel .browse-cat-title,
 body.page-panel .panel-head h1 {
-  color: #fff8f0;
+  color: rgba(240, 232, 255, 0.85);
 }
 
 body.page-panel .browse-lead,
-body.page-panel .browse-disclaimer,
-body.page-panel .panel-head p,
-body.page-panel .panel-head-meta,
-body.page-panel .panel-head-about,
-body.page-panel .panel-head-skills,
-body.page-panel .panel-head-hours,
+body.page-panel .browse-disclaimer {
+  color: #4a433a;
+}
+
 body.page-auth .auth-card .sub {
   color: rgba(232, 222, 255, 0.9);
 }
@@ -2752,16 +2815,27 @@ body.page-panel .panel-settings > summary {
   color: rgba(220, 205, 245, 0.9);
 }
 
-body.page-panel .panel-profile-strip,
-body.page-panel .panel-view-tabs,
-body.page-panel .browse-header,
-body.page-panel .browse-card,
-body.page-panel .panel-head,
-body.page-panel .composer,
+/* Browse card text — dark (light card on dark bg) */
+body.page-panel .browse-title {
+  color: #2c241c;
+}
+
+body.page-panel .browse-card-name {
+  color: #2c241c;
+}
+
+body.page-panel .browse-card-tag,
+body.page-panel .browse-card-skills,
+body.page-panel .browse-card-about,
+body.page-panel .browse-card-hours {
+  color: #5c5248;
+}
+
+/* Okno modalne profilu — jasne dla czytelności */
 body.page-panel .panel-modal-card {
   background: #fffaf3;
   color: #2b2118;
-  border-color: #d9cab7;
+  border-color: rgba(212, 175, 101, 0.3);
 }
 
 body.page-panel .panel-profile-line,
@@ -2800,27 +2874,34 @@ body.page-auth select {
   color: #fff;
 }
 
-body.page-panel .panel-profile-strip input,
-body.page-panel .panel-profile-strip textarea,
-body.page-panel .panel-profile-strip select,
+/* Inputs inside panel modal (profile settings) — always light background */
 body.page-panel .panel-modal-card input,
 body.page-panel .panel-modal-card textarea,
-body.page-panel .panel-modal-card select,
-body.page-panel .composer textarea {
+body.page-panel .panel-modal-card select {
   background: #fff;
   border-color: #d4c3af;
   color: #2b2118;
+}
+
+body.page-panel .panel-modal-card label {
+  color: #5c5248;
+}
+
+body.page-panel .panel-modal-card .panel-profile-line,
+body.page-panel .panel-modal-card .panel-settings-hint,
+body.page-panel .panel-modal-card .panel-modal-section-title {
+  color: #5c5248;
+}
+
+body.page-panel .panel-modal-card h2,
+body.page-panel .panel-modal-card .panel-modal-header h2 {
+  color: #2f261d;
 }
 
 body.page-panel .panel-profile-strip input::placeholder,
 body.page-panel .panel-modal-card input::placeholder,
 body.page-panel .composer textarea::placeholder {
   color: #9a8d7d;
-}
-
-body.page-panel input::placeholder,
-body.page-panel textarea::placeholder {
-  color: rgba(237, 228, 255, 0.56);
 }
 
 body.page-auth label {
@@ -2856,39 +2937,43 @@ body.page-panel .panel-view--browse {
 }
 
 body.page-panel .messages {
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-  background: linear-gradient(180deg, rgba(42, 24, 68, 0.9), rgba(28, 16, 46, 0.94));
+  border-top: 1px solid rgba(212, 175, 101, 0.15);
+  background: linear-gradient(180deg, #f5efe4 0%, #ede5d6 100%);
 }
 
 body.page-panel .bubble {
-  border-color: rgba(255, 255, 255, 0.14);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  border-color: #d4c4b0;
+  box-shadow: 0 2px 8px rgba(40, 32, 24, 0.08);
 }
 
 body.page-panel .bubble.user {
-  background: rgba(250, 247, 255, 0.97);
-  color: #1f1630;
-  border-color: rgba(110, 87, 160, 0.35);
+  background: #fff;
+  color: #2b2118;
+  border-color: #d4c4b0;
 }
 
 body.page-panel .bubble.staff {
-  background: rgba(220, 247, 234, 0.96);
+  background: #eef7f1;
   color: #0f2f20;
-  border-color: rgba(30, 128, 90, 0.35);
+  border-color: #9bc4a8;
 }
 
 body.page-panel .bubble .meta {
-  color: rgba(80, 70, 100, 0.85);
+  color: #7a6e62;
 }
 
 body.page-panel .composer {
-  border-top-color: rgba(255, 255, 255, 0.12);
+  border-top-color: rgba(212, 175, 101, 0.25);
 }
 
 body.page-panel .composer textarea {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.22);
-  color: #fff;
+  background: #fff;
+  border-color: #d4c4b0;
+  color: #2b2118;
+}
+
+body.page-panel .composer textarea::placeholder {
+  color: #9a8d7d;
 }
 
 body.page-panel .panel-side {
@@ -3065,6 +3150,181 @@ body.page-auth .chosen-medium-text {
   .page-panel .panel-side h2 {
     font-size: 0.92rem;
   }
+}
+
+/* ===== MESSENGER CHAT HEAD ===== */
+
+.panel-head--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  padding: 2rem 1.5rem;
+  text-align: center;
+}
+
+/* Kompaktowy nagłówek czatu w stylu messenger */
+.panel-head-messenger {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 1.1rem;
+  min-height: 60px;
+}
+
+.panel-head-avatar-sm {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 2px solid rgba(212, 175, 101, 0.4);
+  background: var(--paper-2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.panel-head-avatar-sm img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.panel-head-copy-sm {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.panel-head-name-sm {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.panel-head-badge-sm {
+  font-size: 0.72rem;
+}
+
+.panel-head-profile-link {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  padding: 0.3rem 0.65rem;
+}
+
+/* Rząd widoczności wątku — poniżej czat-head */
+.panel-thread-vis {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 1.1rem;
+  background: rgba(0, 0, 0, 0.04);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+.panel-thread-vis.hidden {
+  display: none;
+}
+
+.panel-thread-vis .thread-vis-note {
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+  flex: 1 1 100%;
+}
+
+/* Na ciemnych stronach (page-panel) */
+body.page-panel .panel-head-messenger {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+body.page-panel .panel-head-name-sm {
+  color: #fff;
+}
+
+body.page-panel .panel-thread-vis {
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+body.page-panel .panel-thread-vis .thread-vis-note {
+  color: rgba(220, 205, 245, 0.8);
+}
+
+/* ===== POPRAWIONY PANEL BROWSE — JASNE KARTY NA CIEMNYM TLE ===== */
+
+/* Browse header i karty — czytelne, ale spójne z motywem */
+body.page-panel .browse-header {
+  background: #faf6ef;
+  color: #2c241c;
+  border: 1px solid rgba(212, 175, 101, 0.35);
+  box-shadow: 0 4px 20px rgba(7, 5, 28, 0.2);
+}
+
+body.page-panel .browse-card {
+  background: #faf6ef;
+  color: #2c241c;
+  border: 1px solid rgba(212, 175, 101, 0.25);
+  box-shadow: 0 4px 16px rgba(7, 5, 28, 0.18);
+}
+
+body.page-panel .browse-card:hover {
+  border-color: rgba(212, 175, 101, 0.5);
+  box-shadow: 0 8px 28px rgba(7, 5, 28, 0.28), 0 0 0 1px rgba(212, 175, 101, 0.25);
+}
+
+body.page-panel .browse-cat-title {
+  color: #2c241c;
+  border-bottom-color: rgba(212, 175, 101, 0.5);
+}
+
+/* Panel-head przy domyślnym stanie (przed wyborem medium) */
+body.page-panel .panel-head:not(:has(.panel-head-messenger)) {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  color: rgba(240, 232, 255, 0.7);
+  min-height: 120px;
+}
+
+body.page-panel .panel-head:not(:has(.panel-head-messenger)) h1 {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  color: rgba(240, 232, 255, 0.85);
+  margin: 0 0 0.35rem;
+}
+
+body.page-panel .panel-head:not(:has(.panel-head-messenger)) p {
+  color: rgba(220, 205, 245, 0.65);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+/* ===== NAV PANEL — PRZYCISK PROFILU ===== */
+body.page-panel .nav-actions--panel {
+  align-items: center;
+}
+
+#account-summary-toggle {
+  font-size: 0.82rem;
+  max-width: 18rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ===== MAGICZNE ANIMACJE I EFEKTY ===== */

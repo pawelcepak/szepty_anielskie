@@ -278,7 +278,7 @@ function updateThreadVisibilityRow() {
   btnS.classList.toggle("hidden", !hidden);
   if (note) {
     note.textContent = hidden
-      ? "Wątek jest schowany tylko w Twoim panelu — u konsultanta nadal widoczny."
+      ? "Wątek jest schowany w panelu — konsultant nadal go widzi."
       : "";
   }
 }
@@ -325,6 +325,14 @@ function onboardingNeeded() {
   return [u.has_children, u.smokes, u.drinks_alcohol, u.has_car].every((v) => (v || "unknown") === "unknown");
 }
 
+function showProfileModal(on) {
+  const modal = document.getElementById("profile-settings-modal");
+  if (!modal) return;
+  modal.classList.toggle("hidden", !on);
+  modal.setAttribute("aria-hidden", on ? "false" : "true");
+  if (on) refreshAccountSummary();
+}
+
 function showOnboardingModal(on) {
   const modal = document.getElementById("panel-onboarding-modal");
   if (!modal) return;
@@ -354,7 +362,6 @@ function maybeOpenOnboardingModal() {
 
 function renderProfileStrip() {
   const line = document.getElementById("panel-profile-line");
-  const summaryMeta = document.getElementById("panel-profile-summary-meta");
   const form = document.getElementById("panel-city-form");
   const inp = document.getElementById("panel-city-input");
   if (!me || !line) return;
@@ -372,10 +379,6 @@ function renderProfileStrip() {
   )}</strong> · płeć <strong>${esc(gen)}</strong> · miasto <strong>${city ? esc(city) : "—"}</strong> · data urodzenia <strong>${esc(
     bd
   )}</strong> · ${extras}.`;
-  if (summaryMeta) {
-    const shortMeta = [u.first_name || "@?", city || "miasto —", gen].join(" · ");
-    summaryMeta.textContent = shortMeta;
-  }
   if (form) {
     const need = !city;
     form.classList.toggle("hidden", !need);
@@ -544,27 +547,21 @@ async function openCharacter(id) {
   const c = characters.find((x) => x.id === id);
   if (!c) return;
   const src = esc(c.portrait_url || FALLBACK_PORTRAIT);
-  const about = c.about ? `<p class="panel-head-about">${esc(c.about)}</p>` : "";
-  const skills = c.skills ? `<p class="panel-head-skills">${esc(c.skills)}</p>` : "";
-  const gen = c.gender ? `<p class="panel-head-meta"><strong>Płeć (postać):</strong> ${esc(c.gender)}</p>` : "";
   const av = availabilityForCharacter(c);
-  const hoursBlock = `<p class="panel-head-hours"><span class="${esc(av.badgeClass)}">${esc(av.badgeText)}</span> ${esc(
-    av.line
-  )}</p>`;
-  const profileLink = `<p class="panel-head-meta"><a class="composer-foot-link" href="/medium.html?id=${encodeURIComponent(
-    c.id
-  )}">Zobacz pełny profil medium</a></p>`;
-  chatHead.innerHTML = `<div class="panel-head-inner">
-      <div class="panel-head-avatar"><img src="${src}" alt="" width="112" height="112" loading="lazy" /></div>
-      <div class="panel-head-copy">
-        <h1>${esc(c.name)}</h1>
-        <p class="panel-head-tagline">${esc(c.tagline)}</p>
-        ${gen}
-        ${skills}
-        ${about}
-        ${hoursBlock}
-        ${profileLink}
+  const hoursShort = c.typical_hours_from && c.typical_hours_to
+    ? `${esc(c.typical_hours_from)} – ${esc(c.typical_hours_to)}`
+    : "";
+  // Messenger-style compact head — tylko awatar, nazwa, status
+  chatHead.innerHTML = `
+    <div class="panel-head-messenger">
+      <div class="panel-head-avatar-sm">
+        <img src="${src}" alt="" width="44" height="44" loading="lazy" />
       </div>
+      <div class="panel-head-copy-sm">
+        <span class="panel-head-name-sm">${esc(c.name)}</span>
+        <span class="${esc(av.badgeClass)} panel-head-badge-sm">${esc(av.badgeText)}${hoursShort ? ` · ${hoursShort}` : ""}</span>
+      </div>
+      <a href="/medium.html?id=${encodeURIComponent(c.id)}" class="btn btn-outline btn-sm panel-head-profile-link">Profil</a>
     </div>`;
   const data = await api(`/api/threads/${encodeURIComponent(id)}/messages`);
   me.messages_remaining = data.messages_remaining;
@@ -625,10 +622,16 @@ document.getElementById("panel-sort")?.addEventListener("change", (event) => {
 });
 
 document.getElementById("account-summary-toggle")?.addEventListener("click", () => {
-  const card = document.getElementById("account-summary-card");
-  if (!card) return;
-  card.classList.toggle("hidden");
-  refreshAccountSummary();
+  showProfileModal(true);
+});
+
+document.getElementById("btn-close-profile")?.addEventListener("click", () => {
+  showProfileModal(false);
+});
+
+// Zamknij profile modal po kliknięciu w tło
+document.getElementById("profile-settings-modal")?.addEventListener("click", (e) => {
+  if (e.target === e.currentTarget) showProfileModal(false);
 });
 
 document.getElementById("panel-onboarding-later")?.addEventListener("click", () => {

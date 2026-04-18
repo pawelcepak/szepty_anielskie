@@ -18,12 +18,9 @@
       <div class="site-top-inner">
         <a class="logo" href="/">Szepty Anielskie</a>
         <nav class="nav-actions nav-actions--panel">
-          <div class="panel-nav-status">
-            <button type="button" class="btn btn-outline btn-sm" id="account-summary-toggle">
-              <span class="top-meta top-meta--strong" id="who"></span>
-            </button>
-            <span class="top-meta" id="session-hint"></span>
-          </div>
+          <button type="button" class="btn btn-outline btn-sm" id="account-summary-toggle">
+            <span class="top-meta top-meta--strong" id="who"></span>
+          </button>
           <a class="link-panel-topup" href="/panel-doladowanie.html">Pakiet / doładowanie</a>
           <span class="top-meta" id="bal"></span>
           <button type="button" class="btn btn-outline" id="logout">Wyloguj</button>
@@ -33,6 +30,8 @@
 
     <div id="panel-live-region" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
     <div id="client-toast" class="client-toast hidden" role="status"></div>
+
+    <!-- Modal: onboarding -->
     <div id="panel-onboarding-modal" class="panel-modal hidden" aria-hidden="true">
       <div class="panel-modal-card" role="dialog" aria-modal="true" aria-labelledby="panel-onboarding-title">
         <h2 id="panel-onboarding-title">Uzupełnij kilka informacji o sobie</h2>
@@ -73,21 +72,27 @@
         </form>
       </div>
     </div>
-    <section id="account-summary-card" class="auth-card auth-card--wide hidden" style="max-width: 980px; margin: 1rem auto 0">
-      <h2 style="margin-top: 0">Twoje konto</h2>
-      <p class="sub" id="summary-current-thread"></p>
-      <p class="sub" id="summary-last-status"></p>
-      <p class="sub" id="summary-pack-left"></p>
-      <p class="sub" id="summary-best-pack"></p>
-    </section>
 
-    <div class="panel-app">
-      <details class="panel-profile-strip panel-profile-details" id="panel-settings" aria-label="Profil i ustawienia">
-        <summary class="panel-profile-summary">
-          <span class="panel-profile-summary-title">Profil i ustawienia konta</span>
-          <span class="panel-profile-summary-meta" id="panel-profile-summary-meta"></span>
-        </summary>
+    <!-- Modal: profil i ustawienia konta -->
+    <div id="profile-settings-modal" class="panel-modal hidden" aria-hidden="true">
+      <div class="panel-modal-card panel-modal-card--wide" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title">
+        <div class="panel-modal-header">
+          <h2 id="profile-modal-title">Profil i ustawienia konta</h2>
+          <button type="button" class="btn btn-outline btn-sm" id="btn-close-profile" aria-label="Zamknij">✕</button>
+        </div>
+
+        <!-- Podsumowanie konta -->
+        <div class="profile-modal-summary">
+          <p class="sub" id="summary-current-thread"></p>
+          <p class="sub" id="summary-last-status"></p>
+          <p class="sub" id="summary-pack-left"></p>
+          <p class="sub" id="summary-best-pack"></p>
+        </div>
+
+        <div class="panel-modal-divider"></div>
+
         <p class="panel-profile-line" id="panel-profile-line"></p>
+
         <form id="panel-city-form" class="panel-city-form hidden">
           <label class="panel-city-label" for="panel-city-input">Uzupełnij miasto</label>
           <div class="panel-city-row">
@@ -102,56 +107,69 @@
           </div>
           <p class="form-error" id="panel-city-err" hidden></p>
         </form>
+
         <p class="sub panel-settings-hint">
           Dodatkowe informacje mogą ułatwić rozmowę i oszczędzić pytań — konsultant zobaczy je w Twoim profilu.
         </p>
+
+        <div class="panel-modal-divider"></div>
+        <p class="panel-modal-section-title">Dane profilu</p>
         <form id="panel-settings-form" class="panel-settings-grid">
-            <label for="settings-city">Miasto (opcjonalnie)</label>
-            <input id="settings-city" type="text" maxlength="80" placeholder="Puste = nie podano" />
-            <label for="settings-has-children">Dzieci</label>
-            <select id="settings-has-children">
-              <option value="unknown">Nie podano</option>
-              <option value="yes">Tak</option>
-              <option value="no">Nie</option>
-            </select>
-            <label for="settings-smokes">Palenie</label>
-            <select id="settings-smokes">
-              <option value="unknown">Nie podano</option>
-              <option value="yes">Tak</option>
-              <option value="no">Nie</option>
-            </select>
-            <label for="settings-drinks-alcohol">Alkohol</label>
-            <select id="settings-drinks-alcohol">
-              <option value="unknown">Nie podano</option>
-              <option value="yes">Tak</option>
-              <option value="no">Nie</option>
-            </select>
-            <label for="settings-has-car">Auto</label>
-            <select id="settings-has-car">
-              <option value="unknown">Nie podano</option>
-              <option value="yes">Tak</option>
-              <option value="no">Nie</option>
-            </select>
-            <label for="settings-avatar">Zdjęcie profilowe (opcjonalnie)</label>
-            <input id="settings-avatar" type="file" accept="image/jpeg,image/png,image/webp" />
-            <button type="submit" class="btn btn-outline btn-sm">Zapisz profil</button>
-            <p class="form-error" id="settings-profile-err" hidden></p>
+          <label for="settings-city">Miasto (opcjonalnie)</label>
+          <input id="settings-city" type="text" maxlength="80" placeholder="Puste = nie podano" />
+          <label for="settings-has-children">Dzieci</label>
+          <select id="settings-has-children">
+            <option value="unknown">Nie podano</option>
+            <option value="yes">Tak</option>
+            <option value="no">Nie</option>
+          </select>
+          <label for="settings-smokes">Palenie</label>
+          <select id="settings-smokes">
+            <option value="unknown">Nie podano</option>
+            <option value="yes">Tak</option>
+            <option value="no">Nie</option>
+          </select>
+          <label for="settings-drinks-alcohol">Alkohol</label>
+          <select id="settings-drinks-alcohol">
+            <option value="unknown">Nie podano</option>
+            <option value="yes">Tak</option>
+            <option value="no">Nie</option>
+          </select>
+          <label for="settings-has-car">Auto</label>
+          <select id="settings-has-car">
+            <option value="unknown">Nie podano</option>
+            <option value="yes">Tak</option>
+            <option value="no">Nie</option>
+          </select>
+          <label for="settings-avatar">Zdjęcie profilowe (opcjonalnie)</label>
+          <input id="settings-avatar" type="file" accept="image/jpeg,image/png,image/webp" />
+          <button type="submit" class="btn btn-outline btn-sm">Zapisz profil</button>
+          <p class="form-error" id="settings-profile-err" hidden></p>
         </form>
+
+        <div class="panel-modal-divider"></div>
+        <p class="panel-modal-section-title">Zmiana hasła</p>
         <form id="panel-password-form" class="panel-settings-grid">
-            <label for="settings-current-pass">Aktualne hasło</label>
-            <input id="settings-current-pass" type="password" autocomplete="current-password" />
-            <label for="settings-new-pass">Nowe hasło</label>
-            <input id="settings-new-pass" type="password" autocomplete="new-password" />
-            <button type="submit" class="btn btn-outline btn-sm">Zmień hasło</button>
-            <p class="form-error" id="settings-password-err" hidden></p>
+          <label for="settings-current-pass">Aktualne hasło</label>
+          <input id="settings-current-pass" type="password" autocomplete="current-password" />
+          <label for="settings-new-pass">Nowe hasło</label>
+          <input id="settings-new-pass" type="password" autocomplete="new-password" />
+          <button type="submit" class="btn btn-outline btn-sm">Zmień hasło</button>
+          <p class="form-error" id="settings-password-err" hidden></p>
         </form>
+
+        <div class="panel-modal-divider"></div>
+        <p class="panel-modal-section-title">Zmiana adresu e-mail</p>
         <form id="panel-email-form" class="panel-settings-grid">
-            <label for="settings-new-email">Nowy e-mail</label>
-            <input id="settings-new-email" type="email" autocomplete="email" />
-            <button type="submit" class="btn btn-outline btn-sm">Zmień e-mail (potwierdzenie)</button>
-            <p class="form-error" id="settings-email-err" hidden></p>
+          <label for="settings-new-email">Nowy e-mail</label>
+          <input id="settings-new-email" type="email" autocomplete="email" />
+          <button type="submit" class="btn btn-outline btn-sm">Zmień e-mail (potwierdzenie)</button>
+          <p class="form-error" id="settings-email-err" hidden></p>
         </form>
-      </details>
+      </div>
+    </div>
+
+    <div class="panel-app">
       <nav class="panel-view-tabs" aria-label="Widok panelu">
         <button type="button" class="panel-tab panel-tab--active" id="tab-browse" data-view="browse">
           Konsultanci
@@ -197,7 +215,7 @@
           <aside class="panel-side panel-side--threads" aria-label="Aktywne rozmowy">
             <div class="my-threads-wrap">
               <h2>Twoje rozmowy</h2>
-              <p class="my-threads-hint">Tylko rozpoczęte wątki. Gdy konsultant odpisze — zobaczysz „Nowa odpowiedź”.</p>
+              <p class="my-threads-hint">Tylko rozpoczęte wątki. Gdy konsultant odpisze — zobaczysz „Nowa odpowiedź".</p>
               <div id="my-threads" class="my-threads"></div>
             </div>
             <button type="button" class="btn btn-outline btn-block" id="btn-to-browse">
@@ -205,14 +223,16 @@
             </button>
           </aside>
           <div class="panel-main">
+            <!-- Nagłówek czatu (messenger-style, zastępowany przez JS przy wyborze medium) -->
             <div class="panel-head" id="chat-head">
               <h1>Twój panel</h1>
               <p>Wybierz rozmowę z lewej albo przejdź do katalogu konsultantów.</p>
-              <div class="panel-head-actions hidden" id="thread-visibility-row">
-                <button type="button" class="btn btn-outline btn-sm" id="btn-hide-thread">Schowaj wątek w panelu</button>
-                <button type="button" class="btn btn-outline btn-sm" id="btn-show-thread">Pokaż wątek na liście</button>
-                <span class="thread-vis-note" id="thread-vis-note" aria-live="polite"></span>
-              </div>
+            </div>
+            <!-- Rząd widoczności wątku — poza chat-head żeby przeżył innerHTML replacement -->
+            <div class="panel-thread-vis hidden" id="thread-visibility-row">
+              <button type="button" class="btn btn-outline btn-sm" id="btn-hide-thread">Schowaj wątek</button>
+              <button type="button" class="btn btn-outline btn-sm" id="btn-show-thread">Pokaż na liście</button>
+              <span class="thread-vis-note" id="thread-vis-note" aria-live="polite"></span>
             </div>
             <div class="messages" id="messages"></div>
             <form class="composer hidden" id="composer">
@@ -220,7 +240,8 @@
               <div class="composer-foot">
                 <span class="top-meta"
                   >Jedna wysłana wiadomość = jeden kredyt.
-                  <a href="/panel-doladowanie.html" class="composer-foot-link">Doładuj konto</a></span>
+                  <a href="/panel-doladowanie.html" class="composer-foot-link">Doładuj konto</a></span
+                >
                 <button type="submit" class="btn btn-primary">Wyślij</button>
               </div>
             </form>
