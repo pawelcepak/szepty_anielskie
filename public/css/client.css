@@ -225,6 +225,7 @@ img {
   border-radius: 999px;
   font-size: 0.78rem;
   font-weight: 600;
+  color: yellowgreen
 }
 
 .auth-badge--guest {
@@ -255,7 +256,7 @@ img {
   display: block;
   margin-top: 0.2rem;
   font-size: 0.74rem;
-  color: var(--ink-muted);
+  color: white;
 }
 
 .auth-badge-hint a {
@@ -709,12 +710,12 @@ body.page-auth .avatar-preview-wrap img {
   display: block;
   font-family: var(--font-display);
   font-size: 1.5rem;
-  color: var(--accent);
+  color: white;
 }
 
 .price-box span {
   font-size: 0.85rem;
-  color: var(--ink-muted);
+  color: white;
 }
 
 .price-box .price-pln {
@@ -722,12 +723,12 @@ body.page-auth .avatar-preview-wrap img {
   margin-top: 0.35rem;
   font-size: 0.95rem;
   font-weight: 600;
-  color: var(--accent);
+  color: white;
 }
 
 .site-footer {
   padding: 2rem 1.25rem 2.5rem;
-  color: var(--ink-muted);
+  color: white;
   font-size: 0.9rem;
 }
 
@@ -2348,6 +2349,11 @@ body.page-panel .panel-main > .messages {
   margin-right: 0.25rem;
 }
 
+.page-home .auth-badge--guest,
+.page-home .auth-badge-hint:has(a[href="/logowanie.html"]) {
+  display: none;
+}
+
 .tarot-hero {
   min-height: min(72vh, 620px);
   position: relative;
@@ -2446,8 +2452,38 @@ body.page-panel .panel-main > .messages {
   text-shadow: 0 0 20px rgba(212, 175, 101, 0.4);
 }
 
+.tarot-zodiac-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+}
+
+.tarot-zodiac-badge {
+  display: inline-block;
+  padding: 0.18rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  background: rgba(212, 175, 101, 0.15);
+  border: 1px solid rgba(212, 175, 101, 0.45);
+  color: var(--gold);
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.tarot-zodiac-soon {
+  text-align: center;
+  color: rgba(232, 218, 255, 0.65);
+  font-size: 0.85rem;
+  margin: 0.5rem 0 0;
+  font-style: italic;
+}
+
 .tarot-zodiac-row {
-  margin: 1rem auto 0;
+  margin: 0.85rem auto 0;
   max-width: 1040px;
   display: grid;
   grid-template-columns: repeat(6, 1fr);
@@ -2546,6 +2582,9 @@ body.page-panel #panel-catalog-filters .catalog-filter {
   box-shadow: 0 16px 48px rgba(7, 5, 28, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
   backdrop-filter: blur(4px);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .tarot-card:hover {
@@ -2558,6 +2597,7 @@ body.page-panel #panel-catalog-filters .catalog-filter {
   aspect-ratio: 4 / 5;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
 }
 
 .tarot-card-photo img {
@@ -2567,27 +2607,44 @@ body.page-panel #panel-catalog-filters .catalog-filter {
 }
 
 .tarot-card-body {
-  padding: 0.8rem 0.9rem 0.95rem;
+  padding: 0.85rem 1rem 1rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .tarot-card-title {
-  margin: 0;
-  font-size: 0.95rem;
+  margin: 0 0 0.3rem;
+  font-size: 1rem;
   color: #fff;
   font-weight: 700;
   font-family: var(--font-display);
+  line-height: 1.25;
 }
 
-.tarot-card-sub {
-  margin: 0.25rem 0 0.65rem;
-  color: rgba(241, 234, 255, 0.72);
-  font-size: 0.78rem;
+.tarot-card-tagline {
+  margin: 0;
+  font-size: 0.82rem;
+  color: rgba(241, 234, 255, 0.68);
+  line-height: 1.5;
+  flex: 1;
+  overflow: hidden;
+  min-height: calc(0.82rem * 1.5 * 2);
+}
+
+.tarot-card-footer {
+  margin-top: 0.75rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(212, 175, 101, 0.15);
+}
+
+.tarot-card-cat {
+  margin: 0 0 0.55rem;
+  font-size: 0.68rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.tarot-card .btn {
-  width: 100%;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  color: rgba(212, 175, 101, 0.85);
 }
 
 .tarot-about {
@@ -3246,7 +3303,7 @@ body.page-auth .chosen-medium-text {
   font-family: var(--font-display);
   font-size: 1rem;
   font-weight: 700;
-  color: var(--ink);
+  color: black;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

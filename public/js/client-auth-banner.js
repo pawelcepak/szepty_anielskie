@@ -145,7 +145,7 @@ async function refreshAuthBanners() {
       const lab = esc(u.first_name || u.display_name || u.username || "Konto");
       const nick = u.username ? ` @${esc(u.username)}` : "";
       el.innerHTML = `<span class="auth-badge auth-badge--in">Zalogowano: <strong>${lab}</strong>${nick}</span>
-        <span class="auth-badge-hint">Sesja wygasa po ok. <strong>${idle} min</strong> bezczynności · <a href="/panel.html">Panel</a> · <a href="#" data-auth-logout>Wyloguj</a></span>`;
+        <span class="auth-badge-hint"><a href="/panel.html">Panel</a> · <a href="#" data-auth-logout>Wyloguj</a></span>`;
     }
     for (const el of guestOnly) el.classList.toggle("hidden", !!st.logged_in);
     for (const el of userOnly) el.classList.toggle("hidden", !st.logged_in);

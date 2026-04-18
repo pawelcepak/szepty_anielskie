@@ -73,10 +73,13 @@ function render() {
       </div>
       <div class="tarot-card-body">
         <p class="tarot-card-title">${esc(c.name)}</p>
-        <p class="tarot-card-sub">${esc(normalizedCategory(c))}</p>
-        <div class="tarot-card-actions">
-          <a class="btn btn-gold" href="${regHref}">Konsultacja</a>
-          <a class="btn btn-outline btn--on-dark" href="${profileHref}">Zobacz profil</a>
+        <p class="tarot-card-tagline">${c.tagline ? esc(c.tagline) : ""}</p>
+        <div class="tarot-card-footer">
+          <p class="tarot-card-cat">${esc(normalizedCategory(c))}</p>
+          <div class="tarot-card-actions">
+            <a class="btn btn-gold" href="${regHref}">Konsultacja</a>
+            <a class="btn btn-outline btn--on-dark" href="${profileHref}">Zobacz profil</a>
+          </div>
         </div>
       </div>
     `;
