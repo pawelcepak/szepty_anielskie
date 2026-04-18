@@ -614,6 +614,7 @@ app.post("/api/auth/register", registerJsonParser, async (req, res, next) => {
   const username = String(req.body?.username || "").trim().toLowerCase();
   const first_name = String(req.body?.first_name || "").trim();
   const city = String(req.body?.city || "").trim();
+  const birth_date = String(req.body?.birth_date || "").trim() || null;
   const gender = "";
   const has_children = "unknown";
   const smokes = "unknown";
@@ -672,7 +673,7 @@ app.post("/api/auth/register", registerJsonParser, async (req, res, next) => {
     display_name,
     username,
     first_name,
-    null,
+    birth_date || null,
     city || null,
     gender,
     has_children,
