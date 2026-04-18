@@ -548,18 +548,18 @@ if (ORIGINAL_SEED_IDS.length > 0) {
 
 // Assign portrait photos to user-added characters that have none
 const PORTRAIT_POOL = [
-  "https://i.pravatar.cc/400?img=47",
-  "https://i.pravatar.cc/400?img=48",
-  "https://i.pravatar.cc/400?img=49",
-  "https://i.pravatar.cc/400?img=50",
-  "https://i.pravatar.cc/400?img=51",
-  "https://i.pravatar.cc/400?img=52",
-  "https://i.pravatar.cc/400?img=53",
-  "https://i.pravatar.cc/400?img=54",
-  "https://i.pravatar.cc/400?img=55",
-  "https://i.pravatar.cc/400?img=56",
-  "https://i.pravatar.cc/400?img=57",
-  "https://i.pravatar.cc/400?img=58",
+  "/images/medium/zofia.jpg",
+  "/images/medium/halina.jpg",
+  "/images/medium/danuta.jpg",
+  "/images/medium/irena.jpg",
+  "/images/medium/grazyna.jpg",
+  "/images/medium/elzbieta.jpg",
+  "/images/medium/teresa.jpg",
+  "/images/medium/krystyna.jpg",
+  "/images/medium/andrzej.jpg",
+  "/images/medium/marek.jpg",
+  "/images/medium/pawel.jpg",
+  "/images/medium/tomasz.jpg",
 ];
 const noPortraitRows = db
   .prepare("SELECT id FROM characters WHERE portrait_url IS NULL OR portrait_url = '' ORDER BY sort_order ASC, name ASC")
