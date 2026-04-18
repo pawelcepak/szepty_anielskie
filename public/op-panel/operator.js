@@ -494,7 +494,6 @@ function applyRoleChrome() {
   const chatEmpty = document.getElementById("chat-empty");
   const ob = document.getElementById("owner-mode-banner");
   const linkClient = document.getElementById("header-link-client");
-  const linkRecruit = document.getElementById("header-link-recruit");
   const staffSub = document.getElementById("staff-top-subnav");
   const advWrap = document.getElementById("owner-advanced-toggle-wrap");
   const advBtn = document.getElementById("owner-advanced-toggle");
@@ -522,7 +521,6 @@ function applyRoleChrome() {
     if (advBtn) advBtn.textContent = "Narzędzia ukryte";
     ob?.classList.remove("hidden");
     linkClient?.classList.remove("hidden");
-    linkRecruit?.classList.add("hidden");
     mainTitle.textContent = "Lista rozmów (administrator)";
     line1.textContent =
       "Wątki po lewej (jak w komunikatorze). U góry: Monitor, Klienci, Reklama. Pracownicy nie widzą witryny klienta.";
@@ -543,7 +541,6 @@ function applyRoleChrome() {
     advWrap?.classList.add("hidden");
     ob?.classList.add("hidden");
     linkClient?.classList.add("hidden");
-    linkRecruit?.classList.add("hidden");
     mainTitle.textContent = "Lista rozmów";
     line1.textContent =
       "Jako pracownik lista rozmów jest w zakładce „Rozmowy” — stąd przechodzisz do wątku; odpowiedź piszesz dopiero w otwartym czacie.";
