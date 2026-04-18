@@ -18,9 +18,7 @@ function renderPackages() {
   pkg.innerHTML = "";
   const amounts = [10, 20, 50, 100];
   const enabled = me?.fake_purchase_enabled;
-  pkgNote.textContent = enabled
-    ? "..."
-    : "...";
+  if (pkgNote) pkgNote.textContent = "";
   const priceMap = new Map((me?.packages_pln || []).map((x) => [x.amount, x.price_pln]));
   for (const a of amounts) {
     const b = document.createElement("button");
@@ -28,7 +26,7 @@ function renderPackages() {
     const pln = priceMap.get(a);
     b.textContent =
       pln != null && Number.isFinite(Number(pln))
-        ? `+${a} wiadomości — ${pln} zł (test)`
+        ? `+${a} wiadomości — ${pln} zł`
         : `+${a} wiadomości`;
     b.disabled = !enabled;
     b.addEventListener("click", async () => {
@@ -52,12 +50,11 @@ function renderPackages() {
 try {
   me = await api("/api/me");
   const u = me.user;
-  const idle = me.session_idle_minutes ?? 10;
   if (whoEl) {
     whoEl.textContent = `${u.first_name || u.display_name || "?"} (@${u.username || "?"})`;
   }
   if (balLine) {
-    balLine.textContent = `Pozostało: ${me.messages_remaining} wiadomości · sesja: ok. ${idle} min bez ruchu`;
+    balLine.textContent = `Pozostało: ${me.messages_remaining} wiadomości`;
   }
   renderPackages();
 } catch {

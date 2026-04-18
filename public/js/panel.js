@@ -506,7 +506,9 @@ function renderBrowseCatalog() {
       const av = availabilityForCharacter(c);
       const src = esc(c.portrait_url || FALLBACK_PORTRAIT);
       const sk = c.skills ? `<p class="browse-card-skills">${esc(c.skills)}</p>` : "";
-      const about = c.about ? `<p class="browse-card-about">${esc(c.about)}</p>` : "";
+      const about = c.about
+        ? `<p class="browse-card-about-label">Jak się opisuje</p><p class="browse-card-about">${esc(c.about)}</p>`
+        : "";
       const gender = c.gender ? `<p class="browse-card-gender">${esc(c.gender)}</p>` : "";
       const profileHref = `/medium.html?id=${encodeURIComponent(c.id)}`;
       card.innerHTML = `
@@ -554,7 +556,7 @@ async function openCharacter(id) {
   // Messenger-style compact head — tylko awatar, nazwa, status
   chatHead.innerHTML = `
     <div class="panel-head-messenger">
-      <div class="panel-head-avatar-sm">
+      <div class="panel-head-avatar-sm" role="button" tabindex="0" title="Informacje o medium" style="cursor:pointer">
         <img src="${src}" alt="" width="44" height="44" loading="lazy" />
       </div>
       <div class="panel-head-copy-sm">
@@ -563,6 +565,10 @@ async function openCharacter(id) {
       </div>
       <a href="/medium.html?id=${encodeURIComponent(c.id)}" class="btn btn-outline btn-sm panel-head-profile-link">Profil</a>
     </div>`;
+  chatHead.querySelector(".panel-head-avatar-sm")?.addEventListener("click", () => showMediumInfoPopup(c));
+  chatHead.querySelector(".panel-head-avatar-sm")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); showMediumInfoPopup(c); }
+  });
   const data = await api(`/api/threads/${encodeURIComponent(id)}/messages`);
   me.messages_remaining = data.messages_remaining;
   setBalance(me.messages_remaining);
@@ -602,6 +608,49 @@ function renderMessages(msgs) {
 document.getElementById("logout").addEventListener("click", async () => {
   await api("/api/auth/logout", { method: "POST" });
   window.location.href = "/logowanie.html";
+});
+
+function showMediumInfoPopup(c) {
+  const modal = document.getElementById("medium-info-modal");
+  if (!modal) return;
+  const titleEl = document.getElementById("medium-modal-title");
+  const bodyEl = document.getElementById("medium-modal-body");
+  if (titleEl) titleEl.textContent = c.name;
+  const src = esc(c.portrait_url || FALLBACK_PORTRAIT);
+  const av = availabilityForCharacter(c);
+  const hoursShort =
+    c.typical_hours_from && c.typical_hours_to
+      ? `${esc(c.typical_hours_from)} – ${esc(c.typical_hours_to)}`
+      : "";
+  bodyEl.innerHTML = `
+    <div class="medium-popup-top">
+      <div class="medium-popup-photo">
+        <img src="${src}" alt="${esc(c.name)}" width="90" height="113" loading="lazy" />
+      </div>
+      <div>
+        <span class="${esc(av.badgeClass)}">${esc(av.badgeText)}</span>
+        <p class="medium-popup-tagline">${esc(c.tagline)}</p>
+        ${hoursShort ? `<p class="medium-popup-hours">Godziny: ${hoursShort}</p>` : ""}
+      </div>
+    </div>
+    ${c.about ? `<p class="medium-popup-about-label">Jak się opisuje</p><p class="medium-popup-about">${esc(c.about)}</p>` : ""}
+    ${c.skills ? `<p class="medium-popup-skills">Specjalizacje: ${esc(c.skills)}</p>` : ""}
+    <div class="medium-popup-actions">
+      <button type="button" class="btn btn-primary" id="medium-popup-start-btn">Otwórz rozmowę</button>
+      <a href="/medium.html?id=${encodeURIComponent(c.id)}" class="btn btn-outline">Pełny profil</a>
+    </div>`;
+  bodyEl.querySelector("#medium-popup-start-btn")?.addEventListener("click", () => {
+    modal.classList.add("hidden");
+    openCharacter(c.id);
+  });
+  modal.classList.remove("hidden");
+}
+
+document.getElementById("btn-close-medium-modal")?.addEventListener("click", () => {
+  document.getElementById("medium-info-modal")?.classList.add("hidden");
+});
+document.getElementById("medium-info-modal")?.addEventListener("click", (e) => {
+  if (e.target === e.currentTarget) e.currentTarget.classList.add("hidden");
 });
 
 document.getElementById("tab-browse")?.addEventListener("click", () => switchView("browse"));

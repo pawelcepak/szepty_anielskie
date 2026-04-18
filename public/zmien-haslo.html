@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Nowe has&#322;o — Szepty Anielskie</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,600&family=Source+Sans+3:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/css/client.css" />
+  </head>
+  <body class="page-auth">
+    <header class="site-top">
+      <div class="site-top-inner">
+        <a class="logo" href="/">Szepty Anielskie</a>
+        <nav class="nav-actions nav-actions--stack">
+          <div class="nav-actions-links">
+            <a href="/logowanie.html">Logowanie</a>
+          </div>
+        </nav>
+      </div>
+    </header>
+
+    <main class="auth-main">
+      <div class="auth-card">
+        <h1>Nowe has&#322;o</h1>
+        <p class="sub">Wprowad&#378; nowe has&#322;o dla swojego konta.</p>
+        <p class="form-info form-info--ok" id="reset-success" hidden>
+          Has&#322;o zosta&#322;o zmienione. Mo&#380;esz si&#281; teraz <a href="/logowanie.html">zalogowa&#263;</a>.
+        </p>
+        <p class="form-error" id="token-err" hidden></p>
+        <form id="form">
+          <label for="password">Nowe has&#322;o</label>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            autocomplete="new-password"
+            minlength="8"
+            pattern="(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,}"
+            title="Minimum 8 znak&#243;w, co najmniej 1 wielka litera, 1 cyfra i 1 znak specjalny"
+            required
+          />
+          <p class="sub" style="margin-bottom: 0.5rem">Minimum 8 znak&#243;w, 1 wielka litera, 1 cyfra, 1 znak specjalny.</p>
+          <label for="password2">Powt&#243;rz has&#322;o</label>
+          <input
+            id="password2"
+            name="password2"
+            type="password"
+            autocomplete="new-password"
+            required
+          />
+          <p class="form-error" id="err" hidden></p>
+          <button class="btn btn-primary" type="submit" id="submit-btn">Ustaw nowe has&#322;o</button>
+        </form>
+        <p class="sub" style="margin-top: 1.25rem; margin-bottom: 0">
+          <a href="/logowanie.html">Wr&#243;&#263; do logowania</a>
+        </p>
+      </div>
+    </main>
+    <script type="module" src="/js/auth-reset.js"></script>
+  </body>
+</html>

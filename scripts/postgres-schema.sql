@@ -229,3 +229,12 @@ CREATE TABLE IF NOT EXISTS message_reports (
 CREATE INDEX IF NOT EXISTS idx_message_reports_status ON message_reports(status);
 CREATE INDEX IF NOT EXISTS idx_message_reports_thread ON message_reports(thread_id);
 CREATE INDEX IF NOT EXISTS idx_message_reports_message ON message_reports(message_id);
+
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token TEXT NOT NULL UNIQUE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token ON password_reset_tokens(token);

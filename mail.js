@@ -76,7 +76,7 @@ export function createMailTransporter() {
 
 function mailFrom() {
   const f = String(process.env.MAIL_FROM || process.env.SMTP_USER || "").trim();
-  return f || "noreply@localhost";
+  return f || "no-reply@szeptyonline.pl";
 }
 
 function parseSender(value) {
@@ -223,4 +223,15 @@ export async function sendEmailChangeConfirmation({ to, confirmUrl, displayName 
     text,
     html,
   });
+}
+
+export async function sendPasswordResetEmail({ to, resetUrl, displayName }) {
+  const name = displayName || "użytkowniku";
+  const subject = "Zmiana hasła — Szepty Anielskie";
+  const text = `Cześć ${name},\n\nOtrzymaliśmy prośbę o zmianę hasła do Twojego konta.\n\nKliknij poniższy link, aby ustawić nowe hasło (ważny 2 godziny):\n${resetUrl}\n\nJeśli to nie Ty wysłałeś(aś) tę prośbę — zignoruj tę wiadomość. Twoje hasło pozostaje bez zmian.\n\nPozdrawiamy,\nZespół Szepty Anielskie`;
+  const html = `<p>Cześć ${escapeHtml(name)},</p>
+<p>Otrzymaliśmy prośbę o zmianę hasła do Twojego konta w serwisie Szepty Anielskie.</p>
+<p><a href="${resetUrl}" style="display:inline-block;padding:0.6rem 1.4rem;background:#c9a84c;color:#1a1206;border-radius:8px;text-decoration:none;font-weight:700">Ustaw nowe hasło</a></p>
+<p style="font-size:0.85em;color:#888">Link jest ważny przez <strong>2 godziny</strong>. Jeśli to nie Ty wysłałeś(aś) tę prośbę — zignoruj tę wiadomość.</p>`;
+  return sendMailMessage({ to: String(to || "").trim(), subject, text, html });
 }

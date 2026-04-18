@@ -43,6 +43,7 @@ import {
   publicBaseUrl,
   sendOperatorEmailToUser,
   sendVerificationEmail,
+  sendPasswordResetEmail,
 } from "./mail.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -820,8 +821,48 @@ app.post("/api/auth/resend-verification", registerJsonParser, async (req, res) =
   res.json({ ok: true, sent: true });
 });
 
-app.post(
-  "/api/auth/login",
+const RESET_TOKEN_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+app.post("/api/auth/request-password-reset", registerJsonParser, asyncRoute(async (req, res) => {
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  if (!emailOk(email)) return res.status(400).json({ error: "Podaj poprawny adres e-mail." });
+  // Always return success to prevent email enumeration
+  const row = await db.prepare(`SELECT id, display_name, first_name FROM users WHERE email = ?`).get(email);
+  if (!row) return res.json({ ok: true });
+  if (!isMailConfigured()) return res.status(503).json({ error: "Serwis wysyłki e-mail nie jest skonfigurowany. Skontaktuj się z obsługą." });
+  const token = crypto.randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS).toISOString();
+  await db.prepare(`DELETE FROM password_reset_tokens WHERE user_id = ?`).run(row.id);
+  await db.prepare(`INSERT INTO password_reset_tokens (id, user_id, token, expires_at) VALUES (?, ?, ?, ?)`).run(uuidv4(), row.id, token, expiresAt);
+  const resetUrl = `${publicBaseUrl()}/zmien-haslo.html?token=${encodeURIComponent(token)}`;
+  try {
+    await sendPasswordResetEmail({ to: email, resetUrl, displayName: row.first_name || row.display_name || "użytkowniku" });
+  } catch (e) {
+    console.error("[mail][password-reset] failed:", e?.message || e);
+    return res.status(502).json({ error: "Nie udało się wysłać e-maila. Spróbuj ponownie później lub skontaktuj się z obsługą." });
+  }
+  res.json({ ok: true });
+}));
+
+app.post("/api/auth/reset-password", registerJsonParser, asyncRoute(async (req, res) => {
+  const token = String(req.body?.token || "").trim();
+  const password = String(req.body?.password || "");
+  if (!token) return res.status(400).json({ error: "Brak tokenu resetowania hasła." });
+  if (!password || password.length < 8) return res.status(400).json({ error: "Hasło musi mieć co najmniej 8 znaków." });
+  if (!/[A-Z]/.test(password)) return res.status(400).json({ error: "Hasło musi zawierać co najmniej 1 wielką literę." });
+  if (!/[0-9]/.test(password)) return res.status(400).json({ error: "Hasło musi zawierać co najmniej 1 cyfrę." });
+  if (!/[^A-Za-z0-9]/.test(password)) return res.status(400).json({ error: "Hasło musi zawierać co najmniej 1 znak specjalny." });
+  const row = await db.prepare(`SELECT id, user_id, expires_at FROM password_reset_tokens WHERE token = ?`).get(token);
+  if (!row) return res.status(400).json({ error: "Link resetowania jest nieprawidłowy lub wygasł. Poproś o nowy link." });
+  if (new Date(row.expires_at) < new Date()) {
+    await db.prepare(`DELETE FROM password_reset_tokens WHERE id = ?`).run(row.id);
+    return res.status(400).json({ error: "Link resetowania wygasł. Poproś o nowy." });
+  }
+  const hash = bcrypt.hashSync(password, 12);
+  await db.prepare(`UPDATE users SET password_hash = ? WHERE id = ?`).run(hash, row.user_id);
+  await db.prepare(`DELETE FROM password_reset_tokens WHERE user_id = ?`).run(row.user_id);
+  res.json({ ok: true });
+}));
   asyncRoute(async (req, res) => {
     const email = String(req.body?.email || "").trim().toLowerCase();
     const password = String(req.body?.password || "");

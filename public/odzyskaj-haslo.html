@@ -3,7 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Logowanie — Szepty Anielskie</title>
+    <title>Odzyskiwanie hasła — Szepty Anielskie</title>
+    <meta name="robots" content="noindex, nofollow" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -17,10 +18,8 @@
       <div class="site-top-inner">
         <a class="logo" href="/">Szepty Anielskie</a>
         <nav class="nav-actions nav-actions--stack">
-          <div class="auth-banner-wrap" data-auth-banner></div>
           <div class="nav-actions-links">
-            <a href="/rejestracja.html">Rejestracja</a>
-            <a class="btn btn-gold" href="/panel.html">Panel</a>
+            <a href="/logowanie.html">Logowanie</a>
           </div>
         </nav>
       </div>
@@ -28,32 +27,22 @@
 
     <main class="auth-main">
       <div class="auth-card">
-        <h1>Logowanie</h1>
-        <p class="sub">Użyj adresu e-mail i hasła ustawionego przy rejestracji.</p>
-        <p class="form-info" id="auth-info" hidden></p>
+        <h1>Odzyskiwanie has&#322;a</h1>
+        <p class="sub">Podaj adres e-mail u&#380;yty podczas rejestracji. Wy&#347;lemy na niego link do ustawienia nowego has&#322;a.</p>
+        <p class="form-info form-info--ok" id="reset-success" hidden>
+          Je&#347;li podany adres e-mail jest zarejestrowany w serwisie, wys&#322;ali&#347;my na niego link do zmiany has&#322;a. Sprawd&#378; skrzynk&#281; (tak&#380;e folder spam).
+        </p>
         <form id="form">
           <label for="email">E-mail</label>
           <input id="email" name="email" type="email" autocomplete="email" required />
-
-          <label for="password">Hasło</label>
-          <input id="password" name="password" type="password" autocomplete="current-password" required />
-
           <p class="form-error" id="err" hidden></p>
-          <button class="btn btn-primary" type="submit">Zaloguj</button>
+          <button class="btn btn-primary" type="submit" id="submit-btn">Wy&#347;lij link</button>
         </form>
         <p class="sub" style="margin-top: 1.25rem; margin-bottom: 0">
-          Nie masz konta? <a href="/rejestracja.html">Załóż je</a>
-        </p>
-        <p class="sub" style="margin-top: 0.45rem; margin-bottom: 0">
-          Brak maila aktywacyjnego?
-          <button type="button" class="btn-linklike" id="btn-resend-verification">Wyślij link ponownie</button>
-        </p>
-        <p class="sub" style="margin-top: 0.45rem; margin-bottom: 0">
-          <a href="/odzyskaj-haslo.html">Nie pamiętam hasła</a>
+          <a href="/logowanie.html">Wr&#243;&#263; do logowania</a>
         </p>
       </div>
     </main>
-    <script type="module" src="/js/auth-login.js"></script>
-    <script type="module" src="/js/client-auth-banner.js"></script>
+    <script type="module" src="/js/auth-forgot.js"></script>
   </body>
 </html>

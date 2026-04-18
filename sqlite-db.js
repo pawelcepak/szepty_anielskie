@@ -80,6 +80,15 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_customer_sessions_token ON customer_sessions(token);
   CREATE INDEX IF NOT EXISTS idx_operator_sessions_token ON operator_sessions(token);
 
+  CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token TEXT NOT NULL UNIQUE,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token ON password_reset_tokens(token);
+
   CREATE TABLE IF NOT EXISTS characters (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
@@ -560,6 +569,57 @@ if (noPortraitRows.length > 0) {
   db.transaction(() => {
     noPortraitRows.forEach((row, i) => {
       setPortrait.run(PORTRAIT_POOL[i % PORTRAIT_POOL.length], row.id);
+    });
+  })();
+}
+
+// Assign self-description to mediums with NULL/empty about text
+const ABOUT_BY_CATEGORY = {
+  wróżby: [
+    "Pracuję z energią i intuicją od wielu lat. Widzę blokady, ukryte intencje i możliwe kierunki, które stoją przed Tobą. Moją metodą jest połączenie wrodzonej wrażliwości z głęboką empatią — nie oceniam, pomagam. Specjalizuję się w sprawach serca, relacjach rodzinnych oraz ważnych decyzjach życiowych, które wymagają jasnego spojrzenia z zewnątrz. Moje odczyty są szczere i konkretne.",
+    "Intuicja to mój pierwszy zmysł. Zanim cokolwiek powiem, czuję energię sytuacji i osoby, z którą rozmawiam. Moje odczyty są bezpośrednie i konkretne — wskazuję zarówno możliwości, jak i zagrożenia, bo wiem, że prawdziwa pomoc wymaga szczerości. Pomagam w sprawach miłości, kariery i wewnętrznego spokoju, szczególnie gdy nie wiesz, w którą stronę się skierować.",
+    "Widzę energię i emocje zapisane w każdej sytuacji. Przez lata pracy nauczyłam się, że każda historia jest wyjątkowa — dlatego każda rozmowa ze mną jest inna. Nie stosuję szablonów. Czytam to, co naprawdę obecne w Twoim życiu, i pokazuję to bez owijania w bawełnę. Jeśli szukasz prawdziwej odpowiedzi, a nie tylko pocieszenia — dobrze trafiłeś.",
+    "Karty i intuicja są dla mnie narzędziem, ale to Ty jesteś w centrum każdej rozmowy. Słucham, czuję i interpretuję — zawsze z szacunkiem dla Twojej historii i decyzji. Moim celem jest nie tylko odpowiedź na pytanie, ale pomoc w zrozumieniu sytuacji z różnych perspektyw. Wiem, że odwaga, by zapytać, jest już pierwszym krokiem do zmiany.",
+  ],
+  tarot: [
+    "Tarot to dla mnie system symboliczny sięgający głębiej niż słowa. Pracuję z kartami od wielu lat, stale rozwijając warsztat i intuicję. Każde rozłożenie jest unikalną odpowiedzią na Twoją sytuację — bez gotowych formułek. Pomagam w rozumieniu relacji, kierunków rozwoju i podejmowaniu decyzji zgodnych z Twoją prawdziwą ścieżką.",
+    "Uczę się od kart od lat i za każdym razem widzę w nich coś nowego. Tarot to nie przepowiednia — to zwierciadło Twojej sytuacji i energii w danym momencie. Pracuję spokojnie, dokładnie i bez pośpiechu. Każde pytanie traktuję poważnie, bo wiem, że rzadko pyta się o błahostki. Chodź, razem poszukamy odpowiedzi w kartach.",
+    "Tarot to mój język pracy z intuicją i podświadomością. W kartach nie szukam wyroków losu, ale wskazówek i możliwości. Moje odczyty łączą symbole z emocjami — staram się, abyś po rozmowie czuł nie tylko odpowiedź, ale też wewnętrzne zrozumienie. Specjalizuję się w sprawach uczuciowych, wyborach zawodowych i sytuacjach, gdy nie wiadomo, co robić dalej.",
+    "Każda karta mówi mi coś o Twojej historii. Tarotem zajmuję się od wielu lat i wiem, że nie istnieją odczyty złe — istnieją odczyty szczere, nawet jeśli prawda jest trudna. Jestem tu po to, żebyś mógł zobaczyć swoje życie z innej perspektywy i podjąć decyzję, z którą naprawdę się zgadzasz.",
+  ],
+  astrologia: [
+    "Astrologia to moja pasja i sposób rozumienia życia. Przez lata nauki i praktyki nauczyłam się odczytywać horoskopy tak, by naprawdę służyły człowiekowi — nie jako wyrok losu, ale jako mapa możliwości i wyzwań. Analizuję horoskopy urodzeniowe, tranzyty planet i synergie. Pomagam zrozumieć trudne okresy, odnaleźć właściwy rytm i podejmować decyzje zgodne z naturą Twojego wykresu.",
+    "Gwiazdy nie rządzą Twoim życiem — ale wiele o nim mówią. Zajmuję się tym, co zapisane w chwili Twojego urodzenia: Twoimi talentami, wyzwaniami i cyklami życiowymi. Pomagam zrozumieć wpływ planet na bieżące sytuacje i podejmować świadome decyzje, szczególnie w obszarach miłości, kariery i ważnych relacji. Każda konsultacja to rzetelna analiza, bez generycznych przepowiedni.",
+    "Astrologię studiuję od wielu lat, cały czas poszerzając wiedzę. Interesuje mnie astrologia psychologiczna i karmiczna — to, co zapisane w horoskopie jako głębokie wzorce i powtarzające się tematy życiowe. Pomagam zrozumieć siebie, swoje relacje i decyzje, które z pozoru są trudne, ale w świetle gwiazd nabierają głębszego sensu.",
+  ],
+  jasnowidzenie: [
+    "Jasnowidztwo towarzyszyło mi od dziecka — widzę obrazy, odczuwam emocje innych, dostaję przekazy, których nie szukam. Przez lata nauczyłam się pracować z tym darem świadomie i odpowiedzialnie. Każda sesja to coś więcej niż wróżba — to kontakt z głębszą warstwą rzeczywistości, która może dać Ci wskazówki niedostępne w codziennym życiu.",
+    "Widzę i odczuwam to, co niewidoczne gołym okiem. Mój dar rozwijał się stopniowo, a lata pracy nauczyły mnie, jak odpowiedzialnie go używać. Przekazuję informacje bezpośrednio i bez owijania w bawełnę — wiem, że przyszedłeś po prawdę, nie po pocieszenie. Pomagam w sprawach, które nie dają spokoju i wymagają spojrzenia z innej, głębszej perspektywy.",
+    "Moje postrzeganie wykracza poza zmysły — widzę, słyszę i odczuwam informacje niedostępne w zwykłej rozmowie. Pracuję intuicyjnie i szczerze. Jeśli coś Cię niepokoi, ciągnie lub nie daje spokoju — moje odczyty często przynoszą odpowiedź lub ukierunkowanie, którego szukałeś. Każda konsultacja jest inna, bo każdy człowiek niesie inną energię.",
+  ],
+};
+const ABOUT_DEFAULT = [
+  "Pomagam w trudnych momentach życiowych — w sprawach serca, pracy, rodziny i osobistych decyzji. Moje podejście łączy intuicję z empatią. Każda rozmowa jest inna, bo każdy człowiek przynosi ze sobą unikalną historię. Traktuję każde pytanie poważnie i odpowiadam szczerze, nawet jeśli prawda wymaga odwagi. Jeśli czegoś szukasz — jestem tu, by pomóc Ci to znaleźć.",
+  "Pracuję z energią i intuicją, skupiając się na tym, co naprawdę ważne dla Ciebie. Nie mówię tego, co chcesz usłyszeć — mówię to, co widzę i czuję. Moje odczyty są konkretne i praktyczne. Pomagam w sprawach miłosnych, zawodowych i w każdej sytuacji, gdy czujesz, że potrzebujesz spojrzenia z zewnątrz lub wskazówki na dalszą drogę.",
+];
+
+function pickAbout(category, idx) {
+  const cat = String(category || "").toLowerCase();
+  let pool = ABOUT_DEFAULT;
+  for (const [key, arr] of Object.entries(ABOUT_BY_CATEGORY)) {
+    if (cat.includes(key)) { pool = arr; break; }
+  }
+  return pool[idx % pool.length];
+}
+
+const noAboutRows = db
+  .prepare("SELECT id, category FROM characters WHERE about IS NULL OR about = '' ORDER BY sort_order ASC, name ASC")
+  .all();
+if (noAboutRows.length > 0) {
+  const setAbout = db.prepare("UPDATE characters SET about = ? WHERE id = ?");
+  db.transaction(() => {
+    noAboutRows.forEach((row, i) => {
+      setAbout.run(pickAbout(row.category, i), row.id);
     });
   })();
 }
