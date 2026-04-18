@@ -78,14 +78,41 @@ const PROMO_SYSTEM_ENABLED = ["1", "true", "yes"].includes(
   String(process.env.PROMO_SYSTEM_ENABLED || "false").toLowerCase()
 );
 const SEO_INDEXABLE = ["1", "true", "yes"].includes(String(process.env.SEO_INDEXABLE || "false").toLowerCase());
-const P24_ENABLED = ["1", "true", "yes"].includes(String(process.env.P24_ENABLED || "false").toLowerCase());
-const P24_SANDBOX = ["1", "true", "yes"].includes(String(process.env.P24_SANDBOX || "true").toLowerCase());
+const PAYU_ENABLED = ["1", "true", "yes"].includes(String(process.env.PAYU_ENABLED || "false").toLowerCase());
+const PAYU_SANDBOX = ["1", "true", "yes"].includes(String(process.env.PAYU_SANDBOX || "false").toLowerCase());
+const PAYU_BASE_URL = PAYU_SANDBOX ? "https://secure.snd.payu.com" : "https://secure.payu.com";
 
-function isP24Configured() {
-  const merchantId = String(process.env.P24_MERCHANT_ID || "").trim();
-  const posId = String(process.env.P24_POS_ID || "").trim();
-  const crc = String(process.env.P24_CRC || "").trim();
-  return P24_ENABLED && !!merchantId && !!posId && !!crc;
+function isPayUConfigured() {
+  return (
+    PAYU_ENABLED &&
+    !!String(process.env.PAYU_POS_ID || "").trim() &&
+    !!String(process.env.PAYU_MD5_KEY || "").trim() &&
+    !!String(process.env.PAYU_CLIENT_ID || "").trim() &&
+    !!String(process.env.PAYU_CLIENT_SECRET || "").trim()
+  );
+}
+
+async function getPayUAccessToken() {
+  const r = await fetch(`${PAYU_BASE_URL}/pl/standard/user/oauth/authorize`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `grant_type=client_credentials&client_id=${process.env.PAYU_CLIENT_ID}&client_secret=${process.env.PAYU_CLIENT_SECRET}`,
+  });
+  if (!r.ok) throw new Error(`PayU OAuth error ${r.status}: ${await r.text()}`);
+  return (await r.json()).access_token;
+}
+
+function verifyPayUSignature(rawBody, signatureHeader) {
+  const md5Key = String(process.env.PAYU_MD5_KEY || "").trim();
+  const parts = {};
+  (signatureHeader || "").split(";").forEach((p) => {
+    const eq = p.indexOf("=");
+    if (eq > 0) parts[p.slice(0, eq).trim()] = p.slice(eq + 1).trim();
+  });
+  const incoming = parts.signature;
+  if (!incoming) return false;
+  const computed = crypto.createHash("md5").update(rawBody + md5Key).digest("hex");
+  return computed.toLowerCase() === incoming.toLowerCase();
 }
 
 function promoConfigPublic() {
@@ -1106,9 +1133,9 @@ app.post("/api/public/contact", asyncRoute(async (req, res) => {
 
 app.get("/api/public/payments-config", (_req, res) => {
   res.json({
-    p24: {
-      enabled: isP24Configured(),
-      sandbox: P24_SANDBOX,
+    payu: {
+      enabled: isPayUConfigured(),
+      sandbox: PAYU_SANDBOX,
       currency: APP_CONFIG.pricing.currency,
     },
   });
@@ -1239,76 +1266,136 @@ app.post(
 );
 
 app.post(
-  "/api/payments/p24/create",
+  "/api/payments/payu/create",
   requireCustomer,
   asyncRoute(async (req, res) => {
     const amount = Number(req.body?.amount);
     if (!PKG_AMOUNTS.has(amount)) {
       return res.status(400).json({ error: "Dozwolone pakiety: 10, 20, 50 lub 100 wiadomości." });
     }
-    if (!isP24Configured()) {
-      return res.status(503).json({
-        error:
-          "Płatności Przelewy24 nie są jeszcze skonfigurowane. Uzupełnij zmienne P24_* i włącz P24_ENABLED=true.",
-      });
+    if (!isPayUConfigured()) {
+      return res.status(503).json({ error: "Płatności PayU nie są jeszcze skonfigurowane." });
     }
     const txId = uuidv4();
-    const txSession = `p24-${Date.now()}-${txId.slice(0, 8)}`;
+    const extOrderId = `szepty-${Date.now()}-${txId.slice(0, 8)}`;
     const pkg = pricingPackagesForClient().find((p) => Number(p.amount) === amount);
     const pricePln = Number(pkg?.price_pln || 0);
     const amountGro = Math.round(pricePln * 100);
+    const baseUrl = publicBaseUrl();
+    const customer = await db.prepare("SELECT email, first_name FROM users WHERE id = ?").get(req.customer.id);
+
     await db
       .prepare(
-        `INSERT INTO payment_transactions (
-          id, user_id, gateway, external_id, amount, currency, status, package_amount, payload_json
-        ) VALUES (?, ?, 'p24', ?, ?, ?, 'created', ?, ?)`
+        `INSERT INTO payment_transactions (id, user_id, gateway, external_id, amount, currency, status, package_amount, payload_json)
+         VALUES (?, ?, 'payu', ?, ?, ?, 'created', ?, ?)`
       )
       .run(
-        txId,
-        req.customer.id,
-        txSession,
-        amountGro,
-        APP_CONFIG.pricing.currency,
-        amount,
-        JSON.stringify({
-          amount_messages: amount,
-          amount_pln: pricePln,
-          sandbox: P24_SANDBOX,
-          not_implemented: true,
-        })
+        txId, req.customer.id, extOrderId, amountGro,
+        APP_CONFIG.pricing.currency, amount,
+        JSON.stringify({ amount_messages: amount, amount_pln: pricePln, sandbox: PAYU_SANDBOX })
       );
-    return res.status(501).json({
-      error:
-        "Szkielet P24 jest gotowy, ale finalna rejestracja transakcji i callback nie są jeszcze podpięte. Wdrożymy to po utworzeniu konta P24.",
-      tx_id: txId,
-      session_id: txSession,
-      amount_messages: amount,
-      amount_grosze: amountGro,
+
+    const accessToken = await getPayUAccessToken();
+    const orderPayload = {
+      extOrderId,
+      notifyUrl: `${baseUrl}/api/payments/payu/notify`,
+      continueUrl: `${baseUrl}/panel-doladowanie.html?status=ok&tx=${txId}`,
+      customerIp: (req.headers["x-real-ip"] || req.headers["x-forwarded-for"] || req.ip || "127.0.0.1").split(",")[0].trim(),
+      merchantPosId: String(process.env.PAYU_POS_ID),
+      description: `Szepty Anielskie — pakiet ${amount} wiadomości`,
+      currencyCode: "PLN",
+      totalAmount: String(amountGro),
+      buyer: {
+        email: customer?.email || "",
+        firstName: customer?.first_name || "Użytkownik",
+        language: "pl",
+      },
+      products: [{ name: `Pakiet ${amount} wiadomości — Szepty Anielskie`, unitPrice: String(amountGro), quantity: "1" }],
+    };
+
+    const orderResp = await fetch(`${PAYU_BASE_URL}/api/v2_1/orders`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      redirect: "manual",
+      body: JSON.stringify(orderPayload),
     });
+
+    let redirectUri, payuOrderId;
+    if (orderResp.status === 302) {
+      redirectUri = orderResp.headers.get("location");
+    } else if (orderResp.status === 201 || orderResp.status === 200) {
+      const d = await orderResp.json();
+      redirectUri = d.redirectUri;
+      payuOrderId = d.orderId;
+    } else {
+      const errText = await orderResp.text();
+      throw new Error(`PayU create order failed: ${orderResp.status} — ${errText}`);
+    }
+
+    if (payuOrderId) {
+      await db.prepare("UPDATE payment_transactions SET external_id = ?, updated_at = datetime('now') WHERE id = ?").run(payuOrderId, txId);
+    }
+
+    res.json({ ok: true, redirectUri, tx_id: txId });
   })
 );
 
 app.post(
-  "/api/payments/p24/webhook",
+  "/api/payments/payu/notify",
+  express.raw({ type: "application/json" }),
   asyncRoute(async (req, res) => {
-    if (!isP24Configured()) {
-      return res.status(503).json({ error: "P24 nie jest skonfigurowane." });
+    const rawBody = req.body?.toString("utf8") || "";
+    const sigHeader = req.headers["openpayu-signature"] || "";
+
+    if (isPayUConfigured() && !verifyPayUSignature(rawBody, sigHeader)) {
+      console.error("[PayU] Invalid notification signature");
+      return res.status(400).json({ error: "Invalid signature" });
     }
-    const sessionId = String(req.body?.p24_session_id || req.body?.sessionId || "").trim();
-    if (!sessionId) return res.status(400).json({ error: "Brak p24_session_id." });
+
+    let notification;
+    try { notification = JSON.parse(rawBody); } catch {
+      return res.status(400).json({ error: "Invalid JSON" });
+    }
+
+    const order = notification?.order;
+    if (!order) return res.status(400).json({ error: "No order data" });
+
+    const extOrderId = order.extOrderId;
+    const payuOrderId = order.orderId;
+    const payuStatus = order.status;
+
     const tx = await db
-      .prepare(`SELECT id, status FROM payment_transactions WHERE gateway = 'p24' AND external_id = ?`)
-      .get(sessionId);
-    if (!tx) return res.status(404).json({ error: "Nie znaleziono transakcji." });
-    await db
-      .prepare(
-        `UPDATE payment_transactions
-         SET status = ?, updated_at = datetime('now'),
-             payload_json = ?
-         WHERE id = ?`
-      )
-      .run("webhook_received", JSON.stringify(req.body || {}), tx.id);
-    res.json({ ok: true, status: "webhook_received", tx_id: tx.id });
+      .prepare("SELECT id, user_id, status, package_amount FROM payment_transactions WHERE external_id = ?")
+      .get(payuOrderId || extOrderId);
+
+    if (!tx) {
+      const txByExt = await db
+        .prepare("SELECT id, user_id, status, package_amount FROM payment_transactions WHERE external_id = ?")
+        .get(extOrderId);
+      if (!txByExt) return res.status(404).json({ error: "Transaction not found" });
+      Object.assign(tx || {}, txByExt);
+    }
+
+    if (!tx) return res.status(404).json({ error: "Transaction not found" });
+
+    await db.prepare(
+      `UPDATE payment_transactions SET status = ?, updated_at = datetime('now'), payload_json = ? WHERE id = ?`
+    ).run(payuStatus?.toLowerCase() || "notified", JSON.stringify(notification), tx.id);
+
+    if (payuStatus === "COMPLETED" && tx.status !== "paid") {
+      const msgs = Number(tx.package_amount) || 0;
+      if (msgs > 0) {
+        await db.prepare(
+          `INSERT INTO ledger (id, user_id, delta, reason) VALUES (?, ?, ?, ?)`
+        ).run(uuidv4(), tx.user_id, msgs, `payu:${payuOrderId || extOrderId}`);
+        await db.prepare(
+          `UPDATE payment_transactions SET status = 'paid', paid_at = datetime('now') WHERE id = ?`
+        ).run(tx.id);
+        console.log(`[PayU] Credited ${msgs} messages to user ${tx.user_id}`);
+      }
+    }
+
+    res.json({ ok: true });
   })
 );
 
