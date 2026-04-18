@@ -1191,6 +1191,7 @@ body.page-panel.page-panel--simple {
   border-radius: var(--radius-lg);
   padding: 1.5rem 1.35rem 1.75rem;
   box-shadow: 0 8px 28px rgba(22, 20, 18, 0.05);
+  color: black;
 }
 
 .panel-simple-card h1 {
@@ -1597,7 +1598,7 @@ body.page-panel .site-top {
 .browse-card-tag {
   margin: 0;
   font-size: 0.85rem;
-  color: var(--ink-muted);
+  color: black;
   line-height: 1.4;
 }
 
@@ -1612,7 +1613,7 @@ body.page-panel .site-top {
 .browse-card-skills {
   margin: 0;
   font-size: 0.85rem;
-  color: var(--ink-muted);
+  color: black;
   line-height: 1.45;
 }
 
@@ -1620,7 +1621,7 @@ body.page-panel .site-top {
   margin: 0;
   font-size: 0.88rem;
   line-height: 1.5;
-  color: var(--ink);
+  color: black;
 }
 
 .browse-card-hours {
@@ -2040,6 +2041,7 @@ body.page-panel .site-top {
 .btn-sm {
   font-size: 0.82rem;
   padding: 0.35rem 0.65rem;
+  color: black;
 }
 
 .thread-vis-note {
@@ -2192,7 +2194,7 @@ body.page-panel .panel-main > .messages {
 
 .top-meta {
   font-size: 0.9rem;
-  color: var(--ink-muted);
+  color: yellowgreen;
 }
 
 .page-panel .top-meta {

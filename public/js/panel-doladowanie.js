@@ -19,8 +19,8 @@ function renderPackages() {
   const amounts = [10, 20, 50, 100];
   const enabled = me?.fake_purchase_enabled;
   pkgNote.textContent = enabled
-    ? "Symulacja zakupu — dodaje kredyty na koncie testowym."
-    : "Doładowania testowe są wyłączone przez administratora.";
+    ? "..."
+    : "...";
   const priceMap = new Map((me?.packages_pln || []).map((x) => [x.amount, x.price_pln]));
   for (const a of amounts) {
     const b = document.createElement("button");

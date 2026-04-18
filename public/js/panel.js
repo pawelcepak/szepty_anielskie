@@ -114,8 +114,8 @@ function availabilityForCharacter(c) {
   const rangeText = `${c.typical_hours_from} – ${c.typical_hours_to}`;
   return {
     badgeClass: inWin ? "avail-badge avail-badge--on" : "avail-badge avail-badge--off",
-    badgeText: inWin ? "Teraz: wstępne okno online" : "Teraz: poza wstępnym oknem",
-    line: `Wstępne godziny (u Ciebie na komputerze): ${rangeText}. Odpowiedź może przyjść także poza tym przedziałem.`,
+    badgeText: inWin ? "Teraz: online" : "Teraz: offline",
+    line: `Godziny online: ${rangeText}. (Odpowiedź może przyjść także poza tym przedziałem.)`,
   };
 }
 
