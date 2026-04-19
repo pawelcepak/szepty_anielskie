@@ -158,7 +158,14 @@ const PAGE_EXT_RE = /\.(css|js|jpg|jpeg|png|gif|svg|ico|woff2?|ttf|map|webp|json
 app.use((req, res, next) => {
   if (req.method !== "GET") return next();
   const p = req.path || "/";
-  if (p.startsWith("/api") || p.startsWith("/op-panel") || PAGE_EXT_RE.test(p)) return next();
+  // Exclude API, static assets, admin panel (both /op-panel/ dir and OPERATOR_PANEL_PATH)
+  if (
+    p.startsWith("/api") ||
+    p.startsWith("/op-panel") ||
+    p.startsWith(OPERATOR_PANEL_PATH + "/") ||
+    p === OPERATOR_PANEL_PATH ||
+    PAGE_EXT_RE.test(p)
+  ) return next();
   const ip = String(req.ip || req.socket?.remoteAddress || "");
   if (OWNER_IPS.has(ip)) return next();
   const today = new Date().toISOString().slice(0, 10);
