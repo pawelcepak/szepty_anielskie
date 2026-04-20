@@ -74,8 +74,8 @@ const CUSTOMER_SESSION_IDLE_MINUTES = Math.min(
   Math.max(1, Number(process.env.CUSTOMER_SESSION_IDLE_MINUTES || 10))
 );
 const CUSTOMER_SESSION_IDLE_MS = CUSTOMER_SESSION_IDLE_MINUTES * 60 * 1000;
-const PROMO_SYSTEM_ENABLED = ["1", "true", "yes"].includes(
-  String(process.env.PROMO_SYSTEM_ENABLED || "false").toLowerCase()
+const PROMO_SYSTEM_ENABLED = !["0", "false", "no"].includes(
+  String(process.env.PROMO_SYSTEM_ENABLED || "true").toLowerCase()
 );
 const SEO_INDEXABLE = ["1", "true", "yes"].includes(String(process.env.SEO_INDEXABLE || "false").toLowerCase());
 const PAYU_ENABLED = ["1", "true", "yes"].includes(String(process.env.PAYU_ENABLED || "false").toLowerCase());
@@ -118,7 +118,7 @@ function verifyPayUSignature(rawBody, signatureHeader) {
 function promoConfigPublic() {
   return {
     enabled: PROMO_SYSTEM_ENABLED,
-    popup_enabled: ["1", "true", "yes"].includes(String(process.env.PROMO_POPUP_ENABLED || "false").toLowerCase()),
+    popup_enabled: !["0", "false", "no"].includes(String(process.env.PROMO_POPUP_ENABLED || "true").toLowerCase()),
   };
 }
 
