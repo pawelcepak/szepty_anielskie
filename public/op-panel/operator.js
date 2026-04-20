@@ -745,6 +745,7 @@ function setOwnerTab(tab) {
     "owner-page-kyc",
     "owner-page-clients",
     "owner-page-marketing",
+    "owner-page-promo",
     "owner-page-traffic",
   ]) {
     const key = id.replace("owner-page-", "");
@@ -763,6 +764,7 @@ function setOwnerTab(tab) {
   if (tab === "team") refreshStaffList();
   if (tab === "clients") refreshOwnerClients();
   if (tab === "marketing") refreshOwnerMarketing();
+  if (tab === "promo") refreshOwnerPromo();
   if (tab === "traffic") refreshOwnerTraffic();
   if (tab === "hr" || tab === "kyc") {
     const which = tab;
@@ -1129,6 +1131,215 @@ async function refreshOwnerClients() {
     body.innerHTML = "<p class=\"queue-empty\">Nie udało się wczytać listy klientów.</p>";
   }
 }
+
+// ── Promocje ──────────────────────────────────────────────────────────────────
+
+let _promoCampaigns = [];
+
+function formatPromoDate(s) {
+  if (!s) return "—";
+  return formatOpPlTime(s);
+}
+
+function renderPromoCampaigns(campaigns) {
+  const listEl = document.getElementById("promo-campaigns-list");
+  if (!listEl) return;
+  if (!campaigns.length) {
+    listEl.innerHTML = `<p class="owner-monitor-hint">Brak kampanii. Utwórz pierwszą poniżej.</p>`;
+    return;
+  }
+  listEl.innerHTML = campaigns.map((c) => {
+    const active = Number(c.is_active) === 1;
+    const badge = active
+      ? `<span class="promo-badge promo-badge--active">aktywna</span>`
+      : `<span class="promo-badge promo-badge--inactive">nieaktywna</span>`;
+    const discountStr = `${Number(c.discount_percent || 0)}%`;
+    const voucher = c.voucher_code ? `<code class="promo-code-tag">${esc(c.voucher_code)}</code>` : `<span class="promo-dim">brak</span>`;
+    const usageStr = c.max_codes > 0 ? `${c.total_claimed}/${c.max_codes}` : `${c.total_claimed} (bez limitu)`;
+    const popupContent = c.popup_content ? `<p class="promo-popup-preview">"${esc(c.popup_content.slice(0, 120))}${c.popup_content.length > 120 ? "…" : ""}"</p>` : "";
+    return `<div class="promo-campaign-card" data-promo-id="${esc(c.id)}">
+      <div class="promo-card-header">
+        <span class="promo-card-title">${esc(c.label)}</span>
+        ${badge}
+        <span class="promo-card-key"><code>${esc(c.campaign_key)}</code></span>
+      </div>
+      <div class="promo-card-meta">
+        <span>Rabat: <strong>${discountStr}</strong></span>
+        <span>Kod vouchera: ${voucher}</span>
+        <span>Użycia: ${usageStr}</span>
+        <span>Od: ${formatPromoDate(c.start_at)}</span>
+        <span>Do: ${formatPromoDate(c.end_at)}</span>
+      </div>
+      ${popupContent}
+      <div class="promo-card-actions">
+        <button type="button" class="btn-mon promo-btn-edit" data-promo-id="${esc(c.id)}">Edytuj</button>
+        <button type="button" class="btn-mon promo-btn-toggle" data-promo-id="${esc(c.id)}" data-active="${active ? "1" : "0"}">
+          ${active ? "Dezaktywuj" : "Aktywuj"}
+        </button>
+        <button type="button" class="btn-mon promo-btn-link" data-promo-key="${esc(c.campaign_key)}" title="Skopiuj link referencyjny">Kopiuj link ref.</button>
+        <button type="button" class="btn-ghost promo-btn-delete" data-promo-id="${esc(c.id)}">Usuń</button>
+      </div>
+    </div>`;
+  }).join("");
+
+  listEl.querySelectorAll(".promo-btn-edit").forEach((btn) => {
+    btn.addEventListener("click", () => openPromoEditDialog(btn.dataset.promoId));
+  });
+  listEl.querySelectorAll(".promo-btn-toggle").forEach((btn) => {
+    btn.addEventListener("click", () => togglePromoCampaign(btn.dataset.promoId, btn.dataset.active === "1"));
+  });
+  listEl.querySelectorAll(".promo-btn-delete").forEach((btn) => {
+    btn.addEventListener("click", () => deletePromoCampaign(btn.dataset.promoId));
+  });
+  listEl.querySelectorAll(".promo-btn-link").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const url = `${location.origin}/?ref=${encodeURIComponent(btn.dataset.promoKey)}`;
+      navigator.clipboard.writeText(url).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = "Skopiowano!";
+        setTimeout(() => { btn.textContent = orig; }, 1500);
+      });
+    });
+  });
+}
+
+async function refreshOwnerPromo() {
+  if (opRole !== "owner") return;
+  const listEl = document.getElementById("promo-campaigns-list");
+  if (listEl) listEl.innerHTML = `<p class="owner-monitor-hint">Ładowanie…</p>`;
+  try {
+    const data = await api("/api/op/promo/campaigns");
+    _promoCampaigns = data.campaigns || [];
+    renderPromoCampaigns(_promoCampaigns);
+  } catch (e) {
+    if (listEl) listEl.innerHTML = `<p class="err">${esc(e.message)}</p>`;
+  }
+}
+
+function localDatetimeToIso(s) {
+  if (!s) return null;
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+function isoToLocalDatetime(s) {
+  if (!s) return "";
+  const d = parseUtcSqliteDateTime(s);
+  if (!d) return "";
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function openPromoEditDialog(id) {
+  const c = _promoCampaigns.find((x) => x.id === id);
+  if (!c) return;
+  document.getElementById("pe-id").value = c.id;
+  document.getElementById("pe-label").value = c.label || "";
+  document.getElementById("pe-popup-content").value = c.popup_content || "";
+  document.getElementById("pe-discount").value = c.discount_percent ?? 0;
+  document.getElementById("pe-voucher").value = c.voucher_code || "";
+  document.getElementById("pe-prefix").value = c.code_prefix || "SZEPT";
+  document.getElementById("pe-maxcodes").value = c.max_codes ?? 0;
+  document.getElementById("pe-start").value = isoToLocalDatetime(c.start_at);
+  document.getElementById("pe-end").value = isoToLocalDatetime(c.end_at);
+  document.getElementById("pe-active").checked = Number(c.is_active) === 1;
+  document.getElementById("pe-email").checked = Number(c.capture_email) === 1;
+  const errEl = document.getElementById("promo-edit-err");
+  if (errEl) { errEl.hidden = true; errEl.textContent = ""; }
+  document.getElementById("promo-edit-dialog")?.showModal();
+}
+
+async function togglePromoCampaign(id, currentlyActive) {
+  try {
+    await api(`/api/op/promo/campaigns/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ is_active: currentlyActive ? 0 : 1 }),
+    });
+    await refreshOwnerPromo();
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+async function deletePromoCampaign(id) {
+  const c = _promoCampaigns.find((x) => x.id === id);
+  if (!confirm(`Usunąć kampanię "${c?.label || id}"? Wszystkie powiązane kody zostaną usunięte.`)) return;
+  try {
+    await api(`/api/op/promo/campaigns/${encodeURIComponent(id)}`, { method: "DELETE" });
+    await refreshOwnerPromo();
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+// Create campaign form
+document.getElementById("promo-create-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const errEl = document.getElementById("promo-create-err");
+  errEl.hidden = true;
+  const btn = e.target.querySelector("button[type=submit]");
+  btn.disabled = true;
+  try {
+    const body = {
+      campaign_key: document.getElementById("pf-key").value.trim().toLowerCase(),
+      label: document.getElementById("pf-label").value.trim(),
+      popup_content: document.getElementById("pf-popup-content").value.trim(),
+      discount_percent: Number(document.getElementById("pf-discount").value) || 0,
+      voucher_code: document.getElementById("pf-voucher").value.trim().toUpperCase(),
+      code_prefix: document.getElementById("pf-prefix").value.trim().toUpperCase(),
+      max_codes: Number(document.getElementById("pf-maxcodes").value) || 0,
+      start_at: localDatetimeToIso(document.getElementById("pf-start").value),
+      end_at: localDatetimeToIso(document.getElementById("pf-end").value),
+      is_active: document.getElementById("pf-active").checked,
+      capture_email: document.getElementById("pf-email").checked,
+    };
+    await api("/api/op/promo/campaigns", { method: "POST", body: JSON.stringify(body) });
+    e.target.reset();
+    document.getElementById("pf-discount").value = "10";
+    document.getElementById("pf-prefix").value = "SZEPT";
+    document.getElementById("pf-active").checked = true;
+    document.getElementById("promo-form-details").removeAttribute("open");
+    await refreshOwnerPromo();
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.hidden = false;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// Edit campaign dialog save
+document.getElementById("pe-save-btn")?.addEventListener("click", async () => {
+  const errEl = document.getElementById("promo-edit-err");
+  errEl.hidden = true;
+  const id = document.getElementById("pe-id").value;
+  const btn = document.getElementById("pe-save-btn");
+  btn.disabled = true;
+  try {
+    const body = {
+      label: document.getElementById("pe-label").value.trim(),
+      popup_content: document.getElementById("pe-popup-content").value.trim(),
+      discount_percent: Number(document.getElementById("pe-discount").value) || 0,
+      voucher_code: document.getElementById("pe-voucher").value.trim().toUpperCase(),
+      code_prefix: document.getElementById("pe-prefix").value.trim().toUpperCase(),
+      max_codes: Number(document.getElementById("pe-maxcodes").value) || 0,
+      start_at: localDatetimeToIso(document.getElementById("pe-start").value),
+      end_at: localDatetimeToIso(document.getElementById("pe-end").value),
+      is_active: document.getElementById("pe-active").checked,
+      capture_email: document.getElementById("pe-email").checked,
+    };
+    await api(`/api/op/promo/campaigns/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(body) });
+    document.getElementById("promo-edit-dialog")?.close();
+    await refreshOwnerPromo();
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.hidden = false;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ── Ruch ─────────────────────────────────────────────────────────────────────
 
 let _trafficChart = null;
 

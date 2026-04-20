@@ -630,6 +630,31 @@ if (noAboutRows.length > 0) {
   })();
 }
 
+// Promo campaigns: popup content and static voucher code
+const promoCampCols = new Set(db.prepare("PRAGMA table_info(promo_campaigns)").all().map((c) => c.name));
+for (const [col, sqlt] of [
+  ["popup_content", "TEXT"],
+  ["voucher_code", "TEXT"],
+]) {
+  if (!promoCampCols.has(col)) {
+    db.exec(`ALTER TABLE promo_campaigns ADD COLUMN ${col} ${sqlt}`);
+  }
+}
+db.exec(
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_promo_campaigns_voucher ON promo_campaigns(voucher_code) WHERE voucher_code IS NOT NULL`
+);
+
+// Payment transactions: link to promo code and discount amount
+const payTxCols = new Set(db.prepare("PRAGMA table_info(payment_transactions)").all().map((c) => c.name));
+for (const [col, sqlt] of [
+  ["promo_code_id", "TEXT"],
+  ["discount_amount", "INTEGER"],
+]) {
+  if (!payTxCols.has(col)) {
+    db.exec(`ALTER TABLE payment_transactions ADD COLUMN ${col} ${sqlt}`);
+  }
+}
+
 export function createSqliteDatabase() {
   return db;
 }

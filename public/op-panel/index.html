@@ -60,6 +60,7 @@
         <button type="button" class="owner-tab owner-tab--advanced hidden" data-owner-tab="hr">Obsługa pracowników</button>
         <button type="button" class="owner-tab owner-tab--advanced hidden" data-owner-tab="kyc">Weryfikacja tożsamości</button>
         <button type="button" class="owner-tab owner-tab--trail" data-owner-tab="marketing">Reklama</button>
+        <button type="button" class="owner-tab owner-tab--trail" data-owner-tab="promo">Promocje</button>
         <button type="button" class="owner-tab" data-owner-tab="traffic">Ruch</button>
       </nav>
       <header class="op-header op-header--main">
@@ -701,6 +702,137 @@
           </menu>
         </form>
       </dialog>
+
+      <div id="owner-page-promo" class="owner-full-page hidden" aria-label="Kampanie promocyjne">
+        <div class="owner-full-inner">
+          <h2 class="owner-page-title">Kampanie promocyjne</h2>
+          <p class="owner-monitor-hint">
+            Twórz kampanie z kodami rabatowymi. <strong>Kod vouchera</strong> to stały kod, który klient wpisuje przy zamówieniu
+            (np. <code>TIKTOK99</code>). Możesz też generować jednorazowe kody przez popup. Znizka jest naliczana od ceny pakietu.
+          </p>
+          <div id="promo-campaigns-list" class="owner-monitor-body" style="margin-bottom:1.5rem"></div>
+
+          <details class="promo-form-details" id="promo-form-details">
+            <summary class="btn-mon" style="cursor:pointer;display:inline-block;margin-bottom:1rem">+ Nowa kampania</summary>
+            <form id="promo-create-form" class="promo-form" style="max-width:560px">
+              <div class="promo-form-row">
+                <label>Klucz kampanii <span class="promo-hint">(slug URL, np. <code>tiktok99</code>)</span></label>
+                <input type="text" id="pf-key" placeholder="np. tiktok99" required pattern="[a-z0-9_-]+" />
+              </div>
+              <div class="promo-form-row">
+                <label>Nazwa / opis kampanii</label>
+                <input type="text" id="pf-label" placeholder="np. TikTok — 99% rabat test" required />
+              </div>
+              <div class="promo-form-row">
+                <label>Treść popupu <span class="promo-hint">(co wyświetla się klientowi w okienku)</span></label>
+                <textarea id="pf-popup-content" rows="3" placeholder="np. Cześć! Masz specjalną ofertę — 99% zniżki na pierwszy pakiet. Skorzystaj z kodu poniżej!"></textarea>
+              </div>
+              <div class="promo-form-row promo-form-row--2col">
+                <div>
+                  <label>Rabat (%)</label>
+                  <input type="number" id="pf-discount" min="0" max="100" value="10" />
+                </div>
+                <div>
+                  <label>Kod vouchera <span class="promo-hint">(wpisywany przy zakupie)</span></label>
+                  <input type="text" id="pf-voucher" placeholder="np. TIKTOK99" style="text-transform:uppercase" />
+                </div>
+              </div>
+              <div class="promo-form-row promo-form-row--2col">
+                <div>
+                  <label>Prefiks kodów <span class="promo-hint">(generowane jednorazowe)</span></label>
+                  <input type="text" id="pf-prefix" value="SZEPT" maxlength="10" />
+                </div>
+                <div>
+                  <label>Limit użyć (0 = bez limitu)</label>
+                  <input type="number" id="pf-maxcodes" min="0" value="0" />
+                </div>
+              </div>
+              <div class="promo-form-row promo-form-row--2col">
+                <div>
+                  <label>Aktywna od (opcjonalnie)</label>
+                  <input type="datetime-local" id="pf-start" />
+                </div>
+                <div>
+                  <label>Aktywna do (opcjonalnie)</label>
+                  <input type="datetime-local" id="pf-end" />
+                </div>
+              </div>
+              <div class="promo-form-row">
+                <label class="promo-checkbox-label">
+                  <input type="checkbox" id="pf-active" checked />
+                  Kampania aktywna
+                </label>
+                <label class="promo-checkbox-label">
+                  <input type="checkbox" id="pf-email" />
+                  Wymagaj e-maila przy odbieraniu kodu z popupu
+                </label>
+              </div>
+              <p class="err" id="promo-create-err" hidden></p>
+              <button type="submit" class="btn-primary-sm">Utwórz kampanię</button>
+            </form>
+          </details>
+
+          <dialog id="promo-edit-dialog" class="audit-dialog">
+            <form method="dialog">
+              <h3 class="owner-subtitle" style="margin-top:0">Edytuj kampanię</h3>
+              <input type="hidden" id="pe-id" />
+              <div class="promo-form-row">
+                <label>Nazwa kampanii</label>
+                <input type="text" id="pe-label" required />
+              </div>
+              <div class="promo-form-row">
+                <label>Treść popupu</label>
+                <textarea id="pe-popup-content" rows="3"></textarea>
+              </div>
+              <div class="promo-form-row promo-form-row--2col">
+                <div>
+                  <label>Rabat (%)</label>
+                  <input type="number" id="pe-discount" min="0" max="100" />
+                </div>
+                <div>
+                  <label>Kod vouchera</label>
+                  <input type="text" id="pe-voucher" style="text-transform:uppercase" />
+                </div>
+              </div>
+              <div class="promo-form-row promo-form-row--2col">
+                <div>
+                  <label>Prefiks kodów</label>
+                  <input type="text" id="pe-prefix" maxlength="10" />
+                </div>
+                <div>
+                  <label>Limit użyć (0 = bez limitu)</label>
+                  <input type="number" id="pe-maxcodes" min="0" />
+                </div>
+              </div>
+              <div class="promo-form-row promo-form-row--2col">
+                <div>
+                  <label>Aktywna od</label>
+                  <input type="datetime-local" id="pe-start" />
+                </div>
+                <div>
+                  <label>Aktywna do</label>
+                  <input type="datetime-local" id="pe-end" />
+                </div>
+              </div>
+              <div class="promo-form-row">
+                <label class="promo-checkbox-label">
+                  <input type="checkbox" id="pe-active" />
+                  Kampania aktywna
+                </label>
+                <label class="promo-checkbox-label">
+                  <input type="checkbox" id="pe-email" />
+                  Wymagaj e-maila przy odbieraniu kodu
+                </label>
+              </div>
+              <p class="err" id="promo-edit-err" hidden></p>
+              <menu class="audit-dialog-menu">
+                <button type="button" class="btn-primary-sm" id="pe-save-btn">Zapisz zmiany</button>
+                <button type="submit" class="btn-ghost">Anuluj</button>
+              </menu>
+            </form>
+          </dialog>
+        </div>
+      </div>
 
       <div id="owner-page-traffic" class="owner-full-page hidden" aria-label="Ruch na stronie">
         <div class="owner-full-inner">

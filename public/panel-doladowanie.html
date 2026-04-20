@@ -34,6 +34,16 @@
           Wybierz pakiet, aby doładować konto i kontynuować rozmowy z naszymi medium.
         </p>
         <p class="top-meta" id="pkg-note"></p>
+
+        <div class="promo-input-row" id="promo-section" style="margin-bottom:1rem">
+          <label class="promo-input-label" for="promo-code-input">Masz kod promocyjny?</label>
+          <div class="promo-input-wrap">
+            <input type="text" id="promo-code-input" class="promo-input" placeholder="Wpisz kod…" autocomplete="off" style="text-transform:uppercase" maxlength="40" />
+            <button type="button" class="btn btn-outline promo-apply-btn" id="promo-apply-btn">Zastosuj</button>
+          </div>
+          <p class="promo-status" id="promo-status" hidden></p>
+        </div>
+
         <div class="pkg-buttons" id="pkg"></div>
         <p class="form-error" id="pkg-err" hidden></p>
         <p class="top-meta" style="margin-top: 1.25rem">

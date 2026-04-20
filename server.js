@@ -1185,7 +1185,7 @@ app.get("/api/public/promo/bootstrap", asyncRoute(async (req, res) => {
   }
   const row = await db
     .prepare(
-      `SELECT id, campaign_key, label, discount_percent, start_at, end_at, is_active, capture_email,
+      `SELECT id, campaign_key, label, discount_percent, popup_content, start_at, end_at, is_active, capture_email,
               code_prefix, max_codes, total_claimed
        FROM promo_campaigns WHERE campaign_key = ?`
     )
@@ -1200,6 +1200,7 @@ app.get("/api/public/promo/bootstrap", asyncRoute(async (req, res) => {
       key: row.campaign_key,
       label: row.label,
       discount_percent: Number(row.discount_percent || 0),
+      popup_content: row.popup_content || null,
       capture_email: Number(row.capture_email || 0) === 1,
       end_at: row.end_at || null,
     },
@@ -1217,7 +1218,7 @@ app.post("/api/public/promo/claim-code", asyncRoute(async (req, res) => {
   await db.transaction(async (tx) => {
     const campaign = await tx
       .prepare(
-        `SELECT id, campaign_key, label, discount_percent, start_at, end_at, is_active, capture_email,
+        `SELECT id, campaign_key, label, discount_percent, popup_content, start_at, end_at, is_active, capture_email,
                 code_prefix, max_codes, total_claimed
          FROM promo_campaigns WHERE campaign_key = ?`
       )
@@ -1309,23 +1310,74 @@ app.post(
     if (!isPayUConfigured()) {
       return res.status(503).json({ error: "Płatności PayU nie są jeszcze skonfigurowane." });
     }
+
+    // Promo code validation (optional)
+    let promoCodeId = null;
+    let promoType = null;
+    let promoCampaignId = null;
+    let discountPercent = 0;
+
+    const rawPromoCode = String(req.body?.promo_code || "").trim().toUpperCase();
+    if (rawPromoCode && PROMO_SYSTEM_ENABLED) {
+      // Check voucher code on campaign
+      const campaignByVoucher = await db
+        .prepare(`SELECT id, campaign_key, discount_percent, start_at, end_at, is_active, max_codes, total_claimed
+                  FROM promo_campaigns WHERE voucher_code = ?`)
+        .get(rawPromoCode);
+      if (campaignByVoucher && promoIsActiveNow(campaignByVoucher)) {
+        const maxCodes = Number(campaignByVoucher.max_codes || 0);
+        const totalClaimed = Number(campaignByVoucher.total_claimed || 0);
+        if (maxCodes === 0 || totalClaimed < maxCodes) {
+          promoType = "voucher";
+          promoCampaignId = campaignByVoucher.id;
+          discountPercent = Number(campaignByVoucher.discount_percent || 0);
+        }
+      } else {
+        // Check unique promo code
+        const pc = await db
+          .prepare(`SELECT pc.id, pc.used_at, pc.expires_at,
+                           c.discount_percent, c.start_at, c.end_at, c.is_active, c.id AS campaign_id
+                    FROM promo_codes pc
+                    JOIN promo_campaigns c ON c.id = pc.campaign_id
+                    WHERE pc.code = ?`)
+          .get(rawPromoCode);
+        if (pc && !pc.used_at && promoIsActiveNow({ start_at: pc.start_at, end_at: pc.end_at, is_active: pc.is_active })) {
+          const notExpired = !pc.expires_at || new Date(pc.expires_at) >= new Date();
+          if (notExpired) {
+            promoType = "unique";
+            promoCodeId = pc.id;
+            promoCampaignId = pc.campaign_id;
+            discountPercent = Number(pc.discount_percent || 0);
+          }
+        }
+      }
+    }
+
     const txId = uuidv4();
     const extOrderId = `szepty-${Date.now()}-${txId.slice(0, 8)}`;
     const pkg = pricingPackagesForClient().find((p) => Number(p.amount) === amount);
     const pricePln = Number(pkg?.price_pln || 0);
-    const amountGro = Math.round(pricePln * 100);
+    const discountAmount = discountPercent > 0 ? Math.round(pricePln * 100 * discountPercent / 100) : 0;
+    const amountGro = Math.max(1, Math.round(pricePln * 100) - discountAmount);
+    const finalPricePln = amountGro / 100;
     const baseUrl = publicBaseUrl();
     const customer = await db.prepare("SELECT email, first_name FROM users WHERE id = ?").get(req.customer.id);
 
     await db
       .prepare(
-        `INSERT INTO payment_transactions (id, user_id, gateway, external_id, amount, currency, status, package_amount, payload_json)
-         VALUES (?, ?, 'payu', ?, ?, ?, 'created', ?, ?)`
+        `INSERT INTO payment_transactions (id, user_id, gateway, external_id, amount, currency, status, package_amount,
+                                           promo_code_id, discount_amount, payload_json)
+         VALUES (?, ?, 'payu', ?, ?, ?, 'created', ?, ?, ?, ?)`
       )
       .run(
         txId, req.customer.id, extOrderId, amountGro,
         APP_CONFIG.pricing.currency, amount,
-        JSON.stringify({ amount_messages: amount, amount_pln: pricePln, sandbox: PAYU_SANDBOX })
+        promoCodeId, discountAmount,
+        JSON.stringify({
+          amount_messages: amount, amount_pln: finalPricePln, original_pln: pricePln,
+          discount_percent: discountPercent, promo_code: rawPromoCode || null,
+          promo_type: promoType, sandbox: PAYU_SANDBOX
+        })
       );
 
     const accessToken = await getPayUAccessToken();
@@ -1398,12 +1450,12 @@ app.post(
     const payuStatus = order.status;
 
     const tx = await db
-      .prepare("SELECT id, user_id, status, package_amount FROM payment_transactions WHERE external_id = ?")
+      .prepare("SELECT id, user_id, status, package_amount, promo_code_id FROM payment_transactions WHERE external_id = ?")
       .get(payuOrderId || extOrderId);
 
     if (!tx) {
       const txByExt = await db
-        .prepare("SELECT id, user_id, status, package_amount FROM payment_transactions WHERE external_id = ?")
+        .prepare("SELECT id, user_id, status, package_amount, promo_code_id FROM payment_transactions WHERE external_id = ?")
         .get(extOrderId);
       if (!txByExt) return res.status(404).json({ error: "Transaction not found" });
       Object.assign(tx || {}, txByExt);
@@ -1424,6 +1476,21 @@ app.post(
         await db.prepare(
           `UPDATE payment_transactions SET status = 'paid', paid_at = datetime('now') WHERE id = ?`
         ).run(tx.id);
+        // Mark unique promo code as used
+        if (tx.promo_code_id) {
+          await db.prepare(`UPDATE promo_codes SET used_at = datetime('now'), status = 'used' WHERE id = ?`)
+            .run(tx.promo_code_id);
+        }
+        // Increment voucher usage if applicable (promo_code_id is null for vouchers — find via payload_json)
+        try {
+          const txFull = await db.prepare(`SELECT payload_json FROM payment_transactions WHERE id = ?`).get(tx.id);
+          const payload = txFull?.payload_json ? JSON.parse(txFull.payload_json) : {};
+          if (payload.promo_type === "voucher" && payload.promo_code) {
+            await db.prepare(
+              `UPDATE promo_campaigns SET total_claimed = COALESCE(total_claimed, 0) + 1 WHERE voucher_code = ?`
+            ).run(payload.promo_code);
+          }
+        } catch { /* ignore */ }
         console.log(`[PayU] Credited ${msgs} messages to user ${tx.user_id}`);
       }
     }
@@ -1822,8 +1889,8 @@ app.get(
     }
     const rows = await db
       .prepare(
-        `SELECT id, campaign_key, label, discount_percent, start_at, end_at, is_active, capture_email,
-                code_prefix, max_codes, total_claimed, created_at
+        `SELECT id, campaign_key, label, discount_percent, popup_content, voucher_code, start_at, end_at,
+                is_active, capture_email, code_prefix, max_codes, total_claimed, created_at
          FROM promo_campaigns ORDER BY datetime(created_at) DESC`
       )
       .all();
@@ -1842,6 +1909,8 @@ app.post(
     const campaign_key = normalizePromoKey(req.body?.campaign_key || req.body?.key || "");
     const label = String(req.body?.label || "").trim();
     const discount_percent = Math.max(0, Math.min(100, Number(req.body?.discount_percent || 0) || 0));
+    const popup_content = String(req.body?.popup_content || "").trim() || null;
+    const voucher_code = String(req.body?.voucher_code || "").trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 30) || null;
     const start_at = String(req.body?.start_at || "").trim() || null;
     const end_at = String(req.body?.end_at || "").trim() || null;
     const is_active = req.body?.is_active ? 1 : 0;
@@ -1866,14 +1935,15 @@ app.post(
     await db
       .prepare(
         `INSERT INTO promo_campaigns (
-          id, campaign_key, label, discount_percent, start_at, end_at, is_active, capture_email, code_prefix, max_codes, total_claimed
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`
+          id, campaign_key, label, discount_percent, popup_content, voucher_code,
+          start_at, end_at, is_active, capture_email, code_prefix, max_codes, total_claimed
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`
       )
-      .run(id, campaign_key, label, discount_percent, start_at, end_at, is_active, capture_email, code_prefix, max_codes);
+      .run(id, campaign_key, label, discount_percent, popup_content, voucher_code, start_at, end_at, is_active, capture_email, code_prefix, max_codes);
     const row = await db
       .prepare(
-        `SELECT id, campaign_key, label, discount_percent, start_at, end_at, is_active, capture_email,
-                code_prefix, max_codes, total_claimed, created_at
+        `SELECT id, campaign_key, label, discount_percent, popup_content, voucher_code, start_at, end_at,
+                is_active, capture_email, code_prefix, max_codes, total_claimed, created_at
          FROM promo_campaigns WHERE id = ?`
       )
       .get(id);
@@ -1891,8 +1961,8 @@ app.get(
     }
     const campaigns = await db
       .prepare(
-        `SELECT id, campaign_key, label, discount_percent, start_at, end_at, is_active, capture_email,
-                code_prefix, max_codes, total_claimed, created_at
+        `SELECT id, campaign_key, label, discount_percent, popup_content, voucher_code, start_at, end_at,
+                is_active, capture_email, code_prefix, max_codes, total_claimed, created_at
          FROM promo_campaigns ORDER BY datetime(created_at) DESC`
       )
       .all();
@@ -1916,6 +1986,145 @@ app.get(
     res.json({ campaigns: out });
   })
 );
+
+app.patch(
+  "/api/op/promo/campaigns/:id",
+  requireOperator,
+  requireOwner,
+  asyncRoute(async (req, res) => {
+    if (!PROMO_SYSTEM_ENABLED) {
+      return res.status(404).json({ error: "Moduł promocji jest wyłączony (PROMO_SYSTEM_ENABLED=false)." });
+    }
+    const { id } = req.params;
+    const existing = await db.prepare(`SELECT id FROM promo_campaigns WHERE id = ?`).get(id);
+    if (!existing) return res.status(404).json({ error: "Kampania nie istnieje." });
+
+    const fields = [];
+    const vals = [];
+
+    if (req.body?.label !== undefined) {
+      const label = String(req.body.label).trim();
+      if (!label) return res.status(400).json({ error: "Podaj label." });
+      fields.push("label = ?"); vals.push(label);
+    }
+    if (req.body?.discount_percent !== undefined) {
+      fields.push("discount_percent = ?"); vals.push(Math.max(0, Math.min(100, Number(req.body.discount_percent) || 0)));
+    }
+    if (req.body?.popup_content !== undefined) {
+      fields.push("popup_content = ?"); vals.push(String(req.body.popup_content || "").trim() || null);
+    }
+    if (req.body?.voucher_code !== undefined) {
+      const vc = String(req.body.voucher_code || "").trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 30) || null;
+      fields.push("voucher_code = ?"); vals.push(vc);
+    }
+    if (req.body?.is_active !== undefined) {
+      fields.push("is_active = ?"); vals.push(req.body.is_active ? 1 : 0);
+    }
+    if (req.body?.capture_email !== undefined) {
+      fields.push("capture_email = ?"); vals.push(req.body.capture_email ? 1 : 0);
+    }
+    if (req.body?.code_prefix !== undefined) {
+      const cp = String(req.body.code_prefix || "SZEPT").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10) || "SZEPT";
+      fields.push("code_prefix = ?"); vals.push(cp);
+    }
+    if (req.body?.max_codes !== undefined) {
+      fields.push("max_codes = ?"); vals.push(Math.max(0, Math.floor(Number(req.body.max_codes) || 0)));
+    }
+    if (req.body?.start_at !== undefined) {
+      const sa = String(req.body.start_at || "").trim() || null;
+      if (sa && Number.isNaN(new Date(sa).getTime())) return res.status(400).json({ error: "Nieprawidłowe start_at." });
+      fields.push("start_at = ?"); vals.push(sa);
+    }
+    if (req.body?.end_at !== undefined) {
+      const ea = String(req.body.end_at || "").trim() || null;
+      if (ea && Number.isNaN(new Date(ea).getTime())) return res.status(400).json({ error: "Nieprawidłowe end_at." });
+      fields.push("end_at = ?"); vals.push(ea);
+    }
+
+    if (fields.length === 0) return res.status(400).json({ error: "Brak pól do aktualizacji." });
+    vals.push(id);
+    await db.prepare(`UPDATE promo_campaigns SET ${fields.join(", ")} WHERE id = ?`).run(...vals);
+    const row = await db
+      .prepare(`SELECT id, campaign_key, label, discount_percent, popup_content, voucher_code, start_at, end_at,
+                       is_active, capture_email, code_prefix, max_codes, total_claimed, created_at
+                FROM promo_campaigns WHERE id = ?`)
+      .get(id);
+    res.json({ ok: true, campaign: row });
+  })
+);
+
+app.delete(
+  "/api/op/promo/campaigns/:id",
+  requireOperator,
+  requireOwner,
+  asyncRoute(async (req, res) => {
+    if (!PROMO_SYSTEM_ENABLED) {
+      return res.status(404).json({ error: "Moduł promocji jest wyłączony (PROMO_SYSTEM_ENABLED=false)." });
+    }
+    const { id } = req.params;
+    const existing = await db.prepare(`SELECT id FROM promo_campaigns WHERE id = ?`).get(id);
+    if (!existing) return res.status(404).json({ error: "Kampania nie istnieje." });
+    await db.prepare(`DELETE FROM promo_campaigns WHERE id = ?`).run(id);
+    res.json({ ok: true });
+  })
+);
+
+// Validate a promo code (voucher_code on campaign OR unique code from promo_codes)
+app.post("/api/public/promo/validate", asyncRoute(async (req, res) => {
+  if (!PROMO_SYSTEM_ENABLED) {
+    return res.status(404).json({ error: "Promocje są obecnie wyłączone." });
+  }
+  const code = String(req.body?.code || "").trim().toUpperCase();
+  if (!code) return res.status(400).json({ error: "Podaj kod promocyjny." });
+
+  // 1. Check if matches a campaign voucher_code
+  const campaignByVoucher = await db
+    .prepare(`SELECT id, campaign_key, label, discount_percent, popup_content, start_at, end_at, is_active, max_codes, total_claimed
+              FROM promo_campaigns WHERE voucher_code = ?`)
+    .get(code);
+  if (campaignByVoucher && promoIsActiveNow(campaignByVoucher)) {
+    const maxCodes = Number(campaignByVoucher.max_codes || 0);
+    const totalClaimed = Number(campaignByVoucher.total_claimed || 0);
+    if (maxCodes > 0 && totalClaimed >= maxCodes) {
+      return res.status(409).json({ error: "Limit użyć tego kodu został wyczerpany." });
+    }
+    return res.json({
+      ok: true,
+      type: "voucher",
+      campaign_id: campaignByVoucher.id,
+      campaign_key: campaignByVoucher.campaign_key,
+      label: campaignByVoucher.label,
+      discount_percent: Number(campaignByVoucher.discount_percent || 0),
+    });
+  }
+
+  // 2. Check unique code from promo_codes
+  const promoCode = await db
+    .prepare(`SELECT pc.id, pc.campaign_id, pc.status, pc.used_at, pc.expires_at,
+                     pc.email, pc.code,
+                     c.campaign_key, c.label, c.discount_percent, c.start_at, c.end_at, c.is_active
+              FROM promo_codes pc
+              JOIN promo_campaigns c ON c.id = pc.campaign_id
+              WHERE pc.code = ?`)
+    .get(code);
+  if (!promoCode) return res.status(404).json({ error: "Nie znaleziono kodu promocyjnego." });
+  if (promoCode.used_at) return res.status(409).json({ error: "Ten kod był już wykorzystany." });
+  if (promoCode.expires_at && new Date(promoCode.expires_at) < new Date()) {
+    return res.status(410).json({ error: "Ten kod promocyjny wygasł." });
+  }
+  if (!promoIsActiveNow({ start_at: promoCode.start_at, end_at: promoCode.end_at, is_active: promoCode.is_active })) {
+    return res.status(410).json({ error: "Ta promocja nie jest już aktywna." });
+  }
+  res.json({
+    ok: true,
+    type: "unique",
+    promo_code_id: promoCode.id,
+    campaign_id: promoCode.campaign_id,
+    campaign_key: promoCode.campaign_key,
+    label: promoCode.label,
+    discount_percent: Number(promoCode.discount_percent || 0),
+  });
+}));
 
 function validateImageLikeUrl(raw) {
   const value = String(raw || "").trim();
