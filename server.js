@@ -1185,8 +1185,8 @@ app.get("/api/public/promo/bootstrap", asyncRoute(async (req, res) => {
   }
   const row = await db
     .prepare(
-      `SELECT id, campaign_key, label, discount_percent, popup_content, start_at, end_at, is_active, capture_email,
-              code_prefix, max_codes, total_claimed
+      `SELECT id, campaign_key, label, discount_percent, popup_content, voucher_code, start_at, end_at,
+              is_active, capture_email, code_prefix, max_codes, total_claimed
        FROM promo_campaigns WHERE campaign_key = ?`
     )
     .get(key);
@@ -1201,6 +1201,7 @@ app.get("/api/public/promo/bootstrap", asyncRoute(async (req, res) => {
       label: row.label,
       discount_percent: Number(row.discount_percent || 0),
       popup_content: row.popup_content || null,
+      voucher_code: row.voucher_code || null,
       capture_email: Number(row.capture_email || 0) === 1,
       end_at: row.end_at || null,
     },

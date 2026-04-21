@@ -1,4 +1,5 @@
 import { api } from "./api.js";
+import { getSavedPromoCode, clearSavedPromoCode } from "./promo-popup.js";
 
 const pkg = document.getElementById("pkg");
 const pkgNote = document.getElementById("pkg-note");
@@ -180,6 +181,15 @@ try {
     balLine.textContent = `Pozostało: ${me.messages_remaining} wiadomości`;
   }
   renderPackages();
+
+  // Auto-uzupełnij kod promocyjny z localStorage (zapisany przez popup)
+  const savedCode = getSavedPromoCode();
+  if (savedCode && promoInput && !appliedPromo) {
+    promoInput.value = savedCode;
+    await applyPromoCode();
+    // Jeśli kod się zastosował poprawnie — wyczyść localStorage
+    if (appliedPromo) clearSavedPromoCode();
+  }
 } catch {
   window.location.href = "/logowanie.html";
 }
