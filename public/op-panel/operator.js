@@ -1427,6 +1427,7 @@ async function refreshOwnerTraffic() {
 }
 
 async function refreshOwnerMarketing() {
+  const channelsWrap = document.getElementById("mkt-channels");
   const btn = document.getElementById("btn-mkt-generate");
   const err = document.getElementById("mkt-err");
   const out = document.getElementById("mkt-results");
@@ -1460,6 +1461,12 @@ async function refreshOwnerMarketing() {
   const charAboutEl = document.getElementById("editor-character-about");
   const charHoursFromEl = document.getElementById("editor-character-hours-from");
   const charHoursToEl = document.getElementById("editor-character-hours-to");
+  const charHoursMonThuFromEl = document.getElementById("editor-character-hours-mon-thu-from");
+  const charHoursMonThuToEl = document.getElementById("editor-character-hours-mon-thu-to");
+  const charHoursFriFromEl = document.getElementById("editor-character-hours-fri-from");
+  const charHoursFriToEl = document.getElementById("editor-character-hours-fri-to");
+  const charHoursWeekendFromEl = document.getElementById("editor-character-hours-weekend-from");
+  const charHoursWeekendToEl = document.getElementById("editor-character-hours-weekend-to");
   const subButtons = Array.from(document.querySelectorAll("#owner-page-marketing [data-mkt-subpage]"));
   const subPages = Array.from(document.querySelectorAll("#owner-page-marketing [data-mkt-subpage-panel]"));
   const activateMarketingSubpage = (key) => {
@@ -1492,6 +1499,12 @@ async function refreshOwnerMarketing() {
     if (charAboutEl) charAboutEl.value = row.about || "";
     if (charHoursFromEl) charHoursFromEl.value = row.typical_hours_from || "";
     if (charHoursToEl) charHoursToEl.value = row.typical_hours_to || "";
+    if (charHoursMonThuFromEl) charHoursMonThuFromEl.value = row.hours_mon_thu_from || "";
+    if (charHoursMonThuToEl) charHoursMonThuToEl.value = row.hours_mon_thu_to || "";
+    if (charHoursFriFromEl) charHoursFriFromEl.value = row.hours_fri_from || "";
+    if (charHoursFriToEl) charHoursFriToEl.value = row.hours_fri_to || "";
+    if (charHoursWeekendFromEl) charHoursWeekendFromEl.value = row.hours_weekend_from || "";
+    if (charHoursWeekendToEl) charHoursWeekendToEl.value = row.hours_weekend_to || "";
   };
   if (assetListEl) {
     assetListEl.innerHTML = assets.length
@@ -1743,6 +1756,12 @@ async function refreshOwnerMarketing() {
         if (charAboutEl) charAboutEl.value = row.about || "";
         if (charHoursFromEl) charHoursFromEl.value = row.typical_hours_from || "";
         if (charHoursToEl) charHoursToEl.value = row.typical_hours_to || "";
+        if (charHoursMonThuFromEl) charHoursMonThuFromEl.value = row.hours_mon_thu_from || "";
+        if (charHoursMonThuToEl) charHoursMonThuToEl.value = row.hours_mon_thu_to || "";
+        if (charHoursFriFromEl) charHoursFriFromEl.value = row.hours_fri_from || "";
+        if (charHoursFriToEl) charHoursFriToEl.value = row.hours_fri_to || "";
+        if (charHoursWeekendFromEl) charHoursWeekendFromEl.value = row.hours_weekend_from || "";
+        if (charHoursWeekendToEl) charHoursWeekendToEl.value = row.hours_weekend_to || "";
       } catch {
         /* ignore */
       }
@@ -1773,6 +1792,12 @@ async function refreshOwnerMarketing() {
             about: String(charAboutEl?.value || "").trim(),
             typical_hours_from: String(charHoursFromEl?.value || "").trim(),
             typical_hours_to: String(charHoursToEl?.value || "").trim(),
+            hours_mon_thu_from: String(charHoursMonThuFromEl?.value || "").trim(),
+            hours_mon_thu_to: String(charHoursMonThuToEl?.value || "").trim(),
+            hours_fri_from: String(charHoursFriFromEl?.value || "").trim(),
+            hours_fri_to: String(charHoursFriToEl?.value || "").trim(),
+            hours_weekend_from: String(charHoursWeekendFromEl?.value || "").trim(),
+            hours_weekend_to: String(charHoursWeekendToEl?.value || "").trim(),
           }),
         });
         refreshOwnerMarketing();

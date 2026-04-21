@@ -1227,6 +1227,51 @@ body.page-panel.page-panel--simple {
   overflow: auto;
 }
 
+/* Strona doładowania — biała karta na ciemnym tle */
+body.page-panel.page-panel--simple .panel-simple-card {
+  color: var(--ink);
+}
+body.page-panel.page-panel--simple .panel-simple-card .pkg-buttons button {
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-weight: 600;
+}
+body.page-panel.page-panel--simple .panel-simple-card .pkg-buttons button:hover:not(:disabled) {
+  border-color: var(--gold-dim);
+  color: var(--accent);
+  background: #fffaf3;
+}
+body.page-panel.page-panel--simple .panel-simple-card .pkg-buttons button:disabled {
+  opacity: 0.4;
+}
+body.page-panel.page-panel--simple .promo-input-label {
+  color: var(--ink-muted);
+}
+body.page-panel.page-panel--simple .promo-input {
+  background: #fff;
+  border-color: var(--line);
+  color: var(--ink);
+}
+body.page-panel.page-panel--simple .promo-apply-btn {
+  border-color: var(--line);
+  color: var(--ink);
+  background: #fff;
+}
+body.page-panel.page-panel--simple .promo-apply-btn:hover {
+  border-color: var(--gold-dim);
+  color: var(--accent);
+}
+body.page-panel.page-panel--simple .panel-simple-lead {
+  color: var(--ink-muted);
+}
+body.page-panel.page-panel--simple .top-meta {
+  color: var(--ink-muted);
+}
+body.page-panel.page-panel--simple .form-error {
+  color: var(--accent);
+}
+
 .link-panel-topup {
   font-size: 0.82rem;
   font-weight: 600;
@@ -3298,13 +3343,13 @@ body.page-panel .pkg-note {
   color: rgba(232, 222, 255, 0.92);
 }
 
-body.page-panel .pkg-buttons button {
+body.page-panel:not(.page-panel--simple) .pkg-buttons button {
   background: rgba(255, 255, 255, 0.1);
   border-color: rgba(255, 255, 255, 0.22);
   color: #f5f0ff;
 }
 
-body.page-panel .pkg-buttons button:hover:not(:disabled) {
+body.page-panel:not(.page-panel--simple) .pkg-buttons button:hover:not(:disabled) {
   border-color: rgba(212, 176, 107, 0.6);
   color: #fff;
 }

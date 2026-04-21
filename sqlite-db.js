@@ -426,11 +426,21 @@ const charColsHours = new Set(db.prepare("PRAGMA table_info(characters)").all().
 for (const [col, sqlt] of [
   ["typical_hours_from", "TEXT"],
   ["typical_hours_to", "TEXT"],
+  ["hours_mon_thu_from", "TEXT"],
+  ["hours_mon_thu_to", "TEXT"],
+  ["hours_fri_from", "TEXT"],
+  ["hours_fri_to", "TEXT"],
+  ["hours_weekend_from", "TEXT"],
+  ["hours_weekend_to", "TEXT"],
 ]) {
   if (!charColsHours.has(col)) {
     db.exec(`ALTER TABLE characters ADD COLUMN ${col} ${sqlt}`);
   }
 }
+// Ustaw domyślne godziny dla medium które ich jeszcze nie mają
+db.prepare(`UPDATE characters SET hours_mon_thu_from = '18:00', hours_mon_thu_to = '22:00' WHERE hours_mon_thu_from IS NULL OR hours_mon_thu_from = ''`).run();
+db.prepare(`UPDATE characters SET hours_fri_from = '16:00', hours_fri_to = '23:00' WHERE hours_fri_from IS NULL OR hours_fri_from = ''`).run();
+db.prepare(`UPDATE characters SET hours_weekend_from = '10:00', hours_weekend_to = '23:00' WHERE hours_weekend_from IS NULL OR hours_weekend_from = ''`).run();
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS operator_payout_ledger (

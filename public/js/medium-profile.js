@@ -17,9 +17,58 @@ function parseTimeHM(s) {
   return h * 60 + mi;
 }
 
+function genderLabel(g) {
+  if (g === "female") return "Kobieta";
+  if (g === "male") return "Mężczyzna";
+  if (g === "other") return "Inne";
+  return g || "";
+}
+
+function getTodaySchedule(c) {
+  const dow = new Date().getDay(); // 0=niedz, 1=pon, ..., 6=sob
+  if (dow === 0 || dow === 6) {
+    // Weekend
+    if (c.hours_weekend_from && c.hours_weekend_to)
+      return { from: c.hours_weekend_from, to: c.hours_weekend_to, label: "Weekendy" };
+  } else if (dow === 5) {
+    // Piątek
+    if (c.hours_fri_from && c.hours_fri_to)
+      return { from: c.hours_fri_from, to: c.hours_fri_to, label: "Piątki" };
+  } else {
+    // Pon-Czw
+    if (c.hours_mon_thu_from && c.hours_mon_thu_to)
+      return { from: c.hours_mon_thu_from, to: c.hours_mon_thu_to, label: "Pon–Czw" };
+  }
+  // fallback do ogólnych
+  if (c.typical_hours_from && c.typical_hours_to)
+    return { from: c.typical_hours_from, to: c.typical_hours_to, label: "Ogólne" };
+  return null;
+}
+
+function scheduleDescription(c) {
+  const parts = [];
+  if (c.hours_mon_thu_from && c.hours_mon_thu_to)
+    parts.push(`pon–czw: ${c.hours_mon_thu_from}–${c.hours_mon_thu_to}`);
+  if (c.hours_fri_from && c.hours_fri_to)
+    parts.push(`pt: ${c.hours_fri_from}–${c.hours_fri_to}`);
+  if (c.hours_weekend_from && c.hours_weekend_to)
+    parts.push(`weekend: ${c.hours_weekend_from}–${c.hours_weekend_to}`);
+  if (!parts.length && c.typical_hours_from && c.typical_hours_to)
+    parts.push(`${c.typical_hours_from}–${c.typical_hours_to}`);
+  return parts.join(", ");
+}
+
 function availabilityForCharacter(c) {
-  const from = parseTimeHM(c.typical_hours_from);
-  const to = parseTimeHM(c.typical_hours_to);
+  const sched = getTodaySchedule(c);
+  if (!sched) {
+    return {
+      badgeClass: "avail-badge avail-badge--unknown",
+      badgeText: "Status: do potwierdzenia",
+      line: "Godziny orientacyjne nie zostały ustawione.",
+    };
+  }
+  const from = parseTimeHM(sched.from);
+  const to = parseTimeHM(sched.to);
   if (from == null || to == null) {
     return {
       badgeClass: "avail-badge avail-badge--unknown",
@@ -30,10 +79,13 @@ function availabilityForCharacter(c) {
   const now = new Date();
   const mins = now.getHours() * 60 + now.getMinutes();
   const inWin = from <= to ? mins >= from && mins <= to : mins >= from || mins <= to;
+  const descAll = scheduleDescription(c);
   return {
     badgeClass: inWin ? "avail-badge avail-badge--on" : "avail-badge avail-badge--off",
     badgeText: inWin ? "Status: online" : "Status: offline",
-    line: `Najczęściej online: ${c.typical_hours_from} - ${c.typical_hours_to}. Odpowiedź może przyjść również poza tymi godzinami.`,
+    line: descAll
+      ? `Najczęściej online: ${descAll}. Odpowiedź może przyjść również poza tymi godzinami.`
+      : `Najczęściej online: ${sched.from}–${sched.to}.`,
   };
 }
 
@@ -64,7 +116,7 @@ if (!id) {
           <h1>${esc(c.name)}</h1>
           <p class="sub">${esc(c.tagline || "")}</p>
           <p class="sub"><strong>Kategoria:</strong> ${esc(c.category || "—")}</p>
-          ${c.gender ? `<p class="sub"><strong>Postać:</strong> ${esc(c.gender)}</p>` : ""}
+          ${c.gender ? `<p class="sub"><strong>Płeć:</strong> ${esc(genderLabel(c.gender))}</p>` : ""}
           <p class="sub"><span class="${esc(av.badgeClass)}">${esc(av.badgeText)}</span></p>
           <p class="sub">${esc(av.line)}</p>
         </div>

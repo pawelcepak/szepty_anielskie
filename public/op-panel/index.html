@@ -336,13 +336,38 @@
                 <input id="editor-character-name" type="text" placeholder="Nazwa medium" />
                 <input id="editor-character-tagline" type="text" placeholder="Krótki opis" />
                 <input id="editor-character-category" type="text" placeholder="Kategoria" />
-                <input id="editor-character-gender" type="text" placeholder="Płeć / typ postaci" />
+                <select id="editor-character-gender" class="sel">
+                  <option value="">— Płeć —</option>
+                  <option value="female">Kobieta</option>
+                  <option value="male">Mężczyzna</option>
+                  <option value="other">Inne / nie określono</option>
+                </select>
                 <input id="editor-character-portrait" type="text" placeholder="Adres obrazu medium" />
                 <textarea id="editor-character-skills" class="fact-value" rows="3" maxlength="1200" placeholder="Talenty / styl pracy"></textarea>
                 <textarea id="editor-character-about" class="fact-value" rows="5" maxlength="5000" placeholder="Dłuższy opis medium"></textarea>
+                <p style="font-size:0.8rem;opacity:0.7;margin:0.5rem 0 0.2rem">Godziny online — Poniedziałek–Czwartek:</p>
                 <div class="owner-reports-toolbar">
-                  <input id="editor-character-hours-from" type="text" placeholder="Od, np. 10:00" />
-                  <input id="editor-character-hours-to" type="text" placeholder="Do, np. 14:00" />
+                  <input id="editor-character-hours-mon-thu-from" type="text" placeholder="Od, np. 18:00" style="max-width:100px" />
+                  <span style="opacity:0.5">–</span>
+                  <input id="editor-character-hours-mon-thu-to" type="text" placeholder="Do, np. 22:00" style="max-width:100px" />
+                </div>
+                <p style="font-size:0.8rem;opacity:0.7;margin:0.4rem 0 0.2rem">Godziny online — Piątek:</p>
+                <div class="owner-reports-toolbar">
+                  <input id="editor-character-hours-fri-from" type="text" placeholder="Od, np. 16:00" style="max-width:100px" />
+                  <span style="opacity:0.5">–</span>
+                  <input id="editor-character-hours-fri-to" type="text" placeholder="Do, np. 23:00" style="max-width:100px" />
+                </div>
+                <p style="font-size:0.8rem;opacity:0.7;margin:0.4rem 0 0.2rem">Godziny online — Weekend (sob–niedz):</p>
+                <div class="owner-reports-toolbar">
+                  <input id="editor-character-hours-weekend-from" type="text" placeholder="Od, np. 10:00" style="max-width:100px" />
+                  <span style="opacity:0.5">–</span>
+                  <input id="editor-character-hours-weekend-to" type="text" placeholder="Do, np. 23:00" style="max-width:100px" />
+                </div>
+                <p style="font-size:0.75rem;opacity:0.5;margin:0.2rem 0 0.5rem">Godziny ogólne (fallback gdy brak powyższych):</p>
+                <div class="owner-reports-toolbar">
+                  <input id="editor-character-hours-from" type="text" placeholder="Od (ogólne)" style="max-width:100px" />
+                  <span style="opacity:0.5">–</span>
+                  <input id="editor-character-hours-to" type="text" placeholder="Do (ogólne)" style="max-width:100px" />
                 </div>
                 <button type="button" class="btn-primary-sm" id="btn-character-save">Zapisz medium</button>
                 <p class="err" id="character-editor-err" hidden></p>

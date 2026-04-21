@@ -1547,7 +1547,9 @@ app.get(
     const rows = await db
       .prepare(
         `SELECT id, name, tagline, category, portrait_url, gender, skills, about,
-              typical_hours_from, typical_hours_to
+              typical_hours_from, typical_hours_to,
+              hours_mon_thu_from, hours_mon_thu_to, hours_fri_from, hours_fri_to,
+              hours_weekend_from, hours_weekend_to
        FROM characters ORDER BY sort_order ASC, name ASC`
       )
       .all();
@@ -1561,7 +1563,10 @@ app.get(
     const id = String(req.params.id || "").trim();
     const row = await db
       .prepare(
-        `SELECT id, name, tagline, category, sort_order, portrait_url, gender, skills, about, typical_hours_from, typical_hours_to
+        `SELECT id, name, tagline, category, sort_order, portrait_url, gender, skills, about,
+              typical_hours_from, typical_hours_to,
+              hours_mon_thu_from, hours_mon_thu_to, hours_fri_from, hours_fri_to,
+              hours_weekend_from, hours_weekend_to
        FROM characters WHERE id = ?`
       )
       .get(id);
@@ -2213,7 +2218,10 @@ app.get(
   asyncRoute(async (_req, res) => {
     const characters = await db
       .prepare(
-        `SELECT id, name, tagline, category, sort_order, portrait_url, gender, skills, about, typical_hours_from, typical_hours_to
+        `SELECT id, name, tagline, category, sort_order, portrait_url, gender, skills, about,
+                typical_hours_from, typical_hours_to,
+                hours_mon_thu_from, hours_mon_thu_to, hours_fri_from, hours_fri_to,
+                hours_weekend_from, hours_weekend_to
          FROM characters ORDER BY sort_order ASC, name ASC`
       )
       .all();
@@ -2229,7 +2237,10 @@ app.patch(
     const characterId = String(req.params.characterId || "").trim();
     const current = await db
       .prepare(
-        `SELECT id, name, tagline, category, sort_order, portrait_url, gender, skills, about, typical_hours_from, typical_hours_to
+        `SELECT id, name, tagline, category, sort_order, portrait_url, gender, skills, about,
+                typical_hours_from, typical_hours_to,
+                hours_mon_thu_from, hours_mon_thu_to, hours_fri_from, hours_fri_to,
+                hours_weekend_from, hours_weekend_to
          FROM characters WHERE id = ?`
       )
       .get(characterId);
@@ -2242,6 +2253,12 @@ app.patch(
     const about = String(req.body?.about ?? current.about ?? "").trim();
     const typical_hours_from = String(req.body?.typical_hours_from ?? current.typical_hours_from ?? "").trim() || null;
     const typical_hours_to = String(req.body?.typical_hours_to ?? current.typical_hours_to ?? "").trim() || null;
+    const hours_mon_thu_from = String(req.body?.hours_mon_thu_from ?? current.hours_mon_thu_from ?? "").trim() || null;
+    const hours_mon_thu_to = String(req.body?.hours_mon_thu_to ?? current.hours_mon_thu_to ?? "").trim() || null;
+    const hours_fri_from = String(req.body?.hours_fri_from ?? current.hours_fri_from ?? "").trim() || null;
+    const hours_fri_to = String(req.body?.hours_fri_to ?? current.hours_fri_to ?? "").trim() || null;
+    const hours_weekend_from = String(req.body?.hours_weekend_from ?? current.hours_weekend_from ?? "").trim() || null;
+    const hours_weekend_to = String(req.body?.hours_weekend_to ?? current.hours_weekend_to ?? "").trim() || null;
     if (!name || name.length > 120) return res.status(400).json({ error: "Nazwa medium: 1-120 znaków." });
     if (!tagline || tagline.length > 220) return res.status(400).json({ error: "Krótki opis: 1-220 znaków." });
     if (!category || category.length > 40) return res.status(400).json({ error: "Kategoria medium jest wymagana." });
@@ -2255,13 +2272,24 @@ app.patch(
       .prepare(
         `UPDATE characters
          SET name = ?, tagline = ?, category = ?, portrait_url = ?, gender = ?, skills = ?, about = ?,
-             typical_hours_from = ?, typical_hours_to = ?
+             typical_hours_from = ?, typical_hours_to = ?,
+             hours_mon_thu_from = ?, hours_mon_thu_to = ?,
+             hours_fri_from = ?, hours_fri_to = ?,
+             hours_weekend_from = ?, hours_weekend_to = ?
          WHERE id = ?`
       )
-      .run(name, tagline, category, portrait_url, gender, skills, about, typical_hours_from, typical_hours_to, characterId);
+      .run(name, tagline, category, portrait_url, gender, skills, about,
+           typical_hours_from, typical_hours_to,
+           hours_mon_thu_from, hours_mon_thu_to,
+           hours_fri_from, hours_fri_to,
+           hours_weekend_from, hours_weekend_to,
+           characterId);
     const character = await db
       .prepare(
-        `SELECT id, name, tagline, category, sort_order, portrait_url, gender, skills, about, typical_hours_from, typical_hours_to
+        `SELECT id, name, tagline, category, sort_order, portrait_url, gender, skills, about,
+                typical_hours_from, typical_hours_to,
+                hours_mon_thu_from, hours_mon_thu_to, hours_fri_from, hours_fri_to,
+                hours_weekend_from, hours_weekend_to
          FROM characters WHERE id = ?`
       )
       .get(characterId);
