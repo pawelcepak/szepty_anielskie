@@ -508,16 +508,22 @@ const requireOperator = asyncRoute(async (req, res, next) => {
   next();
 });
 
-async function setCustomerSession(res, userId) {
+const REMEMBER_ME_MS = 72 * 60 * 60 * 1000; // 72 hours
+
+async function setCustomerSession(res, userId, rememberMe = false) {
   const token = tokenBytes();
   const id = uuidv4();
-  const exp = customerSessionExpiresAt();
+  const expiresMs = rememberMe ? REMEMBER_ME_MS : CUSTOMER_SESSION_IDLE_MS;
+  const exp = new Date(Date.now() + expiresMs).toISOString();
   await db
     .prepare(
       `INSERT INTO customer_sessions (id, user_id, token, expires_at) VALUES (?, ?, ?, ?)`
     )
     .run(id, userId, token, exp);
-  res.cookie(COOKIE_CUSTOMER, token, customerCookieOpts());
+  const cookieOpts = rememberMe
+    ? { ...customerCookieOpts(), maxAge: REMEMBER_ME_MS }
+    : customerCookieOpts();
+  res.cookie(COOKIE_CUSTOMER, token, cookieOpts);
   return token;
 }
 
@@ -926,6 +932,7 @@ app.post(
   asyncRoute(async (req, res) => {
     const email = String(req.body?.email || "").trim().toLowerCase();
     const password = String(req.body?.password || "");
+    const rememberMe = Boolean(req.body?.remember_me);
     const row = await db
       .prepare(
         `SELECT id, email, display_name, password_hash, username, first_name, birth_date, city, gender, has_children, smokes, drinks_alcohol, has_car, avatar_url, blocked_at, email_verified_at
@@ -941,7 +948,7 @@ app.post(
     if (!row.email_verified_at) {
       return res.status(403).json({ error: "Potwierdź adres e-mail — otwórz link w wiadomości wysłanej po rejestracji." });
     }
-    await setCustomerSession(res, row.id);
+    await setCustomerSession(res, row.id, rememberMe);
     res.json({
       user: {
         id: row.id,
