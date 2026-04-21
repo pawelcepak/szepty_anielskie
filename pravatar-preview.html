@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <title>Pravatar — podgląd wszystkich zdjęć</title>
+  <style>
+    body { font-family: sans-serif; background: #1a1030; color: #fff; padding: 1rem; }
+    h1 { color: #d4af65; margin-bottom: 0.5rem; }
+    p { color: #aaa; margin-bottom: 1.5rem; font-size: 0.9rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 1rem; }
+    .card { background: #2a1a50; border-radius: 10px; overflow: hidden; cursor: pointer; border: 2px solid transparent; transition: border 0.2s; }
+    .card:hover { border-color: #d4af65; }
+    .card.selected { border-color: #f0d878; background: #3a2060; }
+    .card img { width: 100%; display: block; }
+    .card .label { text-align: center; padding: 0.4rem; font-size: 0.85rem; color: #ccc; }
+    .card.selected .label { color: #f0d878; font-weight: bold; }
+    #selected-list { margin-top: 2rem; background: #2a1a50; padding: 1rem; border-radius: 10px; display: none; }
+    #selected-list h2 { color: #d4af65; margin-bottom: 0.5rem; }
+    #selected-list pre { color: #a0e080; font-size: 0.85rem; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>🔮 Pravatar — wybierz zdjęcia dla medium</h1>
+  <p>Kliknij na zdjęcie żeby je zaznaczyć. Na dole pojawi się lista numerów do skopiowania.</p>
+  <div class="grid" id="grid"></div>
+  <div id="selected-list">
+    <h2>Zaznaczone numery:</h2>
+    <pre id="output"></pre>
+  </div>
+
+  <script>
+    const grid = document.getElementById('grid');
+    const selected = new Set();
+
+    for (let i = 1; i <= 70; i++) {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <img src="https://i.pravatar.cc/200?img=${i}" alt="img ${i}" loading="lazy" />
+        <div class="label">#${i}</div>
+      `;
+      card.addEventListener('click', () => {
+        if (selected.has(i)) {
+          selected.delete(i);
+          card.classList.remove('selected');
+        } else {
+          selected.add(i);
+          card.classList.add('selected');
+        }
+        updateOutput();
+      });
+      grid.appendChild(card);
+    }
+
+    function updateOutput() {
+      const list = document.getElementById('selected-list');
+      const out = document.getElementById('output');
+      if (selected.size === 0) {
+        list.style.display = 'none';
+        return;
+      }
+      list.style.display = 'block';
+      const sorted = [...selected].sort((a, b) => a - b);
+      out.textContent = sorted.map(n => `img=${n}  →  https://i.pravatar.cc/400?img=${n}`).join('\n');
+    }
+  </script>
+</body>
+</html>
