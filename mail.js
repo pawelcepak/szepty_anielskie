@@ -171,7 +171,7 @@ export async function sendVerificationEmail({ to, verifyUrl, displayName }) {
   };
   const textTpl =
     String(process.env.MAIL_TEXT_EMAIL_VERIFICATION || "").trim() ||
-    `Cześć {{name}},\n\nWitaj w Szeptach Anielskich — miejscu, gdzie rozmowa z medium dzieje się na żywo, w swoim tempie, bez pośpiechu.\n\nJeszcze jeden krok: potwierdź adres e-mail, żebyśmy mogli bezpiecznie otworzyć Twój panel i pierwszą rozmowę:\n{{verifyUrl}}\n\nPo potwierdzeniu możesz od razu wybrać konsultanta, napisać pierwszą wiadomość i — gdy będziesz gotowa/gotowy — doładować konto pakietem wiadomości (w panelu zobaczysz aktualne pakiety i cennik). Im szybciej potwierdzisz, tym szybciej zostawiasz za sobą formalności i zaczynasz to, po co tu przyszłaś/przyszedłeś.\n\nLink jest ważny {{hours}} godzin. Jeśli nie Ty zakładałeś tego konta — zignoruj tę wiadomość.\n\nDo zobaczenia po drugiej stronie czatu,\nZespół Szeptów Anielskich\n`;
+    `Cześć {{name}},\n\nWitaj w Szeptach Anielskich — miejscu, gdzie rozmowa z medium dzieje się na żywo, w swoim tempie, bez pośpiechu.\n\nJeszcze jeden krok: potwierdź adres e-mail, żebyśmy mogli bezpiecznie otworzyć Twój panel i pierwszą rozmowę:\n{{verifyUrl}}\n\nJeśli powyższy link nie otwiera się z wiadomości, skopiuj go w całości do paska adresu przeglądarki.\n\nPo potwierdzeniu możesz od razu wybrać konsultanta, napisać pierwszą wiadomość i — gdy będziesz gotowa/gotowy — doładować konto pakietem wiadomości (w panelu zobaczysz aktualne pakiety i cennik). Im szybciej potwierdzisz, tym szybciej zostawiasz za sobą formalności i zaczynasz to, po co tu przyszłaś/przyszedłeś.\n\nLink jest ważny {{hours}} godzin. Jeśli nie Ty zakładałeś tego konta — zignoruj tę wiadomość.\n\nDo zobaczenia po drugiej stronie czatu,\nZespół Szeptów Anielskich\n`;
   const htmlTpl = String(process.env.MAIL_HTML_EMAIL_VERIFICATION || "").trim();
   const text = mailTpl(textTpl, vars);
   const html =
@@ -184,6 +184,7 @@ export async function sendVerificationEmail({ to, verifyUrl, displayName }) {
   <p style="margin:28px 0;text-align:center;">
     <a href="${verifyUrl}" style="display:inline-block;padding:14px 28px;border-radius:999px;background:linear-gradient(160deg,#1f6b4a,#145236);color:#fff;font-weight:700;text-decoration:none;font-size:16px;">Potwierdź e-mail i przejdź do panelu</a>
   </p>
+  <p style="font-size:14px;color:#4a4036;line-height:1.5;">Jeśli przycisk nie działa, skopiuj ten adres do przeglądarki (cały, jednym ciągiem):<br /><a href="${verifyUrl}" style="color:#145236;word-break:break-all;">${escapeHtml(verifyUrl)}</a></p>
   <p>Po zalogowaniu zobaczysz <strong>aktualne pakiety wiadomości</strong> i cennik — doładujesz konto, gdy poczujesz, że chcesz pójść dalej w rozmowie. Nie musisz decydować od razu; ważne, że już tu jesteś.</p>
   <p style="font-size:14px;color:#4a4036;">Link jest ważny <strong>${hours} godzin</strong>. Jeśli nie Ty zakładałeś tego konta — spokojnie zignoruj tę wiadomość.</p>
   <p style="margin-top:24px;">Ciepło pozdrawiamy,<br/><span style="color:#5c3d1a;">Zespół Szeptów Anielskich</span></p>
@@ -221,13 +222,13 @@ export async function sendEmailChangeConfirmation({ to, confirmUrl, displayName 
   };
   const textTpl =
     String(process.env.MAIL_TEXT_EMAIL_CHANGE || "").trim() ||
-    `Cześć {{name}},\n\nPotwierdź zmianę adresu e-mail klikając link:\n{{confirmUrl}}\n\nLink jest ważny {{hours}} godzin.\n`;
+    `Cześć {{name}},\n\nPotwierdź zmianę adresu e-mail klikając link:\n{{confirmUrl}}\n\nJeśli link nie otwiera się z wiadomości, skopiuj go w całości do paska adresu przeglądarki.\n\nLink jest ważny {{hours}} godzin.\n`;
   const htmlTpl = String(process.env.MAIL_HTML_EMAIL_CHANGE || "").trim();
   const text = mailTpl(textTpl, vars);
   const html =
     htmlTpl !== ""
       ? mailTpl(htmlTpl, vars)
-      : `<p>Cześć ${escapeHtml(name)},</p><p><a href="${confirmUrl}">Potwierdź zmianę adresu e-mail</a></p><p>Link jest ważny ${hours} godzin.</p>`;
+      : `<p>Cześć ${escapeHtml(name)},</p><p><a href="${confirmUrl}">Potwierdź zmianę adresu e-mail</a></p><p style="font-size:14px;color:#444;line-height:1.5">Jeśli przycisk lub link powyżej nie działa, skopiuj ten adres do przeglądarki:<br /><a href="${confirmUrl}" style="word-break:break-all">${escapeHtml(confirmUrl)}</a></p><p>Link jest ważny ${hours} godzin.</p>`;
   return sendMailMessage({
     to: String(to || "").trim(),
     subject: mailTpl(subject, vars),
@@ -239,10 +240,11 @@ export async function sendEmailChangeConfirmation({ to, confirmUrl, displayName 
 export async function sendPasswordResetEmail({ to, resetUrl, displayName }) {
   const name = displayName || "użytkowniku";
   const subject = "Zmiana hasła — Szepty Anielskie";
-  const text = `Cześć ${name},\n\nOtrzymaliśmy prośbę o zmianę hasła do Twojego konta.\n\nKliknij poniższy link, aby ustawić nowe hasło (ważny 2 godziny):\n${resetUrl}\n\nJeśli to nie Ty wysłałeś(aś) tę prośbę — zignoruj tę wiadomość. Twoje hasło pozostaje bez zmian.\n\nPozdrawiamy,\nZespół Szepty Anielskie`;
+  const text = `Cześć ${name},\n\nOtrzymaliśmy prośbę o zmianę hasła do Twojego konta.\n\nKliknij poniższy link, aby ustawić nowe hasło (ważny 2 godziny):\n${resetUrl}\n\nJeśli link nie otwiera się z wiadomości, skopiuj go w całości do paska adresu przeglądarki.\n\nJeśli to nie Ty wysłałeś(aś) tę prośbę — zignoruj tę wiadomość. Twoje hasło pozostaje bez zmian.\n\nPozdrawiamy,\nZespół Szepty Anielskie`;
   const html = `<p>Cześć ${escapeHtml(name)},</p>
 <p>Otrzymaliśmy prośbę o zmianę hasła do Twojego konta w serwisie Szepty Anielskie.</p>
 <p><a href="${resetUrl}" style="display:inline-block;padding:0.6rem 1.4rem;background:#c9a84c;color:#1a1206;border-radius:8px;text-decoration:none;font-weight:700">Ustaw nowe hasło</a></p>
+<p style="font-size:13px;color:#555;line-height:1.5;margin:14px 0 0">Jeśli przycisk nie działa, otwórz ten link w przeglądarce (skopiuj w całości):<br /><a href="${resetUrl}" style="word-break:break-all;color:#6b5a2a">${escapeHtml(resetUrl)}</a></p>
 <p style="font-size:0.85em;color:#888">Link jest ważny przez <strong>2 godziny</strong>. Jeśli to nie Ty wysłałeś(aś) tę prośbę — zignoruj tę wiadomość.</p>`;
   return sendMailMessage({ to: String(to || "").trim(), subject, text, html });
 }

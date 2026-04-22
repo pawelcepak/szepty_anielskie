@@ -838,7 +838,14 @@ document.getElementById("panel-onboarding-form")?.addEventListener("submit", asy
   }
 });
 
-document.getElementById("composer").addEventListener("submit", async (e) => {
+document.getElementById("body")?.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" || e.shiftKey) return;
+  if (composer?.classList.contains("hidden")) return;
+  e.preventDefault();
+  composer?.requestSubmit();
+});
+
+composer.addEventListener("submit", async (e) => {
   e.preventDefault();
   sendErr.hidden = true;
   const body = document.getElementById("body").value.trim();

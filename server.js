@@ -1398,8 +1398,7 @@ app.get("/api/public/payments-config", (_req, res) => {
         checkoutGateways.length === 0
           ? "Płatności online nie są skonfigurowane — na serwerze ustaw Stripe (STRIPE_SECRET_KEY) lub iMoje (IMOJE_*)."
           : null,
-      payments_info:
-        "Doładowanie konta działa obecnie przez bramkę Stripe. W najbliższych dniach uruchomimy również bramkę iMoje (ING Bank Śląski S.A.) — poinformujemy na stronie i w regulaminie.",
+      payments_info: null,
     },
   });
 });
