@@ -210,6 +210,8 @@ function switchView(view) {
   vc.classList.toggle("hidden", view !== "chat");
   tb.classList.toggle("panel-tab--active", view === "browse");
   tc.classList.toggle("panel-tab--active", view === "chat");
+  document.body.classList.toggle("page-panel--browse-view", view === "browse");
+  document.body.classList.toggle("page-panel--chat-view", view === "chat");
   if (view === "browse") renderBrowseCatalog();
 }
 
