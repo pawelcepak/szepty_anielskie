@@ -112,7 +112,7 @@ if (!id) {
     root.innerHTML = `
       <div class="medium-profile-top">
         <img src="${esc(c.portrait_url || "")}" alt="${esc(c.name)}" width="240" height="280" />
-        <div>
+        <div class="medium-profile-meta">
           <h1>${esc(c.name)}</h1>
           <p class="sub">${esc(c.tagline || "")}</p>
           <p class="sub"><strong>Kategoria:</strong> ${esc(c.category || "—")}</p>
@@ -121,11 +121,11 @@ if (!id) {
           <p class="sub">${esc(av.line)}</p>
         </div>
       </div>
-      ${c.skills ? `<h2 class="legal-h2">Talenty i styl pracy</h2><p class="sub">${esc(c.skills)}</p>` : ""}
-      ${c.about ? `<h2 class="legal-h2">Jak się opisuje</h2><p class="sub">${esc(c.about)}</p>` : ""}
+      ${c.skills ? `<h2 class="legal-h2 medium-profile-block-title">Talenty i styl pracy</h2><p class="sub medium-profile-block-text">${esc(c.skills)}</p>` : ""}
+      ${c.about ? `<h2 class="legal-h2 medium-profile-block-title">Jak się opisuje</h2><p class="sub medium-profile-block-text">${esc(c.about)}</p>` : ""}
       <div class="medium-profile-actions">
         <a class="btn btn-gold" href="${regHref}">Konsultacja z tym medium</a>
-        <a class="btn btn-outline" href="${panelHref}">Otwórz rozmowę w panelu</a>
+        <a class="btn btn-medium-profile-panel" href="${panelHref}">Otwórz rozmowę w panelu</a>
       </div>
     `;
   } catch (e) {

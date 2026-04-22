@@ -17,8 +17,10 @@
   <body class="page-panel page-panel--browse-view">
     <div class="panel-chrome-root" id="panel-chrome-root">
       <div class="panel-chrome-mini" id="panel-chrome-mini">
-        <a class="logo panel-chrome-mini-logo" href="/">Szepty Anielskie</a>
-        <a class="panel-chrome-mini-cennik" href="/informacje-ceny.html">Cennik</a>
+        <div class="panel-chrome-mini-brand">
+          <a class="logo logo--panel-brand panel-chrome-mini-logo" href="/">Szepty Anielskie</a>
+          <a class="link-panel-cennik link-panel-cennik--compact" href="/informacje-ceny.html">Cennik</a>
+        </div>
         <span class="panel-chrome-mini-spacer" aria-hidden="true"></span>
         <span id="panel-unread-badge" class="panel-unread-badge hidden" aria-hidden="true" title="Nieprzeczytane odpowiedzi"></span>
         <button
@@ -35,9 +37,11 @@
       <div id="panel-chrome-body" class="panel-chrome-body">
         <header class="site-top">
           <div class="site-top-inner site-top-inner--panel">
-            <a class="logo" href="/">Szepty Anielskie</a>
+            <div class="site-top-brand-panel">
+              <a class="logo logo--panel-brand" href="/">Szepty Anielskie</a>
+              <a class="link-panel-cennik link-panel-cennik--by-brand" href="/informacje-ceny.html">Cennik</a>
+            </div>
             <div class="site-top-panel-cluster">
-              <a class="link-panel-cennik" href="/informacje-ceny.html">Cennik</a>
               <p id="header-unread-banner" class="header-unread-banner hidden" role="status" aria-live="polite"></p>
               <nav class="nav-actions nav-actions--panel">
                 <button type="button" class="btn btn-account-summary btn-sm" id="account-summary-toggle">

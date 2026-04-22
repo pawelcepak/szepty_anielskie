@@ -161,7 +161,8 @@ export async function sendVerificationEmail({ to, verifyUrl, displayName }) {
   const name = displayName || "użytkowniku";
   const hours = mailLinkExpiryHours();
   const subject =
-    String(process.env.MAIL_SUBJECT_EMAIL_VERIFICATION || "").trim() || "Potwierdź adres e-mail — Szepty Anielskie";
+    String(process.env.MAIL_SUBJECT_EMAIL_VERIFICATION || "").trim() ||
+    "Jesteś o krok od rozmowy — potwierdź e-mail | Szepty Anielskie";
   const vars = {
     name,
     nameHtml: escapeHtml(name),
@@ -170,13 +171,23 @@ export async function sendVerificationEmail({ to, verifyUrl, displayName }) {
   };
   const textTpl =
     String(process.env.MAIL_TEXT_EMAIL_VERIFICATION || "").trim() ||
-    `Cześć {{name}},\n\nOtwórz link, aby potwierdzić konto:\n{{verifyUrl}}\n\nLink jest ważny {{hours}} godzin.\n`;
+    `Cześć {{name}},\n\nWitaj w Szeptach Anielskich — miejscu, gdzie rozmowa z medium dzieje się na żywo, w swoim tempie, bez pośpiechu.\n\nJeszcze jeden krok: potwierdź adres e-mail, żebyśmy mogli bezpiecznie otworzyć Twój panel i pierwszą rozmowę:\n{{verifyUrl}}\n\nPo potwierdzeniu możesz od razu wybrać konsultanta, napisać pierwszą wiadomość i — gdy będziesz gotowa/gotowy — doładować konto pakietem wiadomości (w panelu zobaczysz aktualne pakiety i cennik). Im szybciej potwierdzisz, tym szybciej zostawiasz za sobą formalności i zaczynasz to, po co tu przyszłaś/przyszedłeś.\n\nLink jest ważny {{hours}} godzin. Jeśli nie Ty zakładałeś tego konta — zignoruj tę wiadomość.\n\nDo zobaczenia po drugiej stronie czatu,\nZespół Szeptów Anielskich\n`;
   const htmlTpl = String(process.env.MAIL_HTML_EMAIL_VERIFICATION || "").trim();
   const text = mailTpl(textTpl, vars);
   const html =
     htmlTpl !== ""
       ? mailTpl(htmlTpl, vars)
-      : `<p>Cześć ${escapeHtml(name)},</p><p><a href="${verifyUrl}">Potwierdź adres e-mail</a></p><p>Link jest ważny ${hours} godzin.</p>`;
+      : `<div style="font-family:Georgia,'Times New Roman',serif;max-width:560px;margin:0 auto;line-height:1.6;color:#1f1408;">
+  <p style="font-size:17px;">Cześć <strong>${escapeHtml(name)}</strong>,</p>
+  <p>Witaj w <strong>Szeptach Anielskich</strong> — tam, gdzie rozmowa z medium ma swój rytm: bez pośpiechu, na żywo, po ludzku.</p>
+  <p>Jeszcze <strong>jeden klik</strong> dzieli Cię od panelu i pierwszej wiadomości do wybranego konsultanta. Potwierdź adres e-mail — wtedy odblokujemy konto i możesz od razu wejść w rozmowę.</p>
+  <p style="margin:28px 0;text-align:center;">
+    <a href="${verifyUrl}" style="display:inline-block;padding:14px 28px;border-radius:999px;background:linear-gradient(160deg,#1f6b4a,#145236);color:#fff;font-weight:700;text-decoration:none;font-size:16px;">Potwierdź e-mail i przejdź do panelu</a>
+  </p>
+  <p>Po zalogowaniu zobaczysz <strong>aktualne pakiety wiadomości</strong> i cennik — doładujesz konto, gdy poczujesz, że chcesz pójść dalej w rozmowie. Nie musisz decydować od razu; ważne, że już tu jesteś.</p>
+  <p style="font-size:14px;color:#4a4036;">Link jest ważny <strong>${hours} godzin</strong>. Jeśli nie Ty zakładałeś tego konta — spokojnie zignoruj tę wiadomość.</p>
+  <p style="margin-top:24px;">Ciepło pozdrawiamy,<br/><span style="color:#5c3d1a;">Zespół Szeptów Anielskich</span></p>
+</div>`;
   return sendMailMessage({
     to: String(to || "").trim(),
     subject: mailTpl(subject, vars),
