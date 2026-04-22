@@ -264,37 +264,8 @@ function renderMyThreads() {
       tag.textContent = "Nowa odpowiedź";
       b.appendChild(tag);
     }
-    if (t.client_hidden_at) {
-      b.appendChild(document.createTextNode(" · schowana"));
-    }
     b.addEventListener("click", () => openCharacter(t.character_id));
     el.appendChild(b);
-  }
-}
-
-function updateThreadVisibilityRow() {
-  const row = document.getElementById("thread-visibility-row");
-  const note = document.getElementById("thread-vis-note");
-  const btnH = document.getElementById("btn-hide-thread");
-  const btnS = document.getElementById("btn-show-thread");
-  if (!row || !btnH || !btnS) return;
-  if (!selectedId) {
-    row.classList.add("hidden");
-    return;
-  }
-  row.classList.remove("hidden");
-  const th = myThreads.find((x) => x.character_id === selectedId);
-  if (!th) {
-    row.classList.add("hidden");
-    return;
-  }
-  const hidden = !!th.client_hidden_at;
-  btnH.classList.toggle("hidden", hidden);
-  btnS.classList.toggle("hidden", !hidden);
-  if (note) {
-    note.textContent = hidden
-      ? "Wątek jest schowany w panelu — konsultant nadal go widzi."
-      : "";
   }
 }
 
@@ -591,7 +562,6 @@ async function openCharacter(id) {
   composer.classList.remove("hidden");
   await loadThreads();
   renderBrowseCatalog();
-  updateThreadVisibilityRow();
 }
 
 function renderMessages(msgs) {
@@ -732,42 +702,6 @@ document.getElementById("panel-onboarding-form")?.addEventListener("submit", asy
     if (err) {
       err.hidden = false;
       err.textContent = e.message || String(e);
-    }
-  }
-});
-
-document.getElementById("btn-hide-thread")?.addEventListener("click", async () => {
-  if (!selectedId) return;
-  try {
-    await api(`/api/threads/${encodeURIComponent(selectedId)}/client-visibility`, {
-      method: "PATCH",
-      body: JSON.stringify({ hidden: true }),
-    });
-    await loadThreads();
-    updateThreadVisibilityRow();
-  } catch (e) {
-    const se = document.getElementById("send-err");
-    if (se) {
-      se.textContent = e.message;
-      se.hidden = false;
-    }
-  }
-});
-
-document.getElementById("btn-show-thread")?.addEventListener("click", async () => {
-  if (!selectedId) return;
-  try {
-    await api(`/api/threads/${encodeURIComponent(selectedId)}/client-visibility`, {
-      method: "PATCH",
-      body: JSON.stringify({ hidden: false }),
-    });
-    await loadThreads();
-    updateThreadVisibilityRow();
-  } catch (e) {
-    const se = document.getElementById("send-err");
-    if (se) {
-      se.textContent = e.message;
-      se.hidden = false;
     }
   }
 });

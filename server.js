@@ -2526,6 +2526,11 @@ function validateImageLikeUrl(raw) {
     if (value.length > 2000) throw new Error("Adres obrazu jest zbyt długi.");
     return value;
   }
+  if (value.startsWith("/")) {
+    if (value.length > 2000) throw new Error("Adres obrazu jest zbyt długi.");
+    if (/\s/.test(value) || value.includes("..")) throw new Error("Podaj poprawny adres obrazu lub data URL.");
+    return value;
+  }
   throw new Error("Podaj poprawny adres obrazu lub data URL.");
 }
 

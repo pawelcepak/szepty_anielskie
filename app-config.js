@@ -10,11 +10,13 @@ export const APP_CONFIG = {
   },
   pricing: {
     currency: "PLN",
+    /* Pakiety: ta sama lista jest używana przy naliczaniu Stripe/iMoje, w panelu i na /informacje-ceny.html (API).
+       Na serwerze możesz nadpisać kwoty zmiennymi środowiskowymi CLIENT_PKG_10_PLN, CLIENT_PKG_20_PLN, itd. */
     clientPackages: [
-      { amount: 10, price_pln: 14.99 },
-      { amount: 20, price_pln: 24.99 },
-      { amount: 50, price_pln: 65.99 },
-      { amount: 100, price_pln: 119.99 },
+      { amount: 10, price_pln: 16.99 },
+      { amount: 20, price_pln: 29.99 },
+      { amount: 50, price_pln: 69.99 },
+      { amount: 100, price_pln: 129.98 },
     ],
     paymentOperator: "ING Bank Śląski S.A. (bramka płatności iMoje)",
   },

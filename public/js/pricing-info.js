@@ -11,6 +11,12 @@ function esc(s) {
 const root = document.getElementById("legal-pricing");
 const note = document.getElementById("pricing-load-note");
 
+function formatPln(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return "—";
+  return x.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 if (root) {
   try {
     const { packages } = await api("/api/public/pricing");
@@ -19,7 +25,7 @@ if (root) {
       .map(
         (p) =>
           `<div class="price-box"><strong>${esc(String(p.amount))}</strong><span>wiadomości</span><span class="price-pln">${esc(
-            String(p.price_pln)
+            formatPln(p.price_pln)
           )} zł</span></div>`
       )
       .join("");
