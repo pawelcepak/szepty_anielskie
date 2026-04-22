@@ -2151,6 +2151,8 @@ app.get("/api/op/inbox", requireOperator, asyncRoute(async (req, res) => {
               c.id AS character_id,
               c.name AS character_name,
               c.category,
+              c.typical_hours_from,
+              c.typical_hours_to,
               t.created_at AS thread_started_at,
               (SELECT COUNT(*) FROM messages m WHERE m.thread_id = t.id) AS message_count,
               (SELECT m.sender FROM messages m WHERE m.thread_id = t.id ORDER BY m.created_at DESC LIMIT 1) AS last_sender,
@@ -2188,7 +2190,13 @@ app.get("/api/op/clients", requireOperator, requireOwner, asyncRoute(async (req,
               u.email_verification_token,
               datetime(u.created_at) AS created_at,
               (SELECT COUNT(*) FROM threads t WHERE t.user_id = u.id) AS thread_count,
-              (SELECT COALESCE(SUM(delta), 0) FROM ledger l WHERE l.user_id = u.id) AS messages_balance
+              (SELECT COALESCE(SUM(delta), 0) FROM ledger l WHERE l.user_id = u.id) AS messages_balance,
+              (SELECT datetime(m.created_at)
+                 FROM messages m
+                 JOIN threads t2 ON t2.id = m.thread_id
+                WHERE t2.user_id = u.id
+                ORDER BY datetime(m.created_at) DESC
+                LIMIT 1) AS last_message_at
        FROM users u`;
   const params = [];
   if (g) {
@@ -2241,6 +2249,60 @@ app.patch("/api/op/clients/:clientId/block", requireOperator, requireOwner, asyn
     await db.prepare("DELETE FROM customer_sessions WHERE user_id = ?").run(clientId);
   }
   res.json({ ok: true, client_id: clientId, blocked_at: value, email: row.email });
+}));
+
+app.post("/api/op/clients/:clientId/messages-adjust", requireOperator, requireOwner, asyncRoute(async (req, res) => {
+  const clientId = String(req.params.clientId || "").trim();
+  const deltaRaw = Number(req.body?.delta);
+  const delta = Number.isFinite(deltaRaw) ? Math.trunc(deltaRaw) : NaN;
+  const note = String(req.body?.note || "").trim().slice(0, 120);
+  if (!Number.isInteger(delta) || delta === 0 || delta < -500 || delta > 500) {
+    return res.status(400).json({ error: "Pole delta musi być liczbą całkowitą z zakresu -500..500 (bez 0)." });
+  }
+  if (note.length < 3) {
+    return res.status(400).json({ error: "Dodaj krótką notatkę (min. 3 znaki) dlaczego zmieniasz saldo." });
+  }
+  const row = await db
+    .prepare("SELECT id, email, first_name, display_name FROM users WHERE id = ?")
+    .get(clientId);
+  if (!row) return res.status(404).json({ error: "Nie znaleziono klienta." });
+  const currentBalance = await messagesBalance(clientId);
+  if (currentBalance + delta < 0) {
+    return res.status(400).json({
+      error: `Ta korekta dałaby saldo ujemne. Obecne saldo: ${currentBalance}.`,
+    });
+  }
+  const ledgerId = uuidv4();
+  await db
+    .prepare("INSERT INTO ledger (id, user_id, delta, reason) VALUES (?, ?, ?, ?)")
+    .run(ledgerId, clientId, delta, `owner_adjust:${note}`);
+  const nextBalance = await messagesBalance(clientId);
+  await db
+    .prepare(
+      `INSERT INTO operator_audit (id, operator_id, action, thread_id, detail)
+       VALUES (?, ?, 'client_balance_adjust', ?, ?)`
+    )
+    .run(
+      uuidv4(),
+      req.operator.id,
+      null,
+      JSON.stringify({
+        client_id: clientId,
+        client_email: row.email || "",
+        delta,
+        balance_before: currentBalance,
+        balance_after: nextBalance,
+        note,
+      })
+    );
+  res.json({
+    ok: true,
+    client_id: clientId,
+    client_name: row.first_name || row.display_name || "",
+    delta,
+    balance_before: currentBalance,
+    balance_after: nextBalance,
+  });
 }));
 
 app.post("/api/op/clients/:clientId/delete", requireOperator, requireOwner, asyncRoute(async (req, res) => {

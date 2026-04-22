@@ -498,6 +498,7 @@ function applyRoleChrome() {
   const staffSub = document.getElementById("staff-top-subnav");
   const advWrap = document.getElementById("owner-advanced-toggle-wrap");
   const advBtn = document.getElementById("owner-advanced-toggle");
+  const ownerInboxFilterWrap = document.getElementById("owner-inbox-filter");
   inboxBucket = opRole === "owner" ? "pending" : "mine";
   layoutWork?.classList.remove("layout-work--sidebar-hidden");
   setInboxOpen(false);
@@ -505,6 +506,7 @@ function applyRoleChrome() {
   if (opRole !== "owner") layoutWork?.classList.remove("layout-work--inbox-collapsed");
   btnInboxSidebar?.classList.toggle("hidden", opRole !== "owner");
   staffSub?.classList.toggle("hidden", opRole === "owner");
+  ownerInboxFilterWrap?.classList.toggle("hidden", opRole !== "owner");
   const logoMain = document.getElementById("op-logo-main");
   if (logoMain) {
     logoMain.title =
@@ -985,6 +987,150 @@ function ownerMonthLabel(iso) {
 }
 
 let ownerClientsFilterBound = false;
+let ownerClientsRowsCache = [];
+let ownerInboxFilterOnlineOnly = false;
+
+function parseTimeHM(s) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(s || "").trim());
+  if (!m) return null;
+  const h = Number(m[1]);
+  const mi = Number(m[2]);
+  if (!Number.isInteger(h) || !Number.isInteger(mi) || h < 0 || h > 23 || mi < 0 || mi > 59) return null;
+  return h * 60 + mi;
+}
+
+function warsawNowMinutes() {
+  const d = new Date();
+  const parts = new Intl.DateTimeFormat("pl-PL", {
+    timeZone: "Europe/Warsaw",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(d);
+  const map = {};
+  for (const p of parts) {
+    if (p.type !== "literal") map[p.type] = p.value;
+  }
+  const h = Number(map.hour || 0);
+  const mi = Number(map.minute || 0);
+  if (!Number.isFinite(h) || !Number.isFinite(mi)) return d.getHours() * 60 + d.getMinutes();
+  return h * 60 + mi;
+}
+
+function isMediumOnlineNowByHours(fromHm, toHm) {
+  const from = parseTimeHM(fromHm);
+  const to = parseTimeHM(toHm);
+  if (from == null || to == null) return false;
+  const now = warsawNowMinutes();
+  if (from <= to) return now >= from && now <= to;
+  return now >= from || now <= to;
+}
+
+function csvEscape(v) {
+  const s = String(v ?? "");
+  if (!/[",\n;]/.test(s)) return s;
+  return `"${s.replaceAll('"', '""')}"`;
+}
+
+function clientAccountStatusLabel(c) {
+  if (c.blocked_at) return "blocked";
+  if (!c.email_verified_at) return "unverified";
+  return "active";
+}
+
+function clientVerificationStatusLabel(c) {
+  if (c.email_verified_at) return "verified";
+  if (c.email_verification_token) return "pending";
+  return "legacy";
+}
+
+function daysSinceDateUtc(isoLike) {
+  const ts = new Date(String(isoLike || "")).getTime();
+  if (!Number.isFinite(ts)) return null;
+  const diff = Date.now() - ts;
+  if (!Number.isFinite(diff)) return null;
+  return Math.max(0, Math.floor(diff / (24 * 60 * 60 * 1000)));
+}
+
+function applyOwnerClientsExtraFilters(rows) {
+  const q = String(document.getElementById("owner-clients-search")?.value || "")
+    .trim()
+    .toLowerCase();
+  const accountFilter = String(document.getElementById("owner-clients-status-filter")?.value || "").trim();
+  const verifyFilter = String(document.getElementById("owner-clients-verify-filter")?.value || "").trim();
+  const balanceFilter = String(document.getElementById("owner-clients-balance-filter")?.value || "").trim();
+  const inactiveFilter = String(document.getElementById("owner-clients-inactive-filter")?.value || "").trim();
+  return rows.filter((c) => {
+    if (q) {
+      const hay = [
+        c.username,
+        c.email,
+        c.first_name,
+        c.display_name,
+        c.city,
+      ]
+        .map((x) => String(x || "").toLowerCase())
+        .join(" | ");
+      if (!hay.includes(q)) return false;
+    }
+    if (accountFilter && clientAccountStatusLabel(c) !== accountFilter) return false;
+    if (verifyFilter && clientVerificationStatusLabel(c) !== verifyFilter) return false;
+    const bal = Number(c.messages_balance || 0);
+    if (balanceFilter === "negative_or_zero" && bal > 0) return false;
+    if (balanceFilter === "low" && !(bal >= 1 && bal <= 3)) return false;
+    if (balanceFilter === "ok" && bal < 4) return false;
+    const inactivityDays = daysSinceDateUtc(c.last_message_at);
+    if (inactiveFilter === "14" && !(inactivityDays != null && inactivityDays >= 14)) return false;
+    if (inactiveFilter === "30" && !(inactivityDays != null && inactivityDays >= 30)) return false;
+    if (inactiveFilter === "90" && !(inactivityDays != null && inactivityDays >= 90)) return false;
+    return true;
+  });
+}
+
+function downloadOwnerClientsCsv(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  const head = [
+    "username",
+    "email",
+    "name",
+    "city",
+    "gender",
+    "status_account",
+    "status_verification",
+    "created_at",
+    "last_message_at",
+    "thread_count",
+    "messages_balance",
+  ];
+  const lines = [head.join(";")];
+  for (const c of list) {
+    const line = [
+      c.username || "",
+      c.email || "",
+      c.first_name || c.display_name || "",
+      c.city || "",
+      ownerGenderLabel(c.gender),
+      clientAccountStatusLabel(c),
+      clientVerificationStatusLabel(c),
+      c.created_at || "",
+      c.last_message_at || "",
+      Number(c.thread_count || 0),
+      Number(c.messages_balance || 0),
+    ].map(csvEscape);
+    lines.push(line.join(";"));
+  }
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const stamp = new Date().toISOString().slice(0, 19).replaceAll(":", "-");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `klienci-${stamp}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    URL.revokeObjectURL(a.href);
+    a.remove();
+  }, 250);
+}
 
 async function refreshOwnerClients() {
   if (opRole !== "owner") return;
@@ -998,6 +1144,24 @@ async function refreshOwnerClients() {
     document.getElementById("owner-clients-sort")?.addEventListener("change", () => {
       refreshOwnerClients();
     });
+    document.getElementById("owner-clients-search")?.addEventListener("input", () => {
+      refreshOwnerClients();
+    });
+    document.getElementById("owner-clients-status-filter")?.addEventListener("change", () => {
+      refreshOwnerClients();
+    });
+    document.getElementById("owner-clients-verify-filter")?.addEventListener("change", () => {
+      refreshOwnerClients();
+    });
+    document.getElementById("owner-clients-balance-filter")?.addEventListener("change", () => {
+      refreshOwnerClients();
+    });
+    document.getElementById("owner-clients-inactive-filter")?.addEventListener("change", () => {
+      refreshOwnerClients();
+    });
+    document.getElementById("owner-clients-export-csv")?.addEventListener("click", () => {
+      downloadOwnerClientsCsv(ownerClientsRowsCache);
+    });
   }
   if (!ownerClientsActionsBound) {
     ownerClientsActionsBound = true;
@@ -1006,7 +1170,8 @@ async function refreshOwnerClients() {
       const blockBtn = ev.target.closest("[data-client-block]");
       const unblockBtn = ev.target.closest("[data-client-unblock]");
       const deleteBtn = ev.target.closest("[data-client-delete]");
-      const btn = verifyBtn || blockBtn || unblockBtn || deleteBtn;
+      const adjustBtn = ev.target.closest("[data-client-adjust-balance]");
+      const btn = verifyBtn || blockBtn || unblockBtn || deleteBtn || adjustBtn;
       if (!btn) return;
       const clientId = btn.getAttribute("data-client-id");
       if (!clientId) return;
@@ -1049,6 +1214,24 @@ async function refreshOwnerClients() {
           alert("Konto klienta zostało usunięte.");
           await refreshOwnerClients();
           await refreshInbox();
+        } else if (adjustBtn) {
+          const deltaRaw = window.prompt("Podaj korektę salda wiadomości (np. 5 lub -3):", "5");
+          if (deltaRaw == null) return;
+          const delta = Number(deltaRaw);
+          if (!Number.isFinite(delta) || !Number.isInteger(delta) || delta === 0) {
+            alert("Korekta musi być liczbą całkowitą różną od 0.");
+            return;
+          }
+          const note = window.prompt("Krótka notatka (powód korekty):", "Korekta administracyjna");
+          if (note == null) return;
+          await api(`/api/op/clients/${encodeURIComponent(clientId)}/messages-adjust`, {
+            method: "POST",
+            body: JSON.stringify({
+              delta,
+              note: String(note || "").trim(),
+            }),
+          });
+          await refreshOwnerClients();
         } else {
           return;
         }
@@ -1063,6 +1246,7 @@ async function refreshOwnerClients() {
     const g = String(document.getElementById("owner-clients-gender-filter")?.value || "").trim();
     const sortDir = String(document.getElementById("owner-clients-sort")?.value || "newest").trim();
     const statsEl = document.getElementById("owner-clients-month-stats");
+    const summaryEl = document.getElementById("owner-clients-summary");
     const url = g ? `/api/op/clients?gender=${encodeURIComponent(g)}` : "/api/op/clients";
     const data = await api(url);
     const clients = [...(data.clients || [])];
@@ -1071,8 +1255,17 @@ async function refreshOwnerClients() {
       const tb = new Date(String(b?.created_at || "")).getTime() || 0;
       return sortDir === "oldest" ? ta - tb : tb - ta;
     });
+    const filteredClients = applyOwnerClientsExtraFilters(clients);
+    ownerClientsRowsCache = filteredClients;
+    const summary = {
+      all: filteredClients.length,
+      active: filteredClients.filter((c) => !c.blocked_at).length,
+      blocked: filteredClients.filter((c) => !!c.blocked_at).length,
+      verified: filteredClients.filter((c) => !!c.email_verified_at).length,
+      low_balance: filteredClients.filter((c) => Number(c.messages_balance || 0) <= 3).length,
+    };
     const byMonth = new Map();
-    for (const c of clients) {
+    for (const c of filteredClients) {
       const key = ownerMonthLabel(c?.created_at);
       if (!key) continue;
       byMonth.set(key, (byMonth.get(key) || 0) + 1);
@@ -1083,7 +1276,16 @@ async function refreshOwnerClients() {
         .join("");
       statsEl.innerHTML = statsHtml || `<span class="owner-clients-month-chip">Brak danych miesięcznych</span>`;
     }
-    const rows = clients
+    if (summaryEl) {
+      summaryEl.innerHTML = `
+        <span class="owner-clients-summary-chip">Widocznych: <b>${summary.all}</b></span>
+        <span class="owner-clients-summary-chip">Aktywni: <b>${summary.active}</b></span>
+        <span class="owner-clients-summary-chip">Zablokowani: <b>${summary.blocked}</b></span>
+        <span class="owner-clients-summary-chip">E-mail zweryfikowany: <b>${summary.verified}</b></span>
+        <span class="owner-clients-summary-chip">Niskie saldo (<=3): <b>${summary.low_balance}</b></span>
+      `;
+    }
+    const rows = filteredClients
       .map(
         (c) => {
           const blocked = !!c.blocked_at;
@@ -1100,9 +1302,15 @@ async function refreshOwnerClients() {
           const blockAction = blocked
             ? `<button type="button" class="btn-mon" data-client-unblock data-client-id="${esc(c.id)}">Odblokuj</button>`
             : `<button type="button" class="btn-mon btn-mon--danger" data-client-block data-client-id="${esc(c.id)}">Zablokuj</button>`;
+          const balanceAction = `<button type="button" class="btn-mon btn-mon--primary" data-client-adjust-balance data-client-id="${esc(
+            c.id
+          )}">Korekta salda</button>`;
           const deleteAction = `<button type="button" class="btn-mon btn-mon--danger" data-client-delete data-client-id="${esc(
             c.id
           )}">Usuń konto</button>`;
+          const inactivityDays = daysSinceDateUtc(c.last_message_at);
+          const inactivityLabel =
+            inactivityDays == null ? "brak wiadomości" : `${inactivityDays} dni temu`;
           const profileBlock = `<div class="owner-client-profile-block">
             <div><strong>nazwa:</strong> ${esc(c.first_name || c.display_name || "—")}</div>
             <div><strong>email:</strong> ${esc(c.email || "—")}</div>
@@ -1118,12 +1326,14 @@ async function refreshOwnerClients() {
           return (
           `<tr><td>${esc(c.username || "—")}</td><td>${profileBlock}</td><td>${extraBlock}</td><td>${esc(String(c.birth_date || "").slice(0, 10))}</td><td>${esc(
             formatOpPlTime(c.created_at)
-          )}</td><td>${blocked ? "zablokowany" : "aktywny"}</td><td>${esc(verifyStatus)}</td><td>${verifyAction}<br/>${blockAction}<br/>${deleteAction}</td><td>${c.thread_count ?? 0}</td><td>${c.messages_balance ?? 0}</td></tr>`
+          )}</td><td>${blocked ? "zablokowany" : "aktywny"}</td><td>${esc(verifyStatus)}</td><td>${esc(
+            c.last_message_at ? formatOpPlTime(c.last_message_at) : "—"
+          )}<br/><span class="owner-client-inactive">${esc(inactivityLabel)}</span></td><td>${verifyAction}<br/>${blockAction}<br/>${balanceAction}<br/>${deleteAction}</td><td>${c.thread_count ?? 0}</td><td>${c.messages_balance ?? 0}</td></tr>`
           );
         }
       )
       .join("");
-    body.innerHTML = `<table class="mon-table"><thead><tr><th>Nick</th><th>Profil</th><th>Dodatkowe info</th><th>Ur.</th><th>Rejestracja</th><th>Status konta</th><th>Status e-mail</th><th>Akcje</th><th>Wątki</th><th>Saldo</th></tr></thead><tbody>${
+    body.innerHTML = `<table class="mon-table"><thead><tr><th>Nick</th><th>Profil</th><th>Dodatkowe info</th><th>Ur.</th><th>Rejestracja</th><th>Status konta</th><th>Status e-mail</th><th>Ostatnia aktywność</th><th>Akcje</th><th>Wątki</th><th>Saldo</th></tr></thead><tbody>${
       rows || ""
     }</tbody></table>`;
   } catch {
@@ -1521,6 +1731,86 @@ function renderInboxTabs() {
   }
 }
 
+function renderMediumStatusList(items, opts = {}) {
+  const rows = Array.isArray(items) ? items : [];
+  if (!rows.length) {
+    return `<p class="queue-empty">${esc(opts.emptyText || "Brak pozycji.")}</p>`;
+  }
+  return `<ul class="mon-medium-list">${rows
+    .map((m) => {
+      const cat = String(m.category || "").trim() || "medium";
+      const hasHours = String(m.typical_hours_from || "").trim() && String(m.typical_hours_to || "").trim();
+      const hoursText = hasHours
+        ? `${m.typical_hours_from} - ${m.typical_hours_to}`
+        : "Godziny: do uzupełnienia";
+      let etaText = "";
+      if (m.next_online_label_pl) {
+        const mins = Number(m.next_online_in_minutes);
+        const minsLabel =
+          Number.isFinite(mins) && mins > 0
+            ? ` (za ${mins} ${mins === 1 ? "minutę" : mins < 5 ? "minuty" : "minut"})`
+            : "";
+        etaText = ` · start: ${m.next_online_label_pl}${minsLabel}`;
+      } else if (m.status_reason) {
+        etaText = ` · ${m.status_reason}`;
+      }
+      return `<li class="mon-medium-item"><strong>${esc(m.name || "Medium")}</strong> <span class="mon-medium-meta">(${esc(
+        cat
+      )})</span><br /><span class="mon-medium-meta">${esc(hoursText + etaText)}</span></li>`;
+    })
+    .join("")}</ul>`;
+}
+
+function renderOwnerMediumStatusSection(mediumStatus, monitorTime) {
+  const safe = mediumStatus || {};
+  const onlineNow = Array.isArray(safe.online_now) ? [...safe.online_now] : [];
+  const onlineSoon = Array.isArray(safe.online_within_hour) ? [...safe.online_within_hour] : [];
+  const offline = Array.isArray(safe.offline) ? [...safe.offline] : [];
+  onlineSoon.sort(
+    (a, b) =>
+      (Number(a.next_online_in_minutes) || Number.MAX_SAFE_INTEGER) -
+      (Number(b.next_online_in_minutes) || Number.MAX_SAFE_INTEGER)
+  );
+  offline.sort((a, b) => {
+    const ad = Number(a.next_online_in_minutes);
+    const bd = Number(b.next_online_in_minutes);
+    const aRank = Number.isFinite(ad) ? ad : Number.MAX_SAFE_INTEGER;
+    const bRank = Number.isFinite(bd) ? bd : Number.MAX_SAFE_INTEGER;
+    if (aRank !== bRank) return aRank - bRank;
+    return String(a.name || "").localeCompare(String(b.name || ""), "pl");
+  });
+  const totals = safe.totals || {};
+  const nowLabel = String(monitorTime?.label_pl || "").trim();
+  const nowLine = nowLabel
+    ? `<p class="mon-medium-now">Aktualny czas (Europe/Warsaw): <strong>${esc(nowLabel)}</strong></p>`
+    : "";
+  return `<section class="mon-medium-section" aria-label="Statusy medium">
+      <h4 class="mon-sub">Status medium wg czasu i dnia tygodnia</h4>
+      ${nowLine}
+      <div class="mon-medium-counts">
+        <span class="mon-medium-chip mon-medium-chip--on">Online teraz: ${Number(totals.online_now) || 0}</span>
+        <span class="mon-medium-chip mon-medium-chip--soon">Online w ciągu godziny: ${
+          Number(totals.online_within_hour) || 0
+        }</span>
+        <span class="mon-medium-chip mon-medium-chip--off">Offline: ${Number(totals.offline) || 0}</span>
+      </div>
+      <div class="mon-medium-grid">
+        <article class="mon-medium-col">
+          <h5>Online teraz</h5>
+          ${renderMediumStatusList(onlineNow, { emptyText: "Brak medium online w tej chwili." })}
+        </article>
+        <article class="mon-medium-col">
+          <h5>Online w ciągu godziny</h5>
+          ${renderMediumStatusList(onlineSoon, { emptyText: "Brak medium zaczynających dyżur w ciągu 60 minut." })}
+        </article>
+        <article class="mon-medium-col">
+          <h5>Offline</h5>
+          ${renderMediumStatusList(offline, { emptyText: "Brak medium offline." })}
+        </article>
+      </div>
+    </section>`;
+}
+
 async function refreshOwnerMonitor() {
   if (opRole !== "owner") return;
   const body = document.getElementById("owner-monitor-body");
@@ -1578,10 +1868,12 @@ async function refreshOwnerMonitor() {
           )}</td><td><button type="button" class="btn-audit-open" data-audit-id="${esc(a.id)}">Pełny wpis</button></td></tr>`
       )
       .join("");
+    const mediumSection = renderOwnerMediumStatusSection(data.medium_status, data.monitor_time);
     body.innerHTML = `${ownerBlock}
       <div class="mon-cards">${
         staffParts.join("") || "<p class=\"queue-empty\">Brak kont pracowniczych.</p>"
       }</div>
+      ${mediumSection}
       <h4 class="mon-sub">Dziennik audytu (cały zespół)</h4>
       <div class="mon-scroll"><table class="mon-table mon-table--audit"><thead><tr><th>Kiedy</th><th>Kto</th><th>Akcja</th><th>Skrót</th><th></th></tr></thead><tbody>${aud}</tbody></table></div>`;
   } catch {
@@ -2792,6 +3084,9 @@ document.getElementById("btn-logout").addEventListener("click", async () => {
 });
 
 document.getElementById("btn-refresh").addEventListener("click", () => refreshInbox());
+document.getElementById("inbox-online-only")?.addEventListener("change", () => {
+  if (opRole === "owner") refreshInbox();
+});
 
 btnInboxSidebar?.addEventListener("click", () => rozmowyToggle());
 inboxBackdrop.addEventListener("click", () => setInboxOpen(false));
@@ -2818,23 +3113,38 @@ async function refreshInbox() {
     await refreshStaffConvView();
     return;
   }
+  const ownerInboxFilterWrap = document.getElementById("owner-inbox-filter");
   const teaserWrap = document.getElementById("owner-teaser-panel");
   const inboxEl = document.getElementById("inbox");
   if (inboxBucket === "teaser") {
+    ownerInboxFilterWrap?.classList.add("hidden");
     if (teaserWrap) teaserWrap.classList.remove("hidden");
     if (inboxEl) inboxEl.classList.add("hidden");
     renderInboxTabs();
     await renderOwnerTeaserPanel();
     return;
   }
+  ownerInboxFilterWrap?.classList.remove("hidden");
   const data = await api(`/api/op/inbox?bucket=${encodeURIComponent(inboxBucket)}`);
   threads = data.threads || [];
+  const onlineToggleEl = document.getElementById("inbox-online-only");
+  ownerInboxFilterOnlineOnly = !!onlineToggleEl?.checked;
+  let visibleThreads = threads;
+  if (opRole === "owner" && ownerInboxFilterOnlineOnly) {
+    visibleThreads = threads.filter((t) =>
+      isMediumOnlineNowByHours(t.typical_hours_from, t.typical_hours_to)
+    );
+  }
   if (teaserWrap) teaserWrap.classList.add("hidden");
   if (inboxEl) inboxEl.classList.remove("hidden");
   renderInboxTabs();
+  const counterEl = document.getElementById("inbox-online-only-count");
+  if (counterEl) {
+    counterEl.textContent = ownerInboxFilterOnlineOnly ? `(${visibleThreads.length}/${threads.length})` : "";
+  }
   const inboxPane = document.getElementById("inbox");
   inboxPane.innerHTML = "";
-  for (const t of threads) {
+  for (const t of visibleThreads) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className =
@@ -2863,6 +3173,13 @@ async function refreshInbox() {
       setInboxOpen(false);
     });
     inboxPane.appendChild(btn);
+  }
+  if (!visibleThreads.length) {
+    inboxPane.innerHTML = `<p class="queue-empty">${
+      ownerInboxFilterOnlineOnly
+        ? "Brak rozmów z medium online w tej chwili."
+        : "Brak rozmów w tym widoku."
+    }</p>`;
   }
 }
 
