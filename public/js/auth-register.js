@@ -1,5 +1,25 @@
 import { api } from "./api.js";
 
+function parseBirthDateClient(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || "").trim());
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]) - 1;
+  const da = Number(m[3]);
+  const d = new Date(y, mo, da, 12, 0, 0, 0);
+  if (d.getFullYear() !== y || d.getMonth() !== mo || d.getDate() !== da) return null;
+  return d;
+}
+
+function birthDateAllowedClient(d) {
+  const now = new Date();
+  const cutoff18 = new Date(now.getFullYear() - 18, now.getMonth(), now.getDate(), 12, 0, 0, 0);
+  if (d.getTime() > cutoff18.getTime()) return false;
+  const oldest = new Date(now.getFullYear() - 120, now.getMonth(), now.getDate(), 12, 0, 0, 0);
+  if (d.getTime() < oldest.getTime()) return false;
+  return true;
+}
+
 function esc(s) {
   return String(s)
     .replaceAll("&", "&amp;")
@@ -10,6 +30,21 @@ function esc(s) {
 
 const err = document.getElementById("err");
 const success = document.getElementById("register-success");
+function toIsoDateLocal(d) {
+  const y = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const da = String(d.getDate()).padStart(2, "0");
+  return `${y}-${mo}-${da}`;
+}
+
+const birthInput = document.getElementById("birth_date");
+if (birthInput) {
+  const now = new Date();
+  const maxD = new Date(now.getFullYear() - 18, now.getMonth(), now.getDate());
+  const minD = new Date(now.getFullYear() - 120, now.getMonth(), now.getDate());
+  birthInput.setAttribute("max", toIsoDateLocal(maxD));
+  birthInput.setAttribute("min", toIsoDateLocal(minD));
+}
 
 const params = new URLSearchParams(window.location.search);
 const mediumId = params.get("medium");
@@ -69,6 +104,22 @@ document.getElementById("form").addEventListener("submit", async (e) => {
     err.hidden = false;
     if (submitBtn) submitBtn.disabled = false;
     return;
+  }
+  if (birth_date) {
+    const bd = parseBirthDateClient(birth_date);
+    if (!bd) {
+      err.textContent = "Podaj prawidłową datę urodzenia (format rrrr-mm-dd).";
+      err.hidden = false;
+      if (submitBtn) submitBtn.disabled = false;
+      return;
+    }
+    if (!birthDateAllowedClient(bd)) {
+      err.textContent =
+        "Z podanej daty wynika, że nie masz ukończonych 18 lat (albo data jest zbyt odległa). Usługa jest przeznaczona dla osób pełnoletnich.";
+      err.hidden = false;
+      if (submitBtn) submitBtn.disabled = false;
+      return;
+    }
   }
   const mediumParam = new URLSearchParams(window.location.search).get("medium");
   try {

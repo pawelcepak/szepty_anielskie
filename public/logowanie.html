@@ -30,7 +30,6 @@
     <main class="auth-main">
       <div class="auth-card">
         <h1>Logowanie</h1>
-        <p class="sub">Użyj adresu e-mail i hasła ustawionego przy rejestracji.</p>
         <p class="form-info" id="auth-info" hidden></p>
         <form id="form">
           <label for="email">E-mail</label>
@@ -42,7 +41,7 @@
           <p class="form-error" id="err" hidden></p>
           <label class="remember-me-label">
             <input id="remember-me" name="remember_me" type="checkbox" />
-            Zapamiętaj mnie na 72&nbsp;godz.
+            Nie wylogowuj mnie (przez 72&nbsp;godziny).
           </label>
           <button class="btn btn-primary" type="submit">Zaloguj</button>
         </form>
@@ -50,11 +49,11 @@
           Nie masz konta? <a href="/rejestracja.html">Załóż je</a>
         </p>
         <p class="sub" style="margin-top: 0.45rem; margin-bottom: 0">
+          <a href="/odzyskaj-haslo.html">Nie pamiętam hasła</a>
+        </p><br>
+        <p class="sub" style="margin-top: 0.45rem; margin-bottom: 0">
           Brak maila aktywacyjnego?
           <button type="button" class="btn-linklike" id="btn-resend-verification">Wyślij link ponownie</button>
-        </p>
-        <p class="sub" style="margin-top: 0.45rem; margin-bottom: 0">
-          <a href="/odzyskaj-haslo.html">Nie pamiętam hasła</a>
         </p>
       </div>
     </main>

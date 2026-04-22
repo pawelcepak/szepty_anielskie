@@ -917,6 +917,16 @@ app.post("/api/auth/register", registerJsonParser, async (req, res, next) => {
   if (city.length > 0 && (city.length < 2 || city.length > 80)) {
     return res.status(400).json({ error: "Miasto: opcjonalne; jeśli podasz — 2–80 znaków." });
   }
+  if (birth_date) {
+    const bd = parseBirthDate(birth_date);
+    if (!bd) return res.status(400).json({ error: "Nieprawidłowa data urodzenia." });
+    if (!birthDateAllowed(bd)) {
+      return res.status(400).json({
+        error:
+          "Z podanej daty urodzenia wynika wiek poniżej 18 lat lub data jest zbyt odległa. Rejestracja jest możliwa tylko dla osób pełnoletnich.",
+      });
+    }
+  }
   const exists = await db.prepare("SELECT id FROM users WHERE email = ?").get(email);
   if (exists) return res.status(409).json({ error: "Ten adres e-mail jest już zarejestrowany." });
   if (await db.prepare("SELECT id FROM users WHERE lower(username) = lower(?)").get(username)) {
