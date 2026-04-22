@@ -16,7 +16,6 @@ let browseSort = "online";
 let sessionKeepTimer = null;
 let pollTimer = null;
 const ONBOARDING_SNOOZE_KEY = "panel_onboarding_snooze_v1";
-const PANEL_CHROME_COLLAPSED_KEY = "panel_chrome_collapsed_v1";
 
 const SEEN_PREFIX = "panel_seen_";
 const FALLBACK_PORTRAIT =
@@ -179,24 +178,19 @@ function applyPanelChromeCollapsed(collapsed) {
     if (collapsed) bodyEl.setAttribute("inert", "");
     else bodyEl.removeAttribute("inert");
   }
-  try {
-    sessionStorage.setItem(PANEL_CHROME_COLLAPSED_KEY, collapsed ? "1" : "0");
-  } catch {
-    /* ignore */
-  }
 }
 
 function initPanelChromeCollapse() {
   const toggle = document.getElementById("panel-chrome-toggle");
   const root = document.getElementById("panel-chrome-root");
   if (!toggle || !root) return;
-  let startCollapsed = false;
   try {
-    startCollapsed = sessionStorage.getItem(PANEL_CHROME_COLLAPSED_KEY) === "1";
+    sessionStorage.removeItem("panel_chrome_collapsed_v1");
   } catch {
     /* ignore */
   }
-  applyPanelChromeCollapsed(startCollapsed);
+  /* Zawsze start od rozwiniętego paska — klient od razu widzi konto, saldo, doładowanie. */
+  applyPanelChromeCollapsed(false);
   toggle.addEventListener("click", () => {
     const isCollapsed = root.classList.contains("panel-chrome-root--collapsed");
     applyPanelChromeCollapsed(!isCollapsed);
