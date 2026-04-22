@@ -40,11 +40,14 @@
               <a class="link-panel-cennik" href="/informacje-ceny.html">Cennik</a>
               <p id="header-unread-banner" class="header-unread-banner hidden" role="status" aria-live="polite"></p>
               <nav class="nav-actions nav-actions--panel">
-                <button type="button" class="btn btn-outline btn-sm" id="account-summary-toggle">
-                  <span class="top-meta top-meta--strong" id="who"></span>
+                <button type="button" class="btn btn-account-summary btn-sm" id="account-summary-toggle">
+                  <span class="account-summary-btn-inner">
+                    <span class="account-summary-name" id="who"></span>
+                    <span class="account-summary-hint">Zmień dane konta</span>
+                  </span>
                 </button>
-                <a class="link-panel-topup" href="/panel-doladowanie.html">Pakiet / doładowanie</a>
-                <span class="top-meta" id="bal"></span>
+                <span class="top-meta panel-balance-line" id="bal"></span>
+                <a class="btn btn-panel-topup" href="/panel-doladowanie.html">Doładuj konto</a>
                 <button type="button" class="btn btn-outline" id="logout">Wyloguj</button>
               </nav>
             </div>
@@ -80,7 +83,7 @@
         aria-controls="panel-nav-flyout-sheet"
         aria-label="Otwórz menu: konsultanci i moje rozmowy"
       >
-        <span class="panel-nav-flyout-trigger-icon" aria-hidden="true">⟨</span>
+        <span class="panel-nav-flyout-trigger-icon" aria-hidden="true">⟩</span>
       </button>
     </div>
 

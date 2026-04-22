@@ -429,16 +429,18 @@ body.page-panel .panel-nav-flyout {
   .panel-nav-flyout-sheet {
     position: fixed;
     top: 0;
-    right: 0;
+    left: 0;
+    right: auto;
     height: 100dvh;
     max-height: 100dvh;
     width: min(90vw, 320px);
     display: flex;
     flex-direction: column;
     background: linear-gradient(180deg, rgba(10, 6, 24, 0.98), rgba(7, 4, 18, 0.99));
-    border-left: 1px solid rgba(212, 175, 101, 0.35);
-    box-shadow: -10px 0 36px rgba(0, 0, 0, 0.5);
-    transform: translateX(100%);
+    border-right: 1px solid rgba(212, 175, 101, 0.35);
+    border-left: none;
+    box-shadow: 10px 0 36px rgba(0, 0, 0, 0.5);
+    transform: translateX(-100%);
     transition: transform 0.32s ease;
     z-index: 110;
     padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -536,7 +538,8 @@ body.page-panel .panel-nav-flyout {
     align-items: center;
     justify-content: center;
     position: fixed;
-    right: 0;
+    left: 0;
+    right: auto;
     top: 50%;
     transform: translateY(-50%);
     z-index: 108;
@@ -545,12 +548,12 @@ body.page-panel .panel-nav-flyout {
     padding: 0.35rem 0.2rem;
     margin: 0;
     border: 1px solid rgba(212, 175, 101, 0.45);
-    border-right: none;
-    border-radius: 10px 0 0 10px;
+    border-left: none;
+    border-radius: 0 12px 12px 0;
     background: linear-gradient(180deg, rgba(38, 26, 62, 0.96), rgba(18, 12, 36, 0.98));
     color: #f0d878;
     cursor: pointer;
-    box-shadow: -4px 4px 18px rgba(0, 0, 0, 0.35);
+    box-shadow: 4px 4px 18px rgba(0, 0, 0, 0.35);
     transition: opacity 0.2s ease, transform 0.2s ease;
   }
 
@@ -4214,8 +4217,25 @@ body.page-panel .browse-card .btn-primary.browse-card-cta:hover {
 }
 
 body.page-panel .browse-cat-title {
-  color: #2c241c;
-  border-bottom-color: rgba(212, 175, 101, 0.5);
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.65);
+  background: rgba(12, 8, 28, 0.55);
+  padding: 0.4rem 0.55rem 0.45rem;
+  border-radius: 10px;
+  border-bottom: 2px solid rgba(240, 216, 120, 0.55);
+  margin-bottom: 0.75rem;
+}
+
+body.page-panel .browse-card .browse-card-cta-secondary {
+  background: #141018;
+  color: #fff !important;
+  border-color: #141018 !important;
+}
+
+body.page-panel .browse-card .browse-card-cta-secondary:hover {
+  background: #2a2435;
+  border-color: #2a2435 !important;
+  color: #fff !important;
 }
 
 /* Panel-head przy domyślnym stanie (przed wyborem medium) */
@@ -4246,17 +4266,87 @@ body.page-panel .panel-head:not(:has(.panel-head-messenger)) p {
   margin: 0;
 }
 
-/* ===== NAV PANEL — PRZYCISK PROFILU ===== */
+/* ===== NAV PANEL — KONTO, SALDO, DOŁADOWANIE ===== */
 body.page-panel .nav-actions--panel {
   align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.65rem;
 }
 
-#account-summary-toggle {
-  font-size: 0.82rem;
-  max-width: 18rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+body.page-panel #account-summary-toggle.btn-account-summary {
+  background: linear-gradient(180deg, #d8f8e4 0%, #b8e9cc 100%);
+  color: #0f2918;
+  border: 1px solid rgba(34, 110, 72, 0.45);
+  font-weight: 600;
+  text-align: left;
+  max-width: min(100%, 20rem);
+  white-space: normal;
+  line-height: 1.3;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+}
+
+body.page-panel #account-summary-toggle.btn-account-summary:hover {
+  filter: brightness(1.04);
+  border-color: rgba(34, 110, 72, 0.65);
+}
+
+body.page-panel .account-summary-btn-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+}
+
+body.page-panel .account-summary-name {
+  font-weight: 700;
+  color: #0f2918;
+}
+
+body.page-panel .account-summary-hint {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgba(15, 41, 24, 0.82);
+}
+
+body.page-panel .panel-balance-line {
+  color: #ffe566 !important;
+  font-weight: 700;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+body.page-panel .btn-panel-topup {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.48rem 0.95rem;
+  background: #fff !important;
+  color: #141018 !important;
+  border: 1px solid rgba(255, 255, 255, 0.95) !important;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  text-decoration: none;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+}
+
+body.page-panel .btn-panel-topup:hover {
+  background: #faf7ff !important;
+  color: #000 !important;
+  border-color: rgba(240, 216, 120, 0.75) !important;
+}
+
+/* Modal profilu — widoczne czarne przyciski zapisu (dane / hasło / e-mail) */
+#profile-settings-modal form.panel-settings-grid button[type="submit"].btn {
+  background: #141018 !important;
+  color: #fff !important;
+  border-color: #141018 !important;
+  font-weight: 700;
+}
+
+#profile-settings-modal form.panel-settings-grid button[type="submit"].btn:hover {
+  background: #2a2435 !important;
+  border-color: #2a2435 !important;
+  color: #fff !important;
 }
 
 /* ===== MAGICZNE ANIMACJE I EFEKTY ===== */
