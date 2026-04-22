@@ -1297,6 +1297,17 @@ body.page-panel.page-panel--simple .form-error {
   color: var(--accent);
 }
 
+body.page-panel.page-panel--simple .panel-payment-note {
+  margin: 0 0 0.65rem;
+  padding: 0.55rem 0.65rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #3d2f1a;
+  background: rgba(212, 175, 101, 0.2);
+  border: 1px solid rgba(180, 140, 70, 0.38);
+  border-radius: 8px;
+}
+
 .link-panel-topup {
   font-size: 0.82rem;
   font-weight: 600;

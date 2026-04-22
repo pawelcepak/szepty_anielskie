@@ -9,6 +9,7 @@ const balLine = document.getElementById("bal-line");
 const promoInput = document.getElementById("promo-code-input");
 const promoApplyBtn = document.getElementById("promo-apply-btn");
 const promoStatus = document.getElementById("promo-status");
+const gatewayNote = document.getElementById("payment-gateway-note");
 
 let me = null;
 let paymentsConfig = null;
@@ -19,13 +20,33 @@ document.getElementById("logout")?.addEventListener("click", async () => {
   window.location.href = "/logowanie.html";
 });
 
-// Handle return from PayU
+// Handle return from payment gateway
 const urlParams = new URLSearchParams(window.location.search);
 if (urlParams.get("status") === "ok") {
   if (pkgNote) {
-    pkgNote.textContent = "Płatność przyjęta — wiadomości pojawią się na koncie po potwierdzeniu przez PayU (zwykle kilka sekund).";
+    const gw = urlParams.get("gateway");
+    pkgNote.textContent =
+      gw === "autopay"
+        ? "Płatność przyjęta — wiadomości pojawią się na koncie po potwierdzeniu przez Autopay (zwykle kilka sekund)."
+        : "Płatność przyjęta — wiadomości pojawią się na koncie po potwierdzeniu przez PayU (zwykle kilka sekund).";
     pkgNote.style.color = "#4caf50";
   }
+}
+
+function submitAutopayPost(action, fields) {
+  const form = document.createElement("form");
+  form.method = "POST";
+  form.action = action;
+  form.acceptCharset = "UTF-8";
+  for (const [name, value] of Object.entries(fields)) {
+    const inp = document.createElement("input");
+    inp.type = "hidden";
+    inp.name = name;
+    inp.value = String(value ?? "");
+    form.appendChild(inp);
+  }
+  document.body.appendChild(form);
+  form.submit();
 }
 
 function showPromoStatus(msg, ok = true) {
@@ -54,10 +75,11 @@ function renderPackages() {
   if (pkgNote && !urlParams.get("status")) pkgNote.textContent = "";
   const priceMap = new Map((me?.packages_pln || []).map((x) => [x.amount, x.price_pln]));
   const amounts = [10, 20, 50, 100];
-  const payuEnabled = paymentsConfig?.payu?.enabled;
+  const gw = paymentsConfig?.checkout_gateway;
+  const payOnline = gw === "autopay" || gw === "payu";
   const fakeEnabled = me?.fake_purchase_enabled;
 
-  if (!payuEnabled && !fakeEnabled) {
+  if (!payOnline && !fakeEnabled) {
     if (pkgNote) pkgNote.textContent = "Płatności są tymczasowo niedostępne.";
     return;
   }
@@ -89,17 +111,30 @@ function renderPackages() {
       b.disabled = true;
       b.textContent = "Ładowanie…";
       try {
-        if (payuEnabled) {
+        if (payOnline) {
           const body = { amount: a };
           if (appliedPromo) body.promo_code = appliedPromo.code;
-          const r = await api("/api/payments/payu/create", {
-            method: "POST",
-            body: JSON.stringify(body),
-          });
-          if (r.redirectUri) {
-            window.location.href = r.redirectUri;
+          if (gw === "autopay") {
+            const r = await api("/api/payments/autopay/create", {
+              method: "POST",
+              body: JSON.stringify(body),
+            });
+            const ap = r?.autopay;
+            if (ap?.action && ap?.fields) {
+              submitAutopayPost(ap.action, ap.fields);
+            } else {
+              throw new Error("Brak danych formularza Autopay.");
+            }
           } else {
-            throw new Error("Brak adresu przekierowania od PayU.");
+            const r = await api("/api/payments/payu/create", {
+              method: "POST",
+              body: JSON.stringify(body),
+            });
+            if (r.redirectUri) {
+              window.location.href = r.redirectUri;
+            } else {
+              throw new Error("Brak adresu przekierowania od PayU.");
+            }
           }
         } else {
           const r = await api("/api/test/purchase", {
@@ -179,6 +214,11 @@ try {
   }
   if (balLine) {
     balLine.textContent = `Pozostało: ${me.messages_remaining} wiadomości`;
+  }
+  const note = paymentsConfig?.notices?.checkout;
+  if (gatewayNote && note) {
+    gatewayNote.textContent = note;
+    gatewayNote.hidden = false;
   }
   renderPackages();
 

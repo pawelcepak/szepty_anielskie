@@ -92,6 +92,66 @@ function isPayUConfigured() {
   );
 }
 
+/** Autopay (dawniej Blue Media) — SHA256 wg dokumentacji developers.autopay.pl */
+function autopayServiceId() {
+  return String(process.env.AUTOPAY_SERVICE_ID || "").trim();
+}
+function autopayHashKey() {
+  return String(process.env.AUTOPAY_HASH_KEY || "").trim();
+}
+function autopayPaymentUrl() {
+  const u = String(process.env.AUTOPAY_PAYMENT_URL || "").trim();
+  return u || "https://pay.autopay.eu/payment";
+}
+function isAutopayConfigured() {
+  return !!autopayServiceId() && !!autopayHashKey();
+}
+/** Przy skonfigurowanym Autopay kasa używa Autopay; PayU zostaje w panelu jako niedostępny do czasu wyłączenia Autopay. */
+function preferredClientCheckoutGateway() {
+  if (isAutopayConfigured()) return "autopay";
+  if (isPayUConfigured()) return "payu";
+  return null;
+}
+function autopaySha256(signingString) {
+  return crypto.createHash("sha256").update(signingString, "utf8").digest("hex");
+}
+/** Łańcuch: wartości pól (niepuste) w kolejności dokumentacji, separatory |, na końcu klucz współdzielony (bez dodatkowego | przed kluczem — ten jest już w join). */
+function autopaySigningString(fieldValues) {
+  return [...fieldValues, autopayHashKey()].join("|");
+}
+function autopayXmlInnerText(xmlFragment, localName) {
+  const re = new RegExp(`<${localName}[^>]*>([\\s\\S]*?)</${localName}>`, "i");
+  const m = xmlFragment.match(re);
+  if (!m) return "";
+  return m[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/gi, "$1").trim();
+}
+function autopayBuildItnSigningString(
+  serviceID,
+  orderID,
+  remoteID,
+  amount,
+  currency,
+  gatewayID,
+  paymentDate,
+  paymentStatus,
+  paymentStatusDetails
+) {
+  const parts = [serviceID, orderID, remoteID, amount, currency];
+  const gw = String(gatewayID || "").trim();
+  if (gw) parts.push(gw);
+  parts.push(paymentDate, paymentStatus);
+  const det = String(paymentStatusDetails || "").trim();
+  if (det) parts.push(det);
+  return autopaySigningString(parts);
+}
+function escapeXmlText(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 async function getPayUAccessToken() {
   const r = await fetch(`${PAYU_BASE_URL}/pl/standard/user/oauth/authorize`, {
     method: "POST",
@@ -146,6 +206,7 @@ if (["1", "true", "yes"].includes(String(process.env.TRUST_PROXY || "").toLowerC
 app.get("/favicon.ico", (_req, res) => res.status(204).end());
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: "512kb" }));
+app.use(express.urlencoded({ extended: true, limit: "512kb" }));
 app.use(cookieParser());
 const registerJsonParser = express.json({ limit: "1mb" });
 
@@ -1172,11 +1233,24 @@ app.post("/api/public/contact", asyncRoute(async (req, res) => {
 }));
 
 app.get("/api/public/payments-config", (_req, res) => {
+  const checkoutGateway = preferredClientCheckoutGateway();
   res.json({
+    checkout_gateway: checkoutGateway,
+    currency: APP_CONFIG.pricing.currency,
     payu: {
-      enabled: isPayUConfigured(),
+      configured: isPayUConfigured(),
+      checkout_enabled: checkoutGateway === "payu",
       sandbox: PAYU_SANDBOX,
-      currency: APP_CONFIG.pricing.currency,
+    },
+    autopay: {
+      configured: isAutopayConfigured(),
+      checkout_enabled: checkoutGateway === "autopay",
+    },
+    notices: {
+      checkout:
+        checkoutGateway === "autopay"
+          ? "PayU jest obecnie niedostępny na tej stronie — płatności realizuje Autopay."
+          : null,
     },
   });
 });
@@ -1504,6 +1578,267 @@ app.post(
     }
 
     res.json({ ok: true });
+  })
+);
+
+app.post(
+  "/api/payments/autopay/create",
+  requireCustomer,
+  asyncRoute(async (req, res) => {
+    if (!isAutopayConfigured()) {
+      return res.status(503).json({ error: "Płatności Autopay nie są skonfigurowane." });
+    }
+    const amount = Number(req.body?.amount);
+    if (!PKG_AMOUNTS.has(amount)) {
+      return res.status(400).json({ error: "Dozwolone pakiety: 10, 20, 50 lub 100 wiadomości." });
+    }
+
+    let promoCodeId = null;
+    let promoType = null;
+    let promoCampaignId = null;
+    let discountPercent = 0;
+    const rawPromoCode = String(req.body?.promo_code || "").trim().toUpperCase();
+    if (rawPromoCode && PROMO_SYSTEM_ENABLED) {
+      const campaignByVoucher = await db
+        .prepare(`SELECT id, campaign_key, discount_percent, start_at, end_at, is_active, max_codes, total_claimed
+                  FROM promo_campaigns WHERE voucher_code = ?`)
+        .get(rawPromoCode);
+      if (campaignByVoucher && promoIsActiveNow(campaignByVoucher)) {
+        const maxCodes = Number(campaignByVoucher.max_codes || 0);
+        const totalClaimed = Number(campaignByVoucher.total_claimed || 0);
+        if (maxCodes === 0 || totalClaimed < maxCodes) {
+          promoType = "voucher";
+          promoCampaignId = campaignByVoucher.id;
+          discountPercent = Number(campaignByVoucher.discount_percent || 0);
+        }
+      } else {
+        const pc = await db
+          .prepare(`SELECT pc.id, pc.used_at, pc.expires_at,
+                           c.discount_percent, c.start_at, c.end_at, c.is_active, c.id AS campaign_id
+                    FROM promo_codes pc
+                    JOIN promo_campaigns c ON c.id = pc.campaign_id
+                    WHERE pc.code = ?`)
+          .get(rawPromoCode);
+        if (pc && !pc.used_at && promoIsActiveNow({ start_at: pc.start_at, end_at: pc.end_at, is_active: pc.is_active })) {
+          const notExpired = !pc.expires_at || new Date(pc.expires_at) >= new Date();
+          if (notExpired) {
+            promoType = "unique";
+            promoCodeId = pc.id;
+            promoCampaignId = pc.campaign_id;
+            discountPercent = Number(pc.discount_percent || 0);
+          }
+        }
+      }
+    }
+
+    const txId = uuidv4();
+    const orderId = `sz${Date.now().toString(36)}${crypto.randomBytes(5).toString("hex")}`.slice(0, 32);
+    const pkg = pricingPackagesForClient().find((p) => Number(p.amount) === amount);
+    const pricePln = Number(pkg?.price_pln || 0);
+    const discountAmount = discountPercent > 0 ? Math.round(pricePln * 100 * discountPercent / 100) : 0;
+    const amountGro = Math.max(1, Math.round(pricePln * 100) - discountAmount);
+    const finalPricePln = amountGro / 100;
+    const baseUrl = publicBaseUrl();
+    const customer = await db.prepare("SELECT email, first_name FROM users WHERE id = ?").get(req.customer.id);
+    const email = String(customer?.email || "").trim();
+    if (email.length < 3) {
+      return res.status(400).json({ error: "Uzupełnij adres e-mail w profilu — wymagany do płatności Autopay." });
+    }
+
+    const amountStr = finalPricePln.toFixed(2);
+    const description = `Pakiet ${amount} wiadomosci Szepty Anielskie`.slice(0, 79);
+    const returnURL = `${baseUrl}/panel-doladowanie.html?status=ok&gateway=autopay&tx=${encodeURIComponent(txId)}`;
+    const signingFields = [
+      autopayServiceId(),
+      orderId,
+      amountStr,
+      description,
+      "0",
+      "PLN",
+      email,
+      returnURL,
+    ];
+    const hash = autopaySha256(autopaySigningString(signingFields));
+
+    await db
+      .prepare(
+        `INSERT INTO payment_transactions (id, user_id, gateway, external_id, amount, currency, status, package_amount,
+                                           promo_code_id, discount_amount, payload_json)
+         VALUES (?, ?, 'autopay', ?, ?, ?, 'created', ?, ?, ?, ?)`
+      )
+      .run(
+        txId,
+        req.customer.id,
+        orderId,
+        amountGro,
+        APP_CONFIG.pricing.currency,
+        amount,
+        promoCodeId,
+        discountAmount,
+        JSON.stringify({
+          amount_messages: amount,
+          amount_pln: finalPricePln,
+          original_pln: pricePln,
+          discount_percent: discountPercent,
+          promo_code: rawPromoCode || null,
+          promo_type: promoType,
+          autopay_order_id: orderId,
+        })
+      );
+
+    res.json({
+      ok: true,
+      tx_id: txId,
+      autopay: {
+        method: "POST",
+        action: autopayPaymentUrl(),
+        fields: {
+          ServiceID: autopayServiceId(),
+          OrderID: orderId,
+          Amount: amountStr,
+          Description: description,
+          GatewayID: "0",
+          Currency: "PLN",
+          CustomerEmail: email,
+          ReturnURL: returnURL,
+          Hash: hash,
+        },
+      },
+    });
+  })
+);
+
+app.post(
+  "/api/payments/autopay/itn",
+  asyncRoute(async (req, res) => {
+    if (!isAutopayConfigured()) {
+      res.type("text/plain; charset=utf-8");
+      return res.status(503).send("Autopay not configured");
+    }
+    res.type("application/xml; charset=utf-8");
+    const sendConfirmation = (serviceID, orderID, confirmation) => {
+      const confHash = autopaySha256(autopaySigningString([serviceID, orderID, confirmation]));
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<confirmationList>
+  <serviceID>${escapeXmlText(serviceID)}</serviceID>
+  <transactionsConfirmations>
+    <transactionConfirmed>
+      <orderID>${escapeXmlText(orderID)}</orderID>
+      <confirmation>${escapeXmlText(confirmation)}</confirmation>
+    </transactionConfirmed>
+  </transactionsConfirmations>
+  <hash>${confHash}</hash>
+</confirmationList>`;
+      res.status(200).send(xml);
+    };
+
+    const b64 = String(req.body?.transactions || "").trim();
+    if (!b64) {
+      return sendConfirmation(autopayServiceId(), "0", "NOTCONFIRMED");
+    }
+    let decoded;
+    try {
+      decoded = Buffer.from(b64, "base64").toString("utf8");
+    } catch {
+      return sendConfirmation(autopayServiceId(), "0", "NOTCONFIRMED");
+    }
+
+    const listServiceId = autopayXmlInnerText(decoded, "serviceID");
+    const incomingHash = autopayXmlInnerText(decoded, "hash");
+    const txInnerMatch = decoded.match(/<transaction>\s*([\s\S]*?)\s*<\/transaction>/i);
+    const inner = txInnerMatch ? txInnerMatch[1] : "";
+
+    const orderID = autopayXmlInnerText(inner, "orderID");
+    const remoteID = autopayXmlInnerText(inner, "remoteID");
+    const amountStr = autopayXmlInnerText(inner, "amount");
+    const currency = autopayXmlInnerText(inner, "currency");
+    const gatewayID = autopayXmlInnerText(inner, "gatewayID");
+    const paymentDate = autopayXmlInnerText(inner, "paymentDate");
+    const paymentStatus = autopayXmlInnerText(inner, "paymentStatus");
+    const paymentStatusDetails = autopayXmlInnerText(inner, "paymentStatusDetails");
+
+    if (!listServiceId || !orderID || !incomingHash) {
+      return sendConfirmation(autopayServiceId(), orderID || "0", "NOTCONFIRMED");
+    }
+
+    const expectedSig = autopaySha256(
+      autopayBuildItnSigningString(
+        listServiceId,
+        orderID,
+        remoteID,
+        amountStr,
+        currency,
+        gatewayID,
+        paymentDate,
+        paymentStatus,
+        paymentStatusDetails
+      )
+    );
+    if (expectedSig.toLowerCase() !== String(incomingHash).toLowerCase()) {
+      console.error("[Autopay ITN] Niezgodny hash");
+      return sendConfirmation(listServiceId, orderID, "NOTCONFIRMED");
+    }
+    if (listServiceId !== autopayServiceId()) {
+      return sendConfirmation(listServiceId, orderID, "NOTCONFIRMED");
+    }
+
+    const tx = await db
+      .prepare("SELECT id, user_id, status, package_amount, promo_code_id, amount, payload_json FROM payment_transactions WHERE gateway = 'autopay' AND external_id = ?")
+      .get(orderID);
+    if (!tx) {
+      console.error("[Autopay ITN] Brak transakcji dla OrderID", orderID);
+      return sendConfirmation(listServiceId, orderID, "NOTCONFIRMED");
+    }
+
+    const itnAmountGro = Math.round(parseFloat(amountStr.replace(",", ".")) * 100);
+    if (!Number.isFinite(itnAmountGro) || Math.abs(itnAmountGro - Number(tx.amount)) > 2) {
+      console.error("[Autopay ITN] Niezgodna kwota", { itnAmountGro, expected: tx.amount });
+      return sendConfirmation(listServiceId, orderID, "NOTCONFIRMED");
+    }
+
+    let payload = {};
+    try {
+      payload = JSON.parse(tx.payload_json || "{}");
+    } catch {
+      payload = {};
+    }
+    payload.autopay_itn_last = {
+      remoteID,
+      paymentStatus,
+      paymentStatusDetails,
+      paymentDate,
+      gatewayID,
+      received_at: new Date().toISOString(),
+    };
+
+    await db
+      .prepare(`UPDATE payment_transactions SET status = ?, updated_at = datetime('now'), payload_json = ? WHERE id = ?`)
+      .run(`autopay_${String(paymentStatus || "").toLowerCase() || "notified"}`, JSON.stringify(payload), tx.id);
+
+    if (paymentStatus === "SUCCESS" && tx.status !== "paid") {
+      const msgs = Number(tx.package_amount) || 0;
+      if (msgs > 0) {
+        await db
+          .prepare(`INSERT INTO ledger (id, user_id, delta, reason) VALUES (?, ?, ?, ?)`)
+          .run(uuidv4(), tx.user_id, msgs, `autopay:${remoteID || orderID}`);
+        await db.prepare(`UPDATE payment_transactions SET status = 'paid', paid_at = datetime('now') WHERE id = ?`).run(tx.id);
+        if (tx.promo_code_id) {
+          await db.prepare(`UPDATE promo_codes SET used_at = datetime('now'), status = 'used' WHERE id = ?`).run(tx.promo_code_id);
+        }
+        try {
+          if (payload.promo_type === "voucher" && payload.promo_code) {
+            await db
+              .prepare(`UPDATE promo_campaigns SET total_claimed = COALESCE(total_claimed, 0) + 1 WHERE voucher_code = ?`)
+              .run(payload.promo_code);
+          }
+        } catch {
+          /* ignore */
+        }
+        console.log(`[Autopay] Credited ${msgs} messages to user ${tx.user_id}`);
+      }
+    }
+
+    return sendConfirmation(listServiceId, orderID, "CONFIRMED");
   })
 );
 
