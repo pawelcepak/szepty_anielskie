@@ -50,12 +50,38 @@
             </div>
           </div>
         </header>
+      </div>
+    </div>
 
+    <div id="panel-nav-flyout" class="panel-nav-flyout">
+      <div class="panel-nav-flyout-backdrop" id="panel-nav-flyout-backdrop" aria-hidden="true"></div>
+      <div
+        id="panel-nav-flyout-sheet"
+        class="panel-nav-flyout-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="panel-nav-flyout-title"
+      >
+        <div class="panel-nav-flyout-head">
+          <span class="panel-nav-flyout-title" id="panel-nav-flyout-title">Konsultanci i rozmowy</span>
+          <button type="button" class="panel-nav-flyout-close" id="panel-nav-flyout-close" aria-label="Zamknij menu">✕</button>
+        </div>
         <nav class="panel-view-tabs" aria-label="Widok panelu">
           <button type="button" class="panel-tab panel-tab--active" id="tab-browse" data-view="browse">Konsultanci</button>
           <button type="button" class="panel-tab" id="tab-chat" data-view="chat">Moje rozmowy</button>
         </nav>
+        <div id="panel-flyout-thread-slot" class="panel-flyout-thread-slot"></div>
       </div>
+      <button
+        type="button"
+        id="panel-nav-flyout-trigger"
+        class="panel-nav-flyout-trigger"
+        aria-expanded="false"
+        aria-controls="panel-nav-flyout-sheet"
+        aria-label="Otwórz menu: konsultanci i moje rozmowy"
+      >
+        <span class="panel-nav-flyout-trigger-icon" aria-hidden="true">⟨</span>
+      </button>
     </div>
 
     <div id="panel-live-region" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>

@@ -10,8 +10,6 @@ export const APP_CONFIG = {
   },
   pricing: {
     currency: "PLN",
-    /* Pakiety: ta sama lista jest używana przy naliczaniu Stripe/iMoje, w panelu i na /informacje-ceny.html (API).
-       Na serwerze możesz nadpisać kwoty zmiennymi środowiskowymi CLIENT_PKG_10_PLN, CLIENT_PKG_20_PLN, itd. */
     clientPackages: [
       { amount: 10, price_pln: 16.99 },
       { amount: 20, price_pln: 29.99 },

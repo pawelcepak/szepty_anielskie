@@ -415,6 +415,162 @@ body.page-panel .panel-chrome-root {
   }
 }
 
+/* Wysuwane menu (mobile): zakładki + lista rozmów; desktop — zwykły pasek pod nagłówkiem */
+body.page-panel .panel-nav-flyout {
+  flex-shrink: 0;
+}
+
+@media (max-width: 720px) {
+  .panel-nav-flyout {
+    position: relative;
+    z-index: 0;
+  }
+
+  .panel-nav-flyout-sheet {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100dvh;
+    max-height: 100dvh;
+    width: min(90vw, 320px);
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(180deg, rgba(10, 6, 24, 0.98), rgba(7, 4, 18, 0.99));
+    border-left: 1px solid rgba(212, 175, 101, 0.35);
+    box-shadow: -10px 0 36px rgba(0, 0, 0, 0.5);
+    transform: translateX(100%);
+    transition: transform 0.32s ease;
+    z-index: 110;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .panel-nav-flyout--open .panel-nav-flyout-sheet {
+    transform: translateX(0);
+  }
+
+  .panel-nav-flyout-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.48);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.26s ease;
+    z-index: 109;
+  }
+
+  .panel-nav-flyout--open .panel-nav-flyout-backdrop {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .panel-nav-flyout-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.55rem 0.75rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    flex-shrink: 0;
+  }
+
+  .panel-nav-flyout-title {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #f5f0ff;
+    font-family: var(--font-display);
+  }
+
+  .panel-nav-flyout-close {
+    font: inherit;
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 0.25rem 0.45rem;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    cursor: pointer;
+  }
+
+  .panel-nav-flyout-close:hover {
+    background: rgba(255, 255, 255, 0.14);
+  }
+
+  .panel-nav-flyout .panel-view-tabs {
+    flex-shrink: 0;
+    margin: 0;
+    border-radius: 0;
+  }
+
+  .panel-flyout-thread-slot {
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .panel-flyout-thread-slot:empty {
+    display: none;
+  }
+
+  .panel-flyout-thread-slot .panel-side--threads {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+    border: none;
+    display: flex;
+    flex-direction: column;
+    padding: 0.65rem 0.6rem 0.75rem;
+  }
+
+  .panel-flyout-thread-slot .my-threads-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .panel-nav-flyout-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 108;
+    width: 2.15rem;
+    min-height: 5.5rem;
+    padding: 0.35rem 0.2rem;
+    margin: 0;
+    border: 1px solid rgba(212, 175, 101, 0.45);
+    border-right: none;
+    border-radius: 10px 0 0 10px;
+    background: linear-gradient(180deg, rgba(38, 26, 62, 0.96), rgba(18, 12, 36, 0.98));
+    color: #f0d878;
+    cursor: pointer;
+    box-shadow: -4px 4px 18px rgba(0, 0, 0, 0.35);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+
+  .panel-nav-flyout-trigger:hover {
+    filter: brightness(1.08);
+  }
+
+  .panel-nav-flyout-trigger-icon {
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.12em;
+  }
+
+  .panel-nav-flyout--open .panel-nav-flyout-trigger {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
 @media (min-width: 721px) {
   .panel-chrome-mini {
     display: none !important;
@@ -431,6 +587,39 @@ body.page-panel .panel-chrome-root {
     max-height: none !important;
     opacity: 1 !important;
     pointer-events: auto !important;
+  }
+
+  .panel-nav-flyout-backdrop {
+    display: none !important;
+  }
+
+  .panel-nav-flyout-sheet {
+    position: static !important;
+    transform: none !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    display: block !important;
+    flex-direction: unset !important;
+    border: none !important;
+    border-left: none !important;
+    box-shadow: none !important;
+    padding-bottom: 0 !important;
+    background: transparent !important;
+    z-index: auto !important;
+  }
+
+  .panel-nav-flyout-head {
+    display: none !important;
+  }
+
+  .panel-nav-flyout-trigger {
+    display: none !important;
+  }
+
+  .panel-flyout-thread-slot {
+    display: none !important;
   }
 }
 
@@ -1997,17 +2186,11 @@ body.page-panel .site-top {
   .panel-side {
     border-right: none;
     border-bottom: 1px solid var(--line);
-    max-height: 42vh;
   }
 
-  /* W czacie lista wątków — krótsza, żeby zostało miejsce na wiadomości i przycisk Wyślij */
+  /* Lista wątków tylko gdy jest w układzie kolumnowym czatu (desktop / wąski split), nie w szufladzie */
   .panel-layout--chat > .panel-side {
     max-height: min(26vh, 200px);
-  }
-
-  /* Gdy zwinięto górne menu — jeszcze niższa lista wątków, więcej miejsca na czat */
-  body.page-panel.page-panel--chat-view.panel-chrome-collapsed .panel-layout--chat > .panel-side {
-    max-height: min(18vh, 150px);
   }
 }
 

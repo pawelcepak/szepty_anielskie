@@ -203,6 +203,71 @@ function initPanelChromeCollapse() {
   });
 }
 
+const PANEL_NAV_MOBILE_MAX = 720;
+
+function panelNavMobile() {
+  return window.matchMedia(`(max-width: ${PANEL_NAV_MOBILE_MAX}px)`).matches;
+}
+
+function placeChatSideForViewport() {
+  const layout = document.querySelector(".panel-layout--chat");
+  const slot = document.getElementById("panel-flyout-thread-slot");
+  const main = document.querySelector(".panel-layout--chat .panel-main");
+  const side = document.querySelector(".panel-side--threads");
+  if (!layout || !slot || !side || !main) return;
+  if (panelNavMobile()) {
+    if (side.parentElement !== slot) slot.appendChild(side);
+  } else if (side.parentElement !== layout) {
+    layout.insertBefore(side, main);
+  }
+}
+
+function panelNavFlyoutClose() {
+  const root = document.getElementById("panel-nav-flyout");
+  const sheet = document.getElementById("panel-nav-flyout-sheet");
+  const tr = document.getElementById("panel-nav-flyout-trigger");
+  root?.classList.remove("panel-nav-flyout--open");
+  if (sheet) sheet.setAttribute("aria-hidden", panelNavMobile() ? "true" : "false");
+  tr?.setAttribute("aria-expanded", "false");
+}
+
+function panelNavFlyoutOpen() {
+  if (!panelNavMobile()) return;
+  const root = document.getElementById("panel-nav-flyout");
+  const sheet = document.getElementById("panel-nav-flyout-sheet");
+  const tr = document.getElementById("panel-nav-flyout-trigger");
+  if (!root || !sheet) return;
+  root.classList.add("panel-nav-flyout--open");
+  sheet.setAttribute("aria-hidden", "false");
+  tr?.setAttribute("aria-expanded", "true");
+}
+
+function initPanelNavFlyout() {
+  document.getElementById("panel-nav-flyout-trigger")?.addEventListener("click", () => {
+    if (!panelNavMobile()) return;
+    panelNavFlyoutOpen();
+  });
+  document.getElementById("panel-nav-flyout-backdrop")?.addEventListener("click", () => {
+    panelNavFlyoutClose();
+  });
+  document.getElementById("panel-nav-flyout-close")?.addEventListener("click", () => {
+    panelNavFlyoutClose();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    if (!document.getElementById("panel-nav-flyout")?.classList.contains("panel-nav-flyout--open")) return;
+    panelNavFlyoutClose();
+  });
+  let resizeTimer;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      placeChatSideForViewport();
+      if (!panelNavMobile()) panelNavFlyoutClose();
+    }, 120);
+  });
+}
+
 function updateDocumentTitle() {
   const n = unreadCount();
   const base = "Panel klienta — Szepty Anielskie";
@@ -288,6 +353,8 @@ function switchView(view) {
   document.body.classList.toggle("page-panel--browse-view", view === "browse");
   document.body.classList.toggle("page-panel--chat-view", view === "chat");
   if (view === "browse") renderBrowseCatalog();
+  placeChatSideForViewport();
+  panelNavFlyoutClose();
 }
 
 async function loadThreads() {
@@ -376,6 +443,7 @@ function onboardingNeeded() {
 function showProfileModal(on) {
   const modal = document.getElementById("profile-settings-modal");
   if (!modal) return;
+  if (on) panelNavFlyoutClose();
   modal.classList.toggle("hidden", !on);
   modal.setAttribute("aria-hidden", on ? "false" : "true");
   if (on) refreshAccountSummary();
@@ -384,6 +452,7 @@ function showProfileModal(on) {
 function showOnboardingModal(on) {
   const modal = document.getElementById("panel-onboarding-modal");
   if (!modal) return;
+  if (on) panelNavFlyoutClose();
   modal.classList.toggle("hidden", !on);
   modal.setAttribute("aria-hidden", on ? "false" : "true");
 }
@@ -659,6 +728,7 @@ document.getElementById("logout").addEventListener("click", async () => {
 function showMediumInfoPopup(c) {
   const modal = document.getElementById("medium-info-modal");
   if (!modal) return;
+  panelNavFlyoutClose();
   const titleEl = document.getElementById("medium-modal-title");
   const bodyEl = document.getElementById("medium-modal-body");
   if (titleEl) titleEl.textContent = c.name;
@@ -871,6 +941,9 @@ document.getElementById("panel-email-form")?.addEventListener("submit", async (e
 
 try {
   initPanelChromeCollapse();
+  initPanelNavFlyout();
+  placeChatSideForViewport();
+  panelNavFlyoutClose();
   await loadMe();
   const openId = new URLSearchParams(window.location.search).get("open");
   if (openId && characters.some((c) => c.id === openId)) {
