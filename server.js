@@ -78,101 +78,57 @@ const PROMO_SYSTEM_ENABLED = !["0", "false", "no"].includes(
   String(process.env.PROMO_SYSTEM_ENABLED || "true").toLowerCase()
 );
 const SEO_INDEXABLE = ["1", "true", "yes"].includes(String(process.env.SEO_INDEXABLE || "false").toLowerCase());
-const PAYU_ENABLED = ["1", "true", "yes"].includes(String(process.env.PAYU_ENABLED || "false").toLowerCase());
-const PAYU_SANDBOX = ["1", "true", "yes"].includes(String(process.env.PAYU_SANDBOX || "false").toLowerCase());
-const PAYU_BASE_URL = PAYU_SANDBOX ? "https://secure.snd.payu.com" : "https://secure.payu.com";
-
-function isPayUConfigured() {
+/** ING iMoje — REST API (dokumentacja: https://bump.sh/pgw/doc/imoje-api/) */
+const IMOJE_SANDBOX = ["1", "true", "yes"].includes(String(process.env.IMOJE_SANDBOX || "false").toLowerCase());
+function imojeMerchantId() {
+  return String(process.env.IMOJE_MERCHANT_ID || "").trim();
+}
+function imojeServiceId() {
+  return String(process.env.IMOJE_SERVICE_ID || "").trim();
+}
+function imojeServiceKey() {
+  return String(process.env.IMOJE_SERVICE_KEY || "").trim();
+}
+function imojeBearerToken() {
+  return String(process.env.IMOJE_BEARER_TOKEN || "").trim();
+}
+function imojeApiBase() {
+  return IMOJE_SANDBOX ? "https://sandbox.api.imoje.pl/v1/merchant" : "https://api.imoje.pl/v1/merchant";
+}
+function isImojeConfigured() {
   return (
-    PAYU_ENABLED &&
-    !!String(process.env.PAYU_POS_ID || "").trim() &&
-    !!String(process.env.PAYU_MD5_KEY || "").trim() &&
-    !!String(process.env.PAYU_CLIENT_ID || "").trim() &&
-    !!String(process.env.PAYU_CLIENT_SECRET || "").trim()
+    !!imojeMerchantId() &&
+    !!imojeServiceId() &&
+    !!imojeServiceKey() &&
+    !!imojeBearerToken()
   );
 }
-
-/** Autopay (dawniej Blue Media) — SHA256 wg dokumentacji developers.autopay.pl */
-function autopayServiceId() {
-  return String(process.env.AUTOPAY_SERVICE_ID || "").trim();
-}
-function autopayHashKey() {
-  return String(process.env.AUTOPAY_HASH_KEY || "").trim();
-}
-function autopayPaymentUrl() {
-  const u = String(process.env.AUTOPAY_PAYMENT_URL || "").trim();
-  return u || "https://pay.autopay.eu/payment";
-}
-function isAutopayConfigured() {
-  return !!autopayServiceId() && !!autopayHashKey();
-}
-/** Przy skonfigurowanym Autopay kasa używa Autopay; PayU zostaje w panelu jako niedostępny do czasu wyłączenia Autopay. */
 function preferredClientCheckoutGateway() {
-  if (isAutopayConfigured()) return "autopay";
-  if (isPayUConfigured()) return "payu";
-  return null;
+  return isImojeConfigured() ? "imoje" : null;
 }
-function autopaySha256(signingString) {
-  return crypto.createHash("sha256").update(signingString, "utf8").digest("hex");
+function parseImojeSignatureHeader(headerVal) {
+  const out = {};
+  String(headerVal || "")
+    .split(";")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .forEach((seg) => {
+      const eq = seg.indexOf("=");
+      if (eq > 0) out[seg.slice(0, eq).trim().toLowerCase()] = seg.slice(eq + 1).trim();
+    });
+  return out;
 }
-/** Łańcuch: wartości pól (niepuste) w kolejności dokumentacji, separatory |, na końcu klucz współdzielony (bez dodatkowego | przed kluczem — ten jest już w join). */
-function autopaySigningString(fieldValues) {
-  return [...fieldValues, autopayHashKey()].join("|");
-}
-function autopayXmlInnerText(xmlFragment, localName) {
-  const re = new RegExp(`<${localName}[^>]*>([\\s\\S]*?)</${localName}>`, "i");
-  const m = xmlFragment.match(re);
-  if (!m) return "";
-  return m[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/gi, "$1").trim();
-}
-function autopayBuildItnSigningString(
-  serviceID,
-  orderID,
-  remoteID,
-  amount,
-  currency,
-  gatewayID,
-  paymentDate,
-  paymentStatus,
-  paymentStatusDetails
-) {
-  const parts = [serviceID, orderID, remoteID, amount, currency];
-  const gw = String(gatewayID || "").trim();
-  if (gw) parts.push(gw);
-  parts.push(paymentDate, paymentStatus);
-  const det = String(paymentStatusDetails || "").trim();
-  if (det) parts.push(det);
-  return autopaySigningString(parts);
-}
-function escapeXmlText(s) {
-  return String(s)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-async function getPayUAccessToken() {
-  const r = await fetch(`${PAYU_BASE_URL}/pl/standard/user/oauth/authorize`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: `grant_type=client_credentials&client_id=${process.env.PAYU_CLIENT_ID}&client_secret=${process.env.PAYU_CLIENT_SECRET}`,
-  });
-  if (!r.ok) throw new Error(`PayU OAuth error ${r.status}: ${await r.text()}`);
-  return (await r.json()).access_token;
-}
-
-function verifyPayUSignature(rawBody, signatureHeader) {
-  const md5Key = String(process.env.PAYU_MD5_KEY || "").trim();
-  const parts = {};
-  (signatureHeader || "").split(";").forEach((p) => {
-    const eq = p.indexOf("=");
-    if (eq > 0) parts[p.slice(0, eq).trim()] = p.slice(eq + 1).trim();
-  });
-  const incoming = parts.signature;
+function imojeVerifyNotificationSignature(rawBody, headerVal) {
+  const p = parseImojeSignatureHeader(headerVal);
+  const incoming = p.signature;
+  const alg = (p.alg || "sha256").toLowerCase();
   if (!incoming) return false;
-  const computed = crypto.createHash("md5").update(rawBody + md5Key).digest("hex");
-  return computed.toLowerCase() === incoming.toLowerCase();
+  if (String(p.merchantid || "").trim() !== imojeMerchantId()) return false;
+  if (String(p.serviceid || "").trim().toLowerCase() !== imojeServiceId().toLowerCase()) return false;
+  const allowed = new Set(["sha224", "sha256", "sha384", "sha512"]);
+  const hashName = allowed.has(alg) ? alg : "sha256";
+  const own = crypto.createHash(hashName).update(rawBody + imojeServiceKey(), "utf8").digest("hex");
+  return own.toLowerCase() === String(incoming).toLowerCase();
 }
 
 function promoConfigPublic() {
@@ -205,7 +161,16 @@ if (["1", "true", "yes"].includes(String(process.env.TRUST_PROXY || "").toLowerC
 }
 app.get("/favicon.ico", (_req, res) => res.status(204).end());
 app.use(cors({ origin: true, credentials: true }));
-app.use(express.json({ limit: "512kb" }));
+app.use(
+  express.json({
+    limit: "512kb",
+    verify: (req, _res, buf) => {
+      if (req.method === "POST" && req.path === "/api/payments/imoje/notify") {
+        req.imojeRawBody = Buffer.from(buf).toString("utf8");
+      }
+    },
+  })
+);
 app.use(express.urlencoded({ extended: true, limit: "512kb" }));
 app.use(cookieParser());
 const registerJsonParser = express.json({ limit: "1mb" });
@@ -677,6 +642,48 @@ function buildPromoCode(prefix) {
     .slice(0, 10) || "SZEPT";
   const body = crypto.randomBytes(4).toString("hex").toUpperCase();
   return `${cleanPrefix}-${body}`;
+}
+
+async function resolvePromoForTopup(rawPromoCode) {
+  let promoCodeId = null;
+  let promoType = null;
+  let promoCampaignId = null;
+  let discountPercent = 0;
+  const raw = String(rawPromoCode || "").trim().toUpperCase();
+  if (!raw || !PROMO_SYSTEM_ENABLED) {
+    return { promoCodeId, promoType, promoCampaignId, discountPercent };
+  }
+  const campaignByVoucher = await db
+    .prepare(`SELECT id, campaign_key, discount_percent, start_at, end_at, is_active, max_codes, total_claimed
+              FROM promo_campaigns WHERE voucher_code = ?`)
+    .get(raw);
+  if (campaignByVoucher && promoIsActiveNow(campaignByVoucher)) {
+    const maxCodes = Number(campaignByVoucher.max_codes || 0);
+    const totalClaimed = Number(campaignByVoucher.total_claimed || 0);
+    if (maxCodes === 0 || totalClaimed < maxCodes) {
+      promoType = "voucher";
+      promoCampaignId = campaignByVoucher.id;
+      discountPercent = Number(campaignByVoucher.discount_percent || 0);
+    }
+  } else {
+    const pc = await db
+      .prepare(`SELECT pc.id, pc.used_at, pc.expires_at,
+                       c.discount_percent, c.start_at, c.end_at, c.is_active, c.id AS campaign_id
+                FROM promo_codes pc
+                JOIN promo_campaigns c ON c.id = pc.campaign_id
+                WHERE pc.code = ?`)
+      .get(raw);
+    if (pc && !pc.used_at && promoIsActiveNow({ start_at: pc.start_at, end_at: pc.end_at, is_active: pc.is_active })) {
+      const notExpired = !pc.expires_at || new Date(pc.expires_at) >= new Date();
+      if (notExpired) {
+        promoType = "unique";
+        promoCodeId = pc.id;
+        promoCampaignId = pc.campaign_id;
+        discountPercent = Number(pc.discount_percent || 0);
+      }
+    }
+  }
+  return { promoCodeId, promoType, promoCampaignId, discountPercent };
 }
 
 /** --- Klient: rejestracja / logowanie --- */
@@ -1237,19 +1244,15 @@ app.get("/api/public/payments-config", (_req, res) => {
   res.json({
     checkout_gateway: checkoutGateway,
     currency: APP_CONFIG.pricing.currency,
-    payu: {
-      configured: isPayUConfigured(),
-      checkout_enabled: checkoutGateway === "payu",
-      sandbox: PAYU_SANDBOX,
-    },
-    autopay: {
-      configured: isAutopayConfigured(),
-      checkout_enabled: checkoutGateway === "autopay",
+    imoje: {
+      configured: isImojeConfigured(),
+      checkout_enabled: checkoutGateway === "imoje",
+      sandbox: IMOJE_SANDBOX,
     },
     notices: {
       checkout:
-        checkoutGateway === "autopay"
-          ? "PayU jest obecnie niedostępny na tej stronie — płatności realizuje Autopay."
+        !isImojeConfigured()
+          ? "Płatności iMoje nie są jeszcze skonfigurowane — po dodaniu kluczy API w panelu serwera pojawi się możliwość doładowania."
           : null,
     },
   });
@@ -1382,289 +1385,49 @@ app.post(
 );
 
 app.post(
-  "/api/payments/payu/create",
+  "/api/payments/imoje/create",
   requireCustomer,
   asyncRoute(async (req, res) => {
+    if (!isImojeConfigured()) {
+      return res
+        .status(503)
+        .json({ error: "Płatności iMoje nie są jeszcze skonfigurowane (uzupełnij klucze API w konfiguracji serwera)." });
+    }
     const amount = Number(req.body?.amount);
     if (!PKG_AMOUNTS.has(amount)) {
       return res.status(400).json({ error: "Dozwolone pakiety: 10, 20, 50 lub 100 wiadomości." });
     }
-    if (!isPayUConfigured()) {
-      return res.status(503).json({ error: "Płatności PayU nie są jeszcze skonfigurowane." });
-    }
-
-    // Promo code validation (optional)
-    let promoCodeId = null;
-    let promoType = null;
-    let promoCampaignId = null;
-    let discountPercent = 0;
 
     const rawPromoCode = String(req.body?.promo_code || "").trim().toUpperCase();
-    if (rawPromoCode && PROMO_SYSTEM_ENABLED) {
-      // Check voucher code on campaign
-      const campaignByVoucher = await db
-        .prepare(`SELECT id, campaign_key, discount_percent, start_at, end_at, is_active, max_codes, total_claimed
-                  FROM promo_campaigns WHERE voucher_code = ?`)
-        .get(rawPromoCode);
-      if (campaignByVoucher && promoIsActiveNow(campaignByVoucher)) {
-        const maxCodes = Number(campaignByVoucher.max_codes || 0);
-        const totalClaimed = Number(campaignByVoucher.total_claimed || 0);
-        if (maxCodes === 0 || totalClaimed < maxCodes) {
-          promoType = "voucher";
-          promoCampaignId = campaignByVoucher.id;
-          discountPercent = Number(campaignByVoucher.discount_percent || 0);
-        }
-      } else {
-        // Check unique promo code
-        const pc = await db
-          .prepare(`SELECT pc.id, pc.used_at, pc.expires_at,
-                           c.discount_percent, c.start_at, c.end_at, c.is_active, c.id AS campaign_id
-                    FROM promo_codes pc
-                    JOIN promo_campaigns c ON c.id = pc.campaign_id
-                    WHERE pc.code = ?`)
-          .get(rawPromoCode);
-        if (pc && !pc.used_at && promoIsActiveNow({ start_at: pc.start_at, end_at: pc.end_at, is_active: pc.is_active })) {
-          const notExpired = !pc.expires_at || new Date(pc.expires_at) >= new Date();
-          if (notExpired) {
-            promoType = "unique";
-            promoCodeId = pc.id;
-            promoCampaignId = pc.campaign_id;
-            discountPercent = Number(pc.discount_percent || 0);
-          }
-        }
-      }
-    }
+    const { promoCodeId, promoType, promoCampaignId, discountPercent } = await resolvePromoForTopup(rawPromoCode);
 
     const txId = uuidv4();
-    const extOrderId = `szepty-${Date.now()}-${txId.slice(0, 8)}`;
+    const orderId = `sz${Date.now().toString(36)}${crypto.randomBytes(5).toString("hex")}`.slice(0, 100);
     const pkg = pricingPackagesForClient().find((p) => Number(p.amount) === amount);
     const pricePln = Number(pkg?.price_pln || 0);
-    const discountAmount = discountPercent > 0 ? Math.round(pricePln * 100 * discountPercent / 100) : 0;
+    const discountAmount = discountPercent > 0 ? Math.round((pricePln * 100 * discountPercent) / 100) : 0;
     const amountGro = Math.max(1, Math.round(pricePln * 100) - discountAmount);
     const finalPricePln = amountGro / 100;
     const baseUrl = publicBaseUrl();
     const customer = await db.prepare("SELECT email, first_name FROM users WHERE id = ?").get(req.customer.id);
+    const cEmail = String(customer?.email || "").trim();
 
-    await db
-      .prepare(
-        `INSERT INTO payment_transactions (id, user_id, gateway, external_id, amount, currency, status, package_amount,
-                                           promo_code_id, discount_amount, payload_json)
-         VALUES (?, ?, 'payu', ?, ?, ?, 'created', ?, ?, ?, ?)`
-      )
-      .run(
-        txId, req.customer.id, extOrderId, amountGro,
-        APP_CONFIG.pricing.currency, amount,
-        promoCodeId, discountAmount,
-        JSON.stringify({
-          amount_messages: amount, amount_pln: finalPricePln, original_pln: pricePln,
-          discount_percent: discountPercent, promo_code: rawPromoCode || null,
-          promo_type: promoType, sandbox: PAYU_SANDBOX
-        })
-      );
-
-    const accessToken = await getPayUAccessToken();
-    const orderPayload = {
-      extOrderId,
-      notifyUrl: `${baseUrl}/api/payments/payu/notify`,
-      continueUrl: `${baseUrl}/panel-doladowanie.html?status=ok&tx=${txId}`,
-      customerIp: (req.headers["x-real-ip"] || req.headers["x-forwarded-for"] || req.ip || "127.0.0.1").split(",")[0].trim(),
-      merchantPosId: String(process.env.PAYU_POS_ID),
-      description: `Szepty Anielskie — pakiet ${amount} wiadomości`,
-      currencyCode: "PLN",
-      totalAmount: String(amountGro),
-      buyer: {
-        email: customer?.email || "",
-        firstName: customer?.first_name || "Użytkownik",
-        language: "pl",
-      },
-      products: [{ name: `Pakiet ${amount} wiadomości — Szepty Anielskie`, unitPrice: String(amountGro), quantity: "1" }],
+    const payloadBase = {
+      amount_messages: amount,
+      amount_pln: finalPricePln,
+      original_pln: pricePln,
+      discount_percent: discountPercent,
+      promo_code: rawPromoCode || null,
+      promo_type: promoType,
+      imoje_order_id: orderId,
+      imoje_sandbox: IMOJE_SANDBOX,
     };
 
-    const orderResp = await fetch(`${PAYU_BASE_URL}/api/v2_1/orders`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-      redirect: "manual",
-      body: JSON.stringify(orderPayload),
-    });
-
-    let redirectUri, payuOrderId;
-    if (orderResp.status === 302) {
-      redirectUri = orderResp.headers.get("location");
-    } else if (orderResp.status === 201 || orderResp.status === 200) {
-      const d = await orderResp.json();
-      redirectUri = d.redirectUri;
-      payuOrderId = d.orderId;
-    } else {
-      const errText = await orderResp.text();
-      throw new Error(`PayU create order failed: ${orderResp.status} — ${errText}`);
-    }
-
-    if (payuOrderId) {
-      await db.prepare("UPDATE payment_transactions SET external_id = ?, updated_at = datetime('now') WHERE id = ?").run(payuOrderId, txId);
-    }
-
-    res.json({ ok: true, redirectUri, tx_id: txId });
-  })
-);
-
-app.post(
-  "/api/payments/payu/notify",
-  express.raw({ type: "application/json" }),
-  asyncRoute(async (req, res) => {
-    const rawBody = req.body?.toString("utf8") || "";
-    const sigHeader = req.headers["openpayu-signature"] || "";
-
-    if (isPayUConfigured() && !verifyPayUSignature(rawBody, sigHeader)) {
-      console.error("[PayU] Invalid notification signature");
-      return res.status(400).json({ error: "Invalid signature" });
-    }
-
-    let notification;
-    try { notification = JSON.parse(rawBody); } catch {
-      return res.status(400).json({ error: "Invalid JSON" });
-    }
-
-    const order = notification?.order;
-    if (!order) return res.status(400).json({ error: "No order data" });
-
-    const extOrderId = order.extOrderId;
-    const payuOrderId = order.orderId;
-    const payuStatus = order.status;
-
-    const tx = await db
-      .prepare("SELECT id, user_id, status, package_amount, promo_code_id FROM payment_transactions WHERE external_id = ?")
-      .get(payuOrderId || extOrderId);
-
-    if (!tx) {
-      const txByExt = await db
-        .prepare("SELECT id, user_id, status, package_amount, promo_code_id FROM payment_transactions WHERE external_id = ?")
-        .get(extOrderId);
-      if (!txByExt) return res.status(404).json({ error: "Transaction not found" });
-      Object.assign(tx || {}, txByExt);
-    }
-
-    if (!tx) return res.status(404).json({ error: "Transaction not found" });
-
-    await db.prepare(
-      `UPDATE payment_transactions SET status = ?, updated_at = datetime('now'), payload_json = ? WHERE id = ?`
-    ).run(payuStatus?.toLowerCase() || "notified", JSON.stringify(notification), tx.id);
-
-    if (payuStatus === "COMPLETED" && tx.status !== "paid") {
-      const msgs = Number(tx.package_amount) || 0;
-      if (msgs > 0) {
-        await db.prepare(
-          `INSERT INTO ledger (id, user_id, delta, reason) VALUES (?, ?, ?, ?)`
-        ).run(uuidv4(), tx.user_id, msgs, `payu:${payuOrderId || extOrderId}`);
-        await db.prepare(
-          `UPDATE payment_transactions SET status = 'paid', paid_at = datetime('now') WHERE id = ?`
-        ).run(tx.id);
-        // Mark unique promo code as used
-        if (tx.promo_code_id) {
-          await db.prepare(`UPDATE promo_codes SET used_at = datetime('now'), status = 'used' WHERE id = ?`)
-            .run(tx.promo_code_id);
-        }
-        // Increment voucher usage if applicable (promo_code_id is null for vouchers — find via payload_json)
-        try {
-          const txFull = await db.prepare(`SELECT payload_json FROM payment_transactions WHERE id = ?`).get(tx.id);
-          const payload = txFull?.payload_json ? JSON.parse(txFull.payload_json) : {};
-          if (payload.promo_type === "voucher" && payload.promo_code) {
-            await db.prepare(
-              `UPDATE promo_campaigns SET total_claimed = COALESCE(total_claimed, 0) + 1 WHERE voucher_code = ?`
-            ).run(payload.promo_code);
-          }
-        } catch { /* ignore */ }
-        console.log(`[PayU] Credited ${msgs} messages to user ${tx.user_id}`);
-      }
-    }
-
-    res.json({ ok: true });
-  })
-);
-
-app.post(
-  "/api/payments/autopay/create",
-  requireCustomer,
-  asyncRoute(async (req, res) => {
-    if (!isAutopayConfigured()) {
-      return res.status(503).json({ error: "Płatności Autopay nie są skonfigurowane." });
-    }
-    const amount = Number(req.body?.amount);
-    if (!PKG_AMOUNTS.has(amount)) {
-      return res.status(400).json({ error: "Dozwolone pakiety: 10, 20, 50 lub 100 wiadomości." });
-    }
-
-    let promoCodeId = null;
-    let promoType = null;
-    let promoCampaignId = null;
-    let discountPercent = 0;
-    const rawPromoCode = String(req.body?.promo_code || "").trim().toUpperCase();
-    if (rawPromoCode && PROMO_SYSTEM_ENABLED) {
-      const campaignByVoucher = await db
-        .prepare(`SELECT id, campaign_key, discount_percent, start_at, end_at, is_active, max_codes, total_claimed
-                  FROM promo_campaigns WHERE voucher_code = ?`)
-        .get(rawPromoCode);
-      if (campaignByVoucher && promoIsActiveNow(campaignByVoucher)) {
-        const maxCodes = Number(campaignByVoucher.max_codes || 0);
-        const totalClaimed = Number(campaignByVoucher.total_claimed || 0);
-        if (maxCodes === 0 || totalClaimed < maxCodes) {
-          promoType = "voucher";
-          promoCampaignId = campaignByVoucher.id;
-          discountPercent = Number(campaignByVoucher.discount_percent || 0);
-        }
-      } else {
-        const pc = await db
-          .prepare(`SELECT pc.id, pc.used_at, pc.expires_at,
-                           c.discount_percent, c.start_at, c.end_at, c.is_active, c.id AS campaign_id
-                    FROM promo_codes pc
-                    JOIN promo_campaigns c ON c.id = pc.campaign_id
-                    WHERE pc.code = ?`)
-          .get(rawPromoCode);
-        if (pc && !pc.used_at && promoIsActiveNow({ start_at: pc.start_at, end_at: pc.end_at, is_active: pc.is_active })) {
-          const notExpired = !pc.expires_at || new Date(pc.expires_at) >= new Date();
-          if (notExpired) {
-            promoType = "unique";
-            promoCodeId = pc.id;
-            promoCampaignId = pc.campaign_id;
-            discountPercent = Number(pc.discount_percent || 0);
-          }
-        }
-      }
-    }
-
-    const txId = uuidv4();
-    const orderId = `sz${Date.now().toString(36)}${crypto.randomBytes(5).toString("hex")}`.slice(0, 32);
-    const pkg = pricingPackagesForClient().find((p) => Number(p.amount) === amount);
-    const pricePln = Number(pkg?.price_pln || 0);
-    const discountAmount = discountPercent > 0 ? Math.round(pricePln * 100 * discountPercent / 100) : 0;
-    const amountGro = Math.max(1, Math.round(pricePln * 100) - discountAmount);
-    const finalPricePln = amountGro / 100;
-    const baseUrl = publicBaseUrl();
-    const customer = await db.prepare("SELECT email, first_name FROM users WHERE id = ?").get(req.customer.id);
-    const email = String(customer?.email || "").trim();
-    if (email.length < 3) {
-      return res.status(400).json({ error: "Uzupełnij adres e-mail w profilu — wymagany do płatności Autopay." });
-    }
-
-    const amountStr = finalPricePln.toFixed(2);
-    const description = `Pakiet ${amount} wiadomosci Szepty Anielskie`.slice(0, 79);
-    const returnURL = `${baseUrl}/panel-doladowanie.html?status=ok&gateway=autopay&tx=${encodeURIComponent(txId)}`;
-    const signingFields = [
-      autopayServiceId(),
-      orderId,
-      amountStr,
-      description,
-      "0",
-      "PLN",
-      email,
-      returnURL,
-    ];
-    const hash = autopaySha256(autopaySigningString(signingFields));
-
     await db
       .prepare(
         `INSERT INTO payment_transactions (id, user_id, gateway, external_id, amount, currency, status, package_amount,
                                            promo_code_id, discount_amount, payload_json)
-         VALUES (?, ?, 'autopay', ?, ?, ?, 'created', ?, ?, ?, ?)`
+         VALUES (?, ?, 'imoje', ?, ?, ?, 'created', ?, ?, ?, ?)`
       )
       .run(
         txId,
@@ -1675,126 +1438,138 @@ app.post(
         amount,
         promoCodeId,
         discountAmount,
-        JSON.stringify({
-          amount_messages: amount,
-          amount_pln: finalPricePln,
-          original_pln: pricePln,
-          discount_percent: discountPercent,
-          promo_code: rawPromoCode || null,
-          promo_type: promoType,
-          autopay_order_id: orderId,
-        })
+        JSON.stringify(payloadBase)
       );
 
-    res.json({
-      ok: true,
-      tx_id: txId,
-      autopay: {
-        method: "POST",
-        action: autopayPaymentUrl(),
-        fields: {
-          ServiceID: autopayServiceId(),
-          OrderID: orderId,
-          Amount: amountStr,
-          Description: description,
-          GatewayID: "0",
-          Currency: "PLN",
-          CustomerEmail: email,
-          ReturnURL: returnURL,
-          Hash: hash,
-        },
+    const notificationUrl = `${baseUrl}/api/payments/imoje/notify`;
+    const returnOk = `${baseUrl}/panel-doladowanie.html?status=ok&gateway=imoje&tx=${encodeURIComponent(txId)}`;
+    const returnFail = `${baseUrl}/panel-doladowanie.html?status=fail&gateway=imoje&tx=${encodeURIComponent(txId)}`;
+    const returnPending = `${baseUrl}/panel-doladowanie.html?status=pending&gateway=imoje&tx=${encodeURIComponent(txId)}`;
+
+    const paymentBody = {
+      serviceId: imojeServiceId(),
+      amount: amountGro,
+      currency: "PLN",
+      orderId,
+      title: `Szepty Anielskie — pakiet ${amount} wiadomości`,
+      additionalDescription: `Doładowanie konta: +${amount} wiadomości`,
+      returnUrl: returnPending,
+      successReturnUrl: returnOk,
+      failureReturnUrl: returnFail,
+      notificationUrl,
+    };
+    if (cEmail.length >= 3) {
+      paymentBody.customer = {
+        email: cEmail,
+        firstName: String(customer?.first_name || "Klient").slice(0, 100),
+      };
+    }
+
+    const apiUrl = `${imojeApiBase()}/${encodeURIComponent(imojeMerchantId())}/payment`;
+    const apiResp = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${imojeBearerToken()}`,
       },
+      body: JSON.stringify(paymentBody),
     });
+
+    const rawTxt = await apiResp.text();
+    let data;
+    try {
+      data = rawTxt ? JSON.parse(rawTxt) : {};
+    } catch {
+      throw new Error(`iMoje — niepoprawna odpowiedź (${apiResp.status})`);
+    }
+    if (!apiResp.ok) {
+      const msg = data?.apiErrorResponse?.errors?.[0]?.message || rawTxt.slice(0, 400);
+      throw new Error(`iMoje (${apiResp.status}): ${msg}`);
+    }
+    const pay = data.payment || data;
+    const paymentId = pay?.id;
+    const paywallBase = String(process.env.IMOJE_PAYWALL_BASE || "").trim() || "https://paywall.imoje.pl";
+    const redirectUri = pay?.url || (paymentId ? `${paywallBase.replace(/\/+$/, "")}/${paymentId}` : null);
+    if (!redirectUri) {
+      throw new Error("iMoje nie zwróciło adresu przekierowania do bramki.");
+    }
+
+    const merged = { ...payloadBase, imoje_payment_id: paymentId };
+    await db
+      .prepare(`UPDATE payment_transactions SET payload_json = ?, updated_at = datetime('now') WHERE id = ?`)
+      .run(JSON.stringify(merged), txId);
+
+    res.json({ ok: true, redirectUri, tx_id: txId });
   })
 );
 
 app.post(
-  "/api/payments/autopay/itn",
+  "/api/payments/imoje/notify",
   asyncRoute(async (req, res) => {
-    if (!isAutopayConfigured()) {
-      res.type("text/plain; charset=utf-8");
-      return res.status(503).send("Autopay not configured");
-    }
-    res.type("application/xml; charset=utf-8");
-    const sendConfirmation = (serviceID, orderID, confirmation) => {
-      const confHash = autopaySha256(autopaySigningString([serviceID, orderID, confirmation]));
-      const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<confirmationList>
-  <serviceID>${escapeXmlText(serviceID)}</serviceID>
-  <transactionsConfirmations>
-    <transactionConfirmed>
-      <orderID>${escapeXmlText(orderID)}</orderID>
-      <confirmation>${escapeXmlText(confirmation)}</confirmation>
-    </transactionConfirmed>
-  </transactionsConfirmations>
-  <hash>${confHash}</hash>
-</confirmationList>`;
-      res.status(200).send(xml);
-    };
+    res.setHeader("Cache-Control", "no-store");
+    const okBody = () => res.status(200).type("application/json; charset=utf-8").send(JSON.stringify({ status: "ok" }));
 
-    const b64 = String(req.body?.transactions || "").trim();
-    if (!b64) {
-      return sendConfirmation(autopayServiceId(), "0", "NOTCONFIRMED");
+    if (!isImojeConfigured()) {
+      return res.status(503).type("application/json").send(JSON.stringify({ status: "error", reason: "not_configured" }));
     }
-    let decoded;
+
+    const rawBody = req.imojeRawBody != null ? req.imojeRawBody : JSON.stringify(req.body ?? {});
+    const sigHdr = req.headers["x-imoje-signature"] || req.headers["X-Imoje-Signature"] || "";
+
+    if (!imojeVerifyNotificationSignature(rawBody, sigHdr)) {
+      console.error("[iMoje] Nieprawidłowy podpis notyfikacji");
+      return res.status(401).type("application/json").send(JSON.stringify({ status: "error", reason: "bad_signature" }));
+    }
+
+    let body;
     try {
-      decoded = Buffer.from(b64, "base64").toString("utf8");
+      body = JSON.parse(rawBody);
     } catch {
-      return sendConfirmation(autopayServiceId(), "0", "NOTCONFIRMED");
+      return res.status(400).type("application/json").send(JSON.stringify({ status: "error", reason: "bad_json" }));
     }
 
-    const listServiceId = autopayXmlInnerText(decoded, "serviceID");
-    const incomingHash = autopayXmlInnerText(decoded, "hash");
-    const txInnerMatch = decoded.match(/<transaction>\s*([\s\S]*?)\s*<\/transaction>/i);
-    const inner = txInnerMatch ? txInnerMatch[1] : "";
-
-    const orderID = autopayXmlInnerText(inner, "orderID");
-    const remoteID = autopayXmlInnerText(inner, "remoteID");
-    const amountStr = autopayXmlInnerText(inner, "amount");
-    const currency = autopayXmlInnerText(inner, "currency");
-    const gatewayID = autopayXmlInnerText(inner, "gatewayID");
-    const paymentDate = autopayXmlInnerText(inner, "paymentDate");
-    const paymentStatus = autopayXmlInnerText(inner, "paymentStatus");
-    const paymentStatusDetails = autopayXmlInnerText(inner, "paymentStatusDetails");
-
-    if (!listServiceId || !orderID || !incomingHash) {
-      return sendConfirmation(autopayServiceId(), orderID || "0", "NOTCONFIRMED");
+    if (body?.fileExt && !body?.payment && !body?.transaction) {
+      return okBody();
     }
 
-    const expectedSig = autopaySha256(
-      autopayBuildItnSigningString(
-        listServiceId,
-        orderID,
-        remoteID,
-        amountStr,
-        currency,
-        gatewayID,
-        paymentDate,
-        paymentStatus,
-        paymentStatusDetails
-      )
-    );
-    if (expectedSig.toLowerCase() !== String(incomingHash).toLowerCase()) {
-      console.error("[Autopay ITN] Niezgodny hash");
-      return sendConfirmation(listServiceId, orderID, "NOTCONFIRMED");
-    }
-    if (listServiceId !== autopayServiceId()) {
-      return sendConfirmation(listServiceId, orderID, "NOTCONFIRMED");
+    const orderId = String(body?.transaction?.orderId || body?.payment?.orderId || "").trim();
+    if (!orderId) {
+      return okBody();
     }
 
     const tx = await db
-      .prepare("SELECT id, user_id, status, package_amount, promo_code_id, amount, payload_json FROM payment_transactions WHERE gateway = 'autopay' AND external_id = ?")
-      .get(orderID);
+      .prepare(
+        `SELECT id, user_id, status, package_amount, promo_code_id, amount, payload_json
+         FROM payment_transactions WHERE gateway = 'imoje' AND external_id = ?`
+      )
+      .get(orderId);
     if (!tx) {
-      console.error("[Autopay ITN] Brak transakcji dla OrderID", orderID);
-      return sendConfirmation(listServiceId, orderID, "NOTCONFIRMED");
+      console.warn("[iMoje] Notyfikacja bez dopasowanej transakcji (orderId):", orderId);
+      return okBody();
     }
 
-    const itnAmountGro = Math.round(parseFloat(amountStr.replace(",", ".")) * 100);
-    if (!Number.isFinite(itnAmountGro) || Math.abs(itnAmountGro - Number(tx.amount)) > 2) {
-      console.error("[Autopay ITN] Niezgodna kwota", { itnAmountGro, expected: tx.amount });
-      return sendConfirmation(listServiceId, orderID, "NOTCONFIRMED");
+    if (tx.status === "paid") {
+      let paidPayload = {};
+      try {
+        paidPayload = JSON.parse(tx.payload_json || "{}");
+      } catch {
+        paidPayload = {};
+      }
+      paidPayload.imoje_notification_last = {
+        received_at: new Date().toISOString(),
+        payment: body.payment || null,
+        transaction: body.transaction || null,
+      };
+      await db
+        .prepare(`UPDATE payment_transactions SET payload_json = ?, updated_at = datetime('now') WHERE id = ?`)
+        .run(JSON.stringify(paidPayload), tx.id);
+      return okBody();
     }
+
+    const paySt = String(body?.payment?.status || "");
+    const trxSt = String(body?.transaction?.status || "");
+    const settled = paySt === "settled" || trxSt === "settled";
+    const amt = Number(body?.transaction?.amount ?? body?.payment?.amount);
 
     let payload = {};
     try {
@@ -1802,26 +1577,29 @@ app.post(
     } catch {
       payload = {};
     }
-    payload.autopay_itn_last = {
-      remoteID,
-      paymentStatus,
-      paymentStatusDetails,
-      paymentDate,
-      gatewayID,
+    payload.imoje_notification_last = {
       received_at: new Date().toISOString(),
+      payment: body.payment || null,
+      transaction: body.transaction || null,
     };
 
-    await db
-      .prepare(`UPDATE payment_transactions SET status = ?, updated_at = datetime('now'), payload_json = ? WHERE id = ?`)
-      .run(`autopay_${String(paymentStatus || "").toLowerCase() || "notified"}`, JSON.stringify(payload), tx.id);
-
-    if (paymentStatus === "SUCCESS" && tx.status !== "paid") {
+    if (settled && tx.status !== "paid") {
+      if (!Number.isFinite(amt) || Math.abs(amt - Number(tx.amount)) > 2) {
+        console.error("[iMoje] Niezgodna kwota w notyfikacji", { amt, expected: tx.amount, orderId });
+        await db
+          .prepare(`UPDATE payment_transactions SET status = ?, updated_at = datetime('now'), payload_json = ? WHERE id = ?`)
+          .run("imoje_amount_mismatch", JSON.stringify(payload), tx.id);
+        return okBody();
+      }
       const msgs = Number(tx.package_amount) || 0;
       if (msgs > 0) {
         await db
           .prepare(`INSERT INTO ledger (id, user_id, delta, reason) VALUES (?, ?, ?, ?)`)
-          .run(uuidv4(), tx.user_id, msgs, `autopay:${remoteID || orderID}`);
-        await db.prepare(`UPDATE payment_transactions SET status = 'paid', paid_at = datetime('now') WHERE id = ?`).run(tx.id);
+          .run(uuidv4(), tx.user_id, msgs, `imoje:${body?.transaction?.id || body?.payment?.id || orderId}`);
+        await db.prepare(`UPDATE payment_transactions SET status = 'paid', paid_at = datetime('now'), payload_json = ? WHERE id = ?`).run(
+          JSON.stringify(payload),
+          tx.id
+        );
         if (tx.promo_code_id) {
           await db.prepare(`UPDATE promo_codes SET used_at = datetime('now'), status = 'used' WHERE id = ?`).run(tx.promo_code_id);
         }
@@ -1834,11 +1612,16 @@ app.post(
         } catch {
           /* ignore */
         }
-        console.log(`[Autopay] Credited ${msgs} messages to user ${tx.user_id}`);
+        console.log(`[iMoje] Zaksięgowano ${msgs} wiadomości dla użytkownika ${tx.user_id}`);
       }
+    } else {
+      const st = (paySt || trxSt || "pending").toLowerCase().replace(/[^a-z0-9_]+/g, "_") || "pending";
+      await db
+        .prepare(`UPDATE payment_transactions SET status = ?, updated_at = datetime('now'), payload_json = ? WHERE id = ?`)
+        .run(`imoje_${st}`, JSON.stringify(payload), tx.id);
     }
 
-    return sendConfirmation(listServiceId, orderID, "CONFIRMED");
+    return okBody();
   })
 );
 

@@ -16,7 +16,7 @@ export const APP_CONFIG = {
       { amount: 50, price_pln: 65.99 },
       { amount: 100, price_pln: 119.99 },
     ],
-    paymentOperator: "PayU S.A.",
+    paymentOperator: "ING Bank Śląski S.A. (bramka płatności iMoje)",
   },
   legal: {
     complaintsEmail: "cepakpawel94@gmail.com",

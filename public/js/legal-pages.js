@@ -41,7 +41,7 @@ function setAll(selector, value) {
   setAll('[data-config="nip"]', text(company.nip, "[NIP]"));
   setAll('[data-config="address"]', text(company.address, "[adres]"));
   setAll('[data-config="email"]', text(company.email, "[email]"));
-  setAll('[data-config="paymentOperator"]', text(pricing.paymentOperator, "PayU"));
+  setAll('[data-config="paymentOperator"]', text(pricing.paymentOperator, "ING Bank Śląski S.A. (iMoje)"));
   setAll('[data-config="complaintsEmail"]', text(legal.complaintsEmail, text(company.email, "[email]")));
   setAll('[data-config="complaintsDays"]', String(legal.complaintsResponseBusinessDays ?? 14));
   setAll('[data-config="noticeDays"]', String(legal.regulationChangeNoticeDays ?? 14));

@@ -11,6 +11,8 @@ const promoApplyBtn = document.getElementById("promo-apply-btn");
 const promoStatus = document.getElementById("promo-status");
 const gatewayNote = document.getElementById("payment-gateway-note");
 
+const urlParams = new URLSearchParams(window.location.search);
+
 let me = null;
 let paymentsConfig = null;
 let appliedPromo = null; // { code, discount_percent, label }
@@ -20,33 +22,24 @@ document.getElementById("logout")?.addEventListener("click", async () => {
   window.location.href = "/logowanie.html";
 });
 
-// Handle return from payment gateway
-const urlParams = new URLSearchParams(window.location.search);
-if (urlParams.get("status") === "ok") {
-  if (pkgNote) {
-    const gw = urlParams.get("gateway");
+// Powrót z bramki płatności (iMoje)
+if (pkgNote) {
+  const st = urlParams.get("status");
+  const gw = urlParams.get("gateway");
+  if (st === "ok") {
     pkgNote.textContent =
-      gw === "autopay"
-        ? "Płatność przyjęta — wiadomości pojawią się na koncie po potwierdzeniu przez Autopay (zwykle kilka sekund)."
-        : "Płatność przyjęta — wiadomości pojawią się na koncie po potwierdzeniu przez PayU (zwykle kilka sekund).";
+      gw === "imoje" || !gw
+        ? "Płatność przyjęta — wiadomości pojawią się na koncie po potwierdzeniu przez ING iMoje (zwykle kilka sekund)."
+        : "Płatność przyjęta — wiadomości pojawią się na koncie po potwierdzeniu przez operatora płatności (zwykle kilka sekund).";
     pkgNote.style.color = "#4caf50";
+  } else if (st === "pending") {
+    pkgNote.textContent =
+      "Płatność w toku. Po zaksięgowaniu środków wiadomości pojawią się na koncie.";
+    pkgNote.style.color = "#ff9800";
+  } else if (st === "fail") {
+    pkgNote.textContent = "Płatność nie została dokończona. Możesz wybrać pakiet ponownie.";
+    pkgNote.style.color = "#e57373";
   }
-}
-
-function submitAutopayPost(action, fields) {
-  const form = document.createElement("form");
-  form.method = "POST";
-  form.action = action;
-  form.acceptCharset = "UTF-8";
-  for (const [name, value] of Object.entries(fields)) {
-    const inp = document.createElement("input");
-    inp.type = "hidden";
-    inp.name = name;
-    inp.value = String(value ?? "");
-    form.appendChild(inp);
-  }
-  document.body.appendChild(form);
-  form.submit();
 }
 
 function showPromoStatus(msg, ok = true) {
@@ -76,7 +69,7 @@ function renderPackages() {
   const priceMap = new Map((me?.packages_pln || []).map((x) => [x.amount, x.price_pln]));
   const amounts = [10, 20, 50, 100];
   const gw = paymentsConfig?.checkout_gateway;
-  const payOnline = gw === "autopay" || gw === "payu";
+  const payOnline = gw === "imoje";
   const fakeEnabled = me?.fake_purchase_enabled;
 
   if (!payOnline && !fakeEnabled) {
@@ -104,7 +97,11 @@ function renderPackages() {
     }
 
     const lbl = buildLabel();
-    if (lbl.html) { b.innerHTML = lbl.html; } else { b.textContent = lbl.text; }
+    if (lbl.html) {
+      b.innerHTML = lbl.html;
+    } else {
+      b.textContent = lbl.text;
+    }
 
     b.addEventListener("click", async () => {
       pkgErr.hidden = true;
@@ -114,27 +111,14 @@ function renderPackages() {
         if (payOnline) {
           const body = { amount: a };
           if (appliedPromo) body.promo_code = appliedPromo.code;
-          if (gw === "autopay") {
-            const r = await api("/api/payments/autopay/create", {
-              method: "POST",
-              body: JSON.stringify(body),
-            });
-            const ap = r?.autopay;
-            if (ap?.action && ap?.fields) {
-              submitAutopayPost(ap.action, ap.fields);
-            } else {
-              throw new Error("Brak danych formularza Autopay.");
-            }
+          const r = await api("/api/payments/imoje/create", {
+            method: "POST",
+            body: JSON.stringify(body),
+          });
+          if (r.redirectUri) {
+            window.location.href = r.redirectUri;
           } else {
-            const r = await api("/api/payments/payu/create", {
-              method: "POST",
-              body: JSON.stringify(body),
-            });
-            if (r.redirectUri) {
-              window.location.href = r.redirectUri;
-            } else {
-              throw new Error("Brak adresu przekierowania od PayU.");
-            }
+            throw new Error("Brak adresu przekierowania od ING iMoje.");
           }
         } else {
           const r = await api("/api/test/purchase", {
@@ -145,14 +129,22 @@ function renderPackages() {
           if (balLine) balLine.textContent = `Pozostało: ${me.messages_remaining} wiadomości`;
           b.disabled = false;
           const lbl3 = buildLabel();
-          if (lbl3.html) { b.innerHTML = lbl3.html; } else { b.textContent = lbl3.text; }
+          if (lbl3.html) {
+            b.innerHTML = lbl3.html;
+          } else {
+            b.textContent = lbl3.text;
+          }
         }
       } catch (e) {
         pkgErr.textContent = e.message;
         pkgErr.hidden = false;
         b.disabled = false;
         const lbl2 = buildLabel();
-        if (lbl2.html) { b.innerHTML = lbl2.html; } else { b.textContent = lbl2.text; }
+        if (lbl2.html) {
+          b.innerHTML = lbl2.html;
+        } else {
+          b.textContent = lbl2.text;
+        }
       }
     });
     pkg.appendChild(b);
@@ -173,7 +165,10 @@ async function applyPromoCode() {
       appliedPromo = { code, discount_percent: data.discount_percent, label: data.label };
       showPromoStatus(`✓ Kod "${code}" zastosowany — ${data.discount_percent}% zniżki (${data.label})`);
       if (promoInput) promoInput.disabled = true;
-      if (promoApplyBtn) { promoApplyBtn.textContent = "Usuń kod"; promoApplyBtn.disabled = false; }
+      if (promoApplyBtn) {
+        promoApplyBtn.textContent = "Usuń kod";
+        promoApplyBtn.disabled = false;
+      }
       renderPackages();
     } else {
       showPromoStatus("Kod nie daje zniżki.", false);
@@ -190,7 +185,10 @@ promoApplyBtn?.addEventListener("click", async () => {
   if (appliedPromo) {
     // Remove promo
     appliedPromo = null;
-    if (promoInput) { promoInput.disabled = false; promoInput.value = ""; }
+    if (promoInput) {
+      promoInput.disabled = false;
+      promoInput.value = "";
+    }
     if (promoApplyBtn) promoApplyBtn.textContent = "Zastosuj";
     clearPromoStatus();
     renderPackages();
