@@ -146,6 +146,19 @@ function updateDocumentTitle() {
   const n = unreadCount();
   const base = "Panel klienta — Szepty Anielskie";
   document.title = n > 0 ? `(${n}) ${base}` : base;
+  const banner = document.getElementById("header-unread-banner");
+  if (banner) {
+    if (n <= 0) {
+      banner.classList.add("hidden");
+      banner.textContent = "";
+    } else {
+      banner.classList.remove("hidden");
+      banner.textContent =
+        n === 1
+          ? "Masz 1 nieprzeczytaną odpowiedź od konsultanta — otwórz zakładkę „Moje rozmowy”, aby ją odczytać."
+          : `Masz ${n} nieprzeczytane odpowiedzi od konsultantów — otwórz zakładkę „Moje rozmowy”, aby je odczytać.`;
+    }
+  }
 }
 
 function bestValuePackage() {
@@ -450,7 +463,6 @@ async function loadMe() {
     pricing = [];
   }
   await loadThreads();
-  updateDocumentTitle();
   renderBrowseCatalog();
   refreshAccountSummary();
   startSessionKeepalive();

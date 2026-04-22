@@ -16,16 +16,20 @@
   </head>
   <body class="page-panel page-panel--browse-view">
     <header class="site-top">
-      <div class="site-top-inner">
+      <div class="site-top-inner site-top-inner--panel">
         <a class="logo" href="/">Szepty Anielskie</a>
-        <nav class="nav-actions nav-actions--panel">
-          <button type="button" class="btn btn-outline btn-sm" id="account-summary-toggle">
-            <span class="top-meta top-meta--strong" id="who"></span>
-          </button>
-          <a class="link-panel-topup" href="/panel-doladowanie.html">Pakiet / doładowanie</a>
-          <span class="top-meta" id="bal"></span>
-          <button type="button" class="btn btn-outline" id="logout">Wyloguj</button>
-        </nav>
+        <div class="site-top-panel-cluster">
+          <a class="link-panel-cennik" href="/informacje-ceny.html">Cennik</a>
+          <p id="header-unread-banner" class="header-unread-banner hidden" role="status" aria-live="polite"></p>
+          <nav class="nav-actions nav-actions--panel">
+            <button type="button" class="btn btn-outline btn-sm" id="account-summary-toggle">
+              <span class="top-meta top-meta--strong" id="who"></span>
+            </button>
+            <a class="link-panel-topup" href="/panel-doladowanie.html">Pakiet / doładowanie</a>
+            <span class="top-meta" id="bal"></span>
+            <button type="button" class="btn btn-outline" id="logout">Wyloguj</button>
+          </nav>
+        </div>
       </div>
     </header>
 

@@ -201,6 +201,91 @@ img {
   gap: 0.5rem 0.75rem;
 }
 
+/* Panel klienta — logo + cennik + baner nieprzeczytanych + konto */
+.site-top-inner--panel {
+  align-items: flex-start;
+  gap: 0.5rem 0.85rem;
+}
+
+.site-top-panel-cluster {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.45rem;
+}
+
+.link-panel-cennik {
+  align-self: flex-end;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #f0d878;
+  text-decoration: none;
+  white-space: nowrap;
+  padding: 0.2rem 0.35rem;
+  border-radius: 6px;
+  border: 1px solid rgba(240, 216, 120, 0.45);
+}
+
+.link-panel-cennik:hover {
+  color: #fff;
+  border-color: rgba(255, 235, 180, 0.75);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.header-unread-banner {
+  margin: 0;
+  padding: 0.5rem 0.65rem;
+  border-radius: 10px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+  color: #fffaf5;
+  background: linear-gradient(135deg, #7f1d1d 0%, #b45309 48%, #92400e 100%);
+  border: 1px solid rgba(254, 215, 170, 0.55);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+}
+
+.header-unread-banner.hidden {
+  display: none !important;
+}
+
+@media (min-width: 721px) {
+  .site-top-inner--panel {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
+  .site-top-panel-cluster {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem 0.75rem;
+  }
+
+  .link-panel-cennik {
+    align-self: center;
+    order: 0;
+  }
+
+  .header-unread-banner:not(.hidden) {
+    flex: 1 1 220px;
+    min-width: min(100%, 280px);
+    max-width: 420px;
+    text-align: left;
+    padding: 0.4rem 0.65rem;
+    font-size: 0.84rem;
+  }
+
+  .site-top-panel-cluster .nav-actions--panel {
+    flex: 0 1 auto;
+    width: auto;
+  }
+}
+
 .panel-nav-status {
   display: flex;
   flex-direction: column;
@@ -1291,6 +1376,20 @@ body.page-panel {
   body.page-panel.page-panel--chat-view .panel-view--chat {
     flex: 1 1 0;
     min-height: 0;
+  }
+
+  /* Obszar wiadomości musi dostać realną wysokość — inaczej znika między nagłówkiem a composerem (iOS / Chrome mobile) */
+  body.page-panel.page-panel--chat-view .panel-layout--chat .panel-main {
+    flex: 1 1 0%;
+    min-height: 0;
+    height: auto;
+    max-height: none;
+  }
+
+  body.page-panel.page-panel--chat-view .panel-main > #messages.messages {
+    flex: 1 1 0%;
+    min-height: 0;
+    max-height: none;
   }
 }
 
@@ -2402,12 +2501,18 @@ body.page-panel .site-top {
   background: linear-gradient(180deg, #f3ebe0 0%, #efe4d6 100%);
 }
 
-body.page-panel .panel-main > .messages {
-  flex: 1;
+/* flex-basis 0% — na mobile w przeglądarce inaczej „auto” zbija wysokość listy wiadomości do zera */
+body.page-panel .panel-main > .messages,
+body.page-panel .panel-main > #messages.messages {
+  flex: 1 1 0%;
   min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
+}
+
+body.page-panel .panel-main > #send-err.form-error {
+  flex-shrink: 0;
 }
 
 .bubble {

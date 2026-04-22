@@ -275,9 +275,12 @@ try {
     }
   }
 
+  const info = paymentsConfig?.notices?.payments_info;
   const note = paymentsConfig?.notices?.checkout;
-  if (gatewayNote && note) {
-    gatewayNote.textContent = note;
+  const bits = [info, note].filter(Boolean);
+  if (gatewayNote && bits.length) {
+    gatewayNote.style.whiteSpace = "pre-line";
+    gatewayNote.textContent = bits.join("\n\n");
     gatewayNote.hidden = false;
   }
   syncGatewayPicker();
