@@ -15,23 +15,48 @@
     <link rel="stylesheet" href="/css/client.css" />
   </head>
   <body class="page-panel page-panel--browse-view">
-    <header class="site-top">
-      <div class="site-top-inner site-top-inner--panel">
-        <a class="logo" href="/">Szepty Anielskie</a>
-        <div class="site-top-panel-cluster">
-          <a class="link-panel-cennik" href="/informacje-ceny.html">Cennik</a>
-          <p id="header-unread-banner" class="header-unread-banner hidden" role="status" aria-live="polite"></p>
-          <nav class="nav-actions nav-actions--panel">
-            <button type="button" class="btn btn-outline btn-sm" id="account-summary-toggle">
-              <span class="top-meta top-meta--strong" id="who"></span>
-            </button>
-            <a class="link-panel-topup" href="/panel-doladowanie.html">Pakiet / doładowanie</a>
-            <span class="top-meta" id="bal"></span>
-            <button type="button" class="btn btn-outline" id="logout">Wyloguj</button>
-          </nav>
-        </div>
+    <div class="panel-chrome-root" id="panel-chrome-root">
+      <div class="panel-chrome-mini" id="panel-chrome-mini">
+        <a class="logo panel-chrome-mini-logo" href="/">Szepty Anielskie</a>
+        <a class="panel-chrome-mini-cennik" href="/informacje-ceny.html">Cennik</a>
+        <span class="panel-chrome-mini-spacer" aria-hidden="true"></span>
+        <span id="panel-unread-badge" class="panel-unread-badge hidden" aria-hidden="true" title="Nieprzeczytane odpowiedzi"></span>
+        <button
+          type="button"
+          class="panel-chrome-toggle"
+          id="panel-chrome-toggle"
+          aria-expanded="true"
+          aria-controls="panel-chrome-body"
+        >
+          <span class="panel-chrome-toggle-text">Zwiń</span>
+          <span class="panel-chrome-chevron" id="panel-chrome-chevron" aria-hidden="true">▼</span>
+        </button>
       </div>
-    </header>
+      <div id="panel-chrome-body" class="panel-chrome-body">
+        <header class="site-top">
+          <div class="site-top-inner site-top-inner--panel">
+            <a class="logo" href="/">Szepty Anielskie</a>
+            <div class="site-top-panel-cluster">
+              <a class="link-panel-cennik" href="/informacje-ceny.html">Cennik</a>
+              <p id="header-unread-banner" class="header-unread-banner hidden" role="status" aria-live="polite"></p>
+              <nav class="nav-actions nav-actions--panel">
+                <button type="button" class="btn btn-outline btn-sm" id="account-summary-toggle">
+                  <span class="top-meta top-meta--strong" id="who"></span>
+                </button>
+                <a class="link-panel-topup" href="/panel-doladowanie.html">Pakiet / doładowanie</a>
+                <span class="top-meta" id="bal"></span>
+                <button type="button" class="btn btn-outline" id="logout">Wyloguj</button>
+              </nav>
+            </div>
+          </div>
+        </header>
+
+        <nav class="panel-view-tabs" aria-label="Widok panelu">
+          <button type="button" class="panel-tab panel-tab--active" id="tab-browse" data-view="browse">Konsultanci</button>
+          <button type="button" class="panel-tab" id="tab-chat" data-view="chat">Moje rozmowy</button>
+        </nav>
+      </div>
+    </div>
 
     <div id="panel-live-region" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
     <div id="client-toast" class="client-toast hidden" role="status"></div>
@@ -175,13 +200,6 @@
     </div>
 
     <div class="panel-app">
-      <nav class="panel-view-tabs" aria-label="Widok panelu">
-        <button type="button" class="panel-tab panel-tab--active" id="tab-browse" data-view="browse">
-          Konsultanci
-        </button>
-        <button type="button" class="panel-tab" id="tab-chat" data-view="chat">Moje rozmowy</button>
-      </nav>
-
       <div id="view-browse" class="panel-view panel-view--browse">
         <div class="browse-inner">
           <header class="browse-header">

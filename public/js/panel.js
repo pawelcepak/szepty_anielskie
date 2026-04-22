@@ -16,6 +16,7 @@ let browseSort = "online";
 let sessionKeepTimer = null;
 let pollTimer = null;
 const ONBOARDING_SNOOZE_KEY = "panel_onboarding_snooze_v1";
+const PANEL_CHROME_COLLAPSED_KEY = "panel_chrome_collapsed_v1";
 
 const SEEN_PREFIX = "panel_seen_";
 const FALLBACK_PORTRAIT =
@@ -142,6 +143,66 @@ function unreadCount() {
   return myThreads.filter((t) => threadIsUnread(t)).length;
 }
 
+function updateMiniUnreadBadge() {
+  const n = unreadCount();
+  const el = document.getElementById("panel-unread-badge");
+  if (!el) return;
+  if (n <= 0) {
+    el.classList.add("hidden");
+    el.textContent = "";
+    el.setAttribute("aria-hidden", "true");
+    el.removeAttribute("aria-label");
+  } else {
+    el.classList.remove("hidden");
+    el.textContent = n > 99 ? "99+" : String(n);
+    el.setAttribute("aria-hidden", "false");
+    el.setAttribute(
+      "aria-label",
+      n === 1 ? "1 nieprzeczytana odpowiedź od konsultanta" : `${n} nieprzeczytane odpowiedzi od konsultantów`
+    );
+  }
+}
+
+function applyPanelChromeCollapsed(collapsed) {
+  const root = document.getElementById("panel-chrome-root");
+  const toggle = document.getElementById("panel-chrome-toggle");
+  const chev = document.getElementById("panel-chrome-chevron");
+  const label = document.querySelector(".panel-chrome-toggle-text");
+  const bodyEl = document.getElementById("panel-chrome-body");
+  if (!root || !toggle) return;
+  root.classList.toggle("panel-chrome-root--collapsed", collapsed);
+  document.body.classList.toggle("panel-chrome-collapsed", collapsed);
+  toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+  if (chev) chev.textContent = collapsed ? "▲" : "▼";
+  if (label) label.textContent = collapsed ? "Rozwiń" : "Zwiń";
+  if (bodyEl) {
+    if (collapsed) bodyEl.setAttribute("inert", "");
+    else bodyEl.removeAttribute("inert");
+  }
+  try {
+    sessionStorage.setItem(PANEL_CHROME_COLLAPSED_KEY, collapsed ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
+
+function initPanelChromeCollapse() {
+  const toggle = document.getElementById("panel-chrome-toggle");
+  const root = document.getElementById("panel-chrome-root");
+  if (!toggle || !root) return;
+  let startCollapsed = false;
+  try {
+    startCollapsed = sessionStorage.getItem(PANEL_CHROME_COLLAPSED_KEY) === "1";
+  } catch {
+    /* ignore */
+  }
+  applyPanelChromeCollapsed(startCollapsed);
+  toggle.addEventListener("click", () => {
+    const isCollapsed = root.classList.contains("panel-chrome-root--collapsed");
+    applyPanelChromeCollapsed(!isCollapsed);
+  });
+}
+
 function updateDocumentTitle() {
   const n = unreadCount();
   const base = "Panel klienta — Szepty Anielskie";
@@ -159,6 +220,7 @@ function updateDocumentTitle() {
           : `Masz ${n} nieprzeczytane odpowiedzi od konsultantów — otwórz zakładkę „Moje rozmowy”, aby je odczytać.`;
     }
   }
+  updateMiniUnreadBadge();
 }
 
 function bestValuePackage() {
@@ -808,6 +870,7 @@ document.getElementById("panel-email-form")?.addEventListener("submit", async (e
 });
 
 try {
+  initPanelChromeCollapse();
   await loadMe();
   const openId = new URLSearchParams(window.location.search).get("open");
   if (openId && characters.some((c) => c.id === openId)) {
