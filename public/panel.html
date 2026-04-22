@@ -37,13 +37,9 @@
       <div id="panel-chrome-body" class="panel-chrome-body">
         <header class="site-top">
           <div class="site-top-inner site-top-inner--panel">
-            <div class="site-top-brand-panel">
-              <a class="logo logo--panel-brand" href="/">Szepty Anielskie</a>
-              <a class="link-panel-cennik link-panel-cennik--by-brand" href="/informacje-ceny.html">Cennik</a>
-            </div>
             <div class="site-top-panel-cluster">
               <p id="header-unread-banner" class="header-unread-banner hidden" role="status" aria-live="polite"></p>
-              <nav class="nav-actions nav-actions--panel">
+              <div class="site-top-panel-row site-top-panel-row--account">
                 <button type="button" class="btn btn-account-summary btn-sm" id="account-summary-toggle">
                   <span class="account-summary-btn-inner">
                     <span class="account-summary-name" id="who"></span>
@@ -51,9 +47,11 @@
                   </span>
                 </button>
                 <span class="top-meta panel-balance-line" id="bal"></span>
+              </div>
+              <div class="site-top-panel-row site-top-panel-row--wallet">
                 <a class="btn btn-panel-topup" href="/panel-doladowanie.html">Doładuj konto</a>
                 <button type="button" class="btn btn-outline" id="logout">Wyloguj</button>
-              </nav>
+              </div>
             </div>
           </div>
         </header>

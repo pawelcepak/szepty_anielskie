@@ -634,12 +634,14 @@ function renderBrowseCatalog() {
             <span class="${esc(av.badgeClass)}">${esc(av.badgeText)}</span>
             <h3 class="browse-card-name">${esc(c.name)}</h3>
             <p class="browse-card-tag">${esc(c.tagline)}</p>
-            ${gender}
           </div>
         </div>
-        ${sk}
-        ${about}
-        <p class="browse-card-hours">${esc(av.line)}</p>
+        <div class="browse-card-detail">
+          ${gender}
+          ${sk}
+          ${about}
+          <p class="browse-card-hours">${esc(av.line)}</p>
+        </div>
         <div class="browse-card-actions">
           <button type="button" class="btn btn-primary browse-card-cta">Otwórz rozmowę</button>
           <a class="btn btn-outline browse-card-cta-secondary" href="${profileHref}">Profil medium</a>
