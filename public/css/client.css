@@ -1308,6 +1308,29 @@ body.page-panel.page-panel--simple .panel-payment-note {
   border-radius: 8px;
 }
 
+body.page-panel.page-panel--simple .gateway-picker {
+  margin: 0 0 1rem;
+  padding: 0.5rem 0 0;
+}
+body.page-panel.page-panel--simple .gateway-picker .gateway-picker-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+body.page-panel.page-panel--simple .gateway-picker label.gateway-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-right: 1.1rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+body.page-panel.page-panel--simple .gateway-picker label.gateway-opt input {
+  accent-color: var(--focus);
+}
+
 .link-panel-topup {
   font-size: 0.82rem;
   font-weight: 600;

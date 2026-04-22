@@ -10,27 +10,35 @@ const promoInput = document.getElementById("promo-code-input");
 const promoApplyBtn = document.getElementById("promo-apply-btn");
 const promoStatus = document.getElementById("promo-status");
 const gatewayNote = document.getElementById("payment-gateway-note");
+const gatewayPicker = document.getElementById("gateway-picker");
 
 const urlParams = new URLSearchParams(window.location.search);
 
 let me = null;
 let paymentsConfig = null;
 let appliedPromo = null; // { code, discount_percent, label }
+let selectedCheckoutGateway = "stripe";
 
 document.getElementById("logout")?.addEventListener("click", async () => {
   await api("/api/auth/logout", { method: "POST" });
   window.location.href = "/logowanie.html";
 });
 
-// Powrót z bramki płatności (iMoje)
+// Powrót z bramki płatności
 if (pkgNote) {
   const st = urlParams.get("status");
   const gw = urlParams.get("gateway");
   if (st === "ok") {
-    pkgNote.textContent =
-      gw === "imoje" || !gw
-        ? "Płatność przyjęta — wiadomości pojawią się na koncie po potwierdzeniu przez ING iMoje (zwykle kilka sekund)."
-        : "Płatność przyjęta — wiadomości pojawią się na koncie po potwierdzeniu przez operatora płatności (zwykle kilka sekund).";
+    if (gw === "stripe") {
+      pkgNote.textContent =
+        "Płatność zakończona w Stripe — pakiet jest dopisywany automatycznie. Jeśli saldo nie rośnie, odśwież stronę za kilka sekund.";
+    } else if (gw === "imoje" || !gw) {
+      pkgNote.textContent =
+        "Płatność przyjęta — wiadomości pojawią się na koncie po potwierdzeniu przez ING iMoje (zwykle kilka sekund).";
+    } else {
+      pkgNote.textContent =
+        "Płatność przyjęta — wiadomości pojawią się na koncie po potwierdzeniu przez operatora płatności (zwykle kilka sekund).";
+    }
     pkgNote.style.color = "#4caf50";
   } else if (st === "pending") {
     pkgNote.textContent =
@@ -40,6 +48,37 @@ if (pkgNote) {
     pkgNote.textContent = "Płatność nie została dokończona. Możesz wybrać pakiet ponownie.";
     pkgNote.style.color = "#e57373";
   }
+}
+
+function syncGatewayPicker() {
+  const list = paymentsConfig?.checkout_gateways || [];
+  if (!gatewayPicker) return;
+  if (list.length <= 1) {
+    gatewayPicker.hidden = true;
+    gatewayPicker.innerHTML = "";
+    selectedCheckoutGateway = list[0] || selectedCheckoutGateway;
+    return;
+  }
+  gatewayPicker.hidden = false;
+  const first = list[0];
+  if (!list.includes(selectedCheckoutGateway)) {
+    selectedCheckoutGateway = first;
+  }
+  const parts = [
+    '<p class="gateway-picker-title">Sposób płatności</p>',
+    ...list.map((g) => {
+      const id = `gw-${g}`;
+      const label = g === "stripe" ? "Stripe (karta, szybkie testy)" : "iMoje (ING)";
+      return `<label class="gateway-opt" for="${id}"><input type="radio" name="checkout-gw" id="${id}" value="${g}" />${label}</label>`;
+    }),
+  ];
+  gatewayPicker.innerHTML = parts.join("");
+  gatewayPicker.querySelectorAll('input[name="checkout-gw"]').forEach((inp) => {
+    inp.checked = inp.value === selectedCheckoutGateway;
+    inp.addEventListener("change", () => {
+      if (inp.checked) selectedCheckoutGateway = inp.value;
+    });
+  });
 }
 
 function showPromoStatus(msg, ok = true) {
@@ -68,8 +107,8 @@ function renderPackages() {
   if (pkgNote && !urlParams.get("status")) pkgNote.textContent = "";
   const priceMap = new Map((me?.packages_pln || []).map((x) => [x.amount, x.price_pln]));
   const amounts = [10, 20, 50, 100];
-  const gw = paymentsConfig?.checkout_gateway;
-  const payOnline = gw === "imoje";
+  const list = paymentsConfig?.checkout_gateways || [];
+  const payOnline = list.length > 0;
   const fakeEnabled = me?.fake_purchase_enabled;
 
   if (!payOnline && !fakeEnabled) {
@@ -111,14 +150,21 @@ function renderPackages() {
         if (payOnline) {
           const body = { amount: a };
           if (appliedPromo) body.promo_code = appliedPromo.code;
-          const r = await api("/api/payments/imoje/create", {
-            method: "POST",
-            body: JSON.stringify(body),
-          });
+          const useGw = selectedCheckoutGateway || list[0];
+          const r =
+            useGw === "stripe"
+              ? await api("/api/payments/stripe/create", {
+                  method: "POST",
+                  body: JSON.stringify(body),
+                })
+              : await api("/api/payments/imoje/create", {
+                  method: "POST",
+                  body: JSON.stringify(body),
+                });
           if (r.redirectUri) {
             window.location.href = r.redirectUri;
           } else {
-            throw new Error("Brak adresu przekierowania od ING iMoje.");
+            throw new Error(useGw === "stripe" ? "Brak adresu przekierowania od Stripe." : "Brak adresu przekierowania od ING iMoje.");
           }
         } else {
           const r = await api("/api/test/purchase", {
@@ -213,11 +259,28 @@ try {
   if (balLine) {
     balLine.textContent = `Pozostało: ${me.messages_remaining} wiadomości`;
   }
+
+  const st = urlParams.get("status");
+  const gw = urlParams.get("gateway");
+  const sid = urlParams.get("session_id");
+  if (st === "ok" && gw === "stripe" && sid) {
+    try {
+      const vr = await api(`/api/payments/stripe/verify-return?session_id=${encodeURIComponent(sid)}`);
+      if (typeof vr.messages_remaining === "number") {
+        me.messages_remaining = vr.messages_remaining;
+        if (balLine) balLine.textContent = `Pozostało: ${me.messages_remaining} wiadomości`;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
   const note = paymentsConfig?.notices?.checkout;
   if (gatewayNote && note) {
     gatewayNote.textContent = note;
     gatewayNote.hidden = false;
   }
+  syncGatewayPicker();
   renderPackages();
 
   // Auto-uzupełnij kod promocyjny z localStorage (zapisany przez popup)

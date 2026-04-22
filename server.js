@@ -36,6 +36,7 @@ import {
   tryClaimThread,
 } from "./assignment.js";
 import { APP_CONFIG } from "./app-config.js";
+import Stripe from "stripe";
 import {
   sendEmailChangeConfirmation,
   isMailConfigured,
@@ -103,8 +104,43 @@ function isImojeConfigured() {
     !!imojeBearerToken()
   );
 }
+function stripeSecretKey() {
+  return String(process.env.STRIPE_SECRET_KEY || "").trim();
+}
+function stripePublishableKey() {
+  return String(process.env.STRIPE_PUBLISHABLE_KEY || "").trim();
+}
+function stripeWebhookSecret() {
+  return String(process.env.STRIPE_WEBHOOK_SECRET || "").trim();
+}
+function isStripeConfigured() {
+  return !!stripeSecretKey();
+}
+let _stripeSdk = null;
+function getStripe() {
+  const sk = stripeSecretKey();
+  if (!sk) return null;
+  if (!_stripeSdk) _stripeSdk = new Stripe(sk);
+  return _stripeSdk;
+}
+/** Kolejność bramek w panelu: domyślnie Stripe pierwszy (wygodne testy), albo CHECKOUT_DEFAULT_GATEWAY=imoje */
+function listCheckoutGateways() {
+  const st = isStripeConfigured();
+  const im = isImojeConfigured();
+  const prefer = String(process.env.CHECKOUT_DEFAULT_GATEWAY || "stripe").toLowerCase();
+  const out = [];
+  if (prefer === "imoje") {
+    if (im) out.push("imoje");
+    if (st) out.push("stripe");
+  } else {
+    if (st) out.push("stripe");
+    if (im) out.push("imoje");
+  }
+  return out;
+}
 function preferredClientCheckoutGateway() {
-  return isImojeConfigured() ? "imoje" : null;
+  const g = listCheckoutGateways();
+  return g[0] || null;
 }
 function parseImojeSignatureHeader(headerVal) {
   const out = {};
@@ -129,6 +165,84 @@ function imojeVerifyNotificationSignature(rawBody, headerVal) {
   const hashName = allowed.has(alg) ? alg : "sha256";
   const own = crypto.createHash(hashName).update(rawBody + imojeServiceKey(), "utf8").digest("hex");
   return own.toLowerCase() === String(incoming).toLowerCase();
+}
+
+async function fulfillPaidPaymentTransaction(tx, ledgerReason, payloadObj) {
+  if (tx.status === "paid") return { already: true };
+  const msgs = Number(tx.package_amount) || 0;
+  if (msgs <= 0) return { ok: false, reason: "no_msgs" };
+  await db
+    .prepare(`INSERT INTO ledger (id, user_id, delta, reason) VALUES (?, ?, ?, ?)`)
+    .run(uuidv4(), tx.user_id, msgs, ledgerReason);
+  await db
+    .prepare(
+      `UPDATE payment_transactions SET status = 'paid', paid_at = datetime('now'), payload_json = ?, updated_at = datetime('now') WHERE id = ?`
+    )
+    .run(JSON.stringify(payloadObj), tx.id);
+  if (tx.promo_code_id) {
+    await db.prepare(`UPDATE promo_codes SET used_at = datetime('now'), status = 'used' WHERE id = ?`).run(tx.promo_code_id);
+  }
+  try {
+    if (payloadObj.promo_type === "voucher" && payloadObj.promo_code) {
+      await db
+        .prepare(`UPDATE promo_campaigns SET total_claimed = COALESCE(total_claimed, 0) + 1 WHERE voucher_code = ?`)
+        .run(payloadObj.promo_code);
+    }
+  } catch {
+    /* ignore */
+  }
+  console.log(`[payments] Zaksięgowano ${msgs} wiadomości (${ledgerReason}) user=${tx.user_id}`);
+  return { ok: true, already: false };
+}
+
+async function tryFulfillStripeCheckoutSession(session, sourceTag) {
+  const sessionId = String(session?.id || "").trim();
+  if (!sessionId.startsWith("cs_")) return { ok: false, reason: "bad_session" };
+  const tx = await db
+    .prepare(
+      `SELECT id, user_id, status, package_amount, promo_code_id, amount, payload_json
+       FROM payment_transactions WHERE gateway = 'stripe' AND external_id = ?`
+    )
+    .get(sessionId);
+  if (!tx) {
+    console.warn("[Stripe] Brak transakcji dla sesji:", sessionId);
+    return { ok: false, reason: "no_tx" };
+  }
+  if (tx.status === "paid") return { ok: true, already: true };
+  if (String(session.payment_status || "") !== "paid") return { ok: false, reason: "not_paid" };
+  const total = Number(session.amount_total);
+  if (!Number.isFinite(total) || Math.abs(total - Number(tx.amount)) > 2) {
+    let payload = {};
+    try {
+      payload = JSON.parse(tx.payload_json || "{}");
+    } catch {
+      payload = {};
+    }
+    payload.stripe_last = { at: new Date().toISOString(), source: sourceTag, session_id: sessionId, amount_total: total };
+    await db
+      .prepare(`UPDATE payment_transactions SET status = 'stripe_amount_mismatch', payload_json = ?, updated_at = datetime('now') WHERE id = ?`)
+      .run(JSON.stringify(payload), tx.id);
+    console.error("[Stripe] Niezgodna kwota sesji", { total, expected: tx.amount, sessionId });
+    return { ok: false, reason: "amount_mismatch" };
+  }
+  const metaUid = String(session.metadata?.user_id || "").trim();
+  if (metaUid && metaUid !== tx.user_id) {
+    console.error("[Stripe] Niezgodny user_id w metadata", { metaUid, txUser: tx.user_id });
+    return { ok: false, reason: "user_mismatch" };
+  }
+  let payload = {};
+  try {
+    payload = JSON.parse(tx.payload_json || "{}");
+  } catch {
+    payload = {};
+  }
+  payload.stripe_checkout_last = {
+    at: new Date().toISOString(),
+    source: sourceTag,
+    payment_status: session.payment_status,
+    payment_intent: session.payment_intent || null,
+  };
+  return fulfillPaidPaymentTransaction(tx, `stripe:${session.payment_intent || sessionId}`, payload);
 }
 
 function promoConfigPublic() {
@@ -161,6 +275,29 @@ if (["1", "true", "yes"].includes(String(process.env.TRUST_PROXY || "").toLowerC
 }
 app.get("/favicon.ico", (_req, res) => res.status(204).end());
 app.use(cors({ origin: true, credentials: true }));
+app.post(
+  "/api/payments/stripe/webhook",
+  express.raw({ type: "application/json" }),
+  asyncRoute(async (req, res) => {
+    const whsec = stripeWebhookSecret();
+    if (!whsec || !isStripeConfigured()) {
+      return res.status(503).type("text/plain").send("stripe webhook not configured");
+    }
+    const stripe = getStripe();
+    const sig = req.headers["stripe-signature"];
+    let event;
+    try {
+      event = stripe.webhooks.constructEvent(req.body, sig, whsec);
+    } catch (e) {
+      console.error("[Stripe] Webhook — błąd weryfikacji podpisu:", e?.message || e);
+      return res.status(400).type("text/plain").send("bad signature");
+    }
+    if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
+      await tryFulfillStripeCheckoutSession(event.data.object, `webhook:${event.type}`);
+    }
+    res.json({ received: true });
+  })
+);
 app.use(
   express.json({
     limit: "512kb",
@@ -1240,19 +1377,26 @@ app.post("/api/public/contact", asyncRoute(async (req, res) => {
 }));
 
 app.get("/api/public/payments-config", (_req, res) => {
+  const checkoutGateways = listCheckoutGateways();
   const checkoutGateway = preferredClientCheckoutGateway();
   res.json({
     checkout_gateway: checkoutGateway,
+    checkout_gateways: checkoutGateways,
     currency: APP_CONFIG.pricing.currency,
+    stripe: {
+      configured: isStripeConfigured(),
+      checkout_enabled: checkoutGateways.includes("stripe"),
+      publishable_key: isStripeConfigured() ? stripePublishableKey() || null : null,
+    },
     imoje: {
       configured: isImojeConfigured(),
-      checkout_enabled: checkoutGateway === "imoje",
+      checkout_enabled: checkoutGateways.includes("imoje"),
       sandbox: IMOJE_SANDBOX,
     },
     notices: {
       checkout:
-        !isImojeConfigured()
-          ? "Płatności iMoje nie są jeszcze skonfigurowane — po dodaniu kluczy API w panelu serwera pojawi się możliwość doładowania."
+        checkoutGateways.length === 0
+          ? "Płatności online nie są skonfigurowane — na serwerze ustaw Stripe (STRIPE_SECRET_KEY) lub iMoje (IMOJE_*)."
           : null,
     },
   });
@@ -1593,26 +1737,11 @@ app.post(
       }
       const msgs = Number(tx.package_amount) || 0;
       if (msgs > 0) {
-        await db
-          .prepare(`INSERT INTO ledger (id, user_id, delta, reason) VALUES (?, ?, ?, ?)`)
-          .run(uuidv4(), tx.user_id, msgs, `imoje:${body?.transaction?.id || body?.payment?.id || orderId}`);
-        await db.prepare(`UPDATE payment_transactions SET status = 'paid', paid_at = datetime('now'), payload_json = ? WHERE id = ?`).run(
-          JSON.stringify(payload),
-          tx.id
+        await fulfillPaidPaymentTransaction(
+          tx,
+          `imoje:${body?.transaction?.id || body?.payment?.id || orderId}`,
+          payload
         );
-        if (tx.promo_code_id) {
-          await db.prepare(`UPDATE promo_codes SET used_at = datetime('now'), status = 'used' WHERE id = ?`).run(tx.promo_code_id);
-        }
-        try {
-          if (payload.promo_type === "voucher" && payload.promo_code) {
-            await db
-              .prepare(`UPDATE promo_campaigns SET total_claimed = COALESCE(total_claimed, 0) + 1 WHERE voucher_code = ?`)
-              .run(payload.promo_code);
-          }
-        } catch {
-          /* ignore */
-        }
-        console.log(`[iMoje] Zaksięgowano ${msgs} wiadomości dla użytkownika ${tx.user_id}`);
       }
     } else {
       const st = (paySt || trxSt || "pending").toLowerCase().replace(/[^a-z0-9_]+/g, "_") || "pending";
@@ -1622,6 +1751,133 @@ app.post(
     }
 
     return okBody();
+  })
+);
+
+app.post(
+  "/api/payments/stripe/create",
+  requireCustomer,
+  asyncRoute(async (req, res) => {
+    const stripe = getStripe();
+    if (!stripe) {
+      return res.status(503).json({
+        error:
+          "Stripe nie jest skonfigurowany. Na serwerze ustaw STRIPE_SECRET_KEY (Dashboard → Developers → API keys — tajny klucz sk_live_… lub sk_test_…).",
+      });
+    }
+    const amount = Number(req.body?.amount);
+    if (!PKG_AMOUNTS.has(amount)) {
+      return res.status(400).json({ error: "Dozwolone pakiety: 10, 20, 50 lub 100 wiadomości." });
+    }
+    const rawPromoCode = String(req.body?.promo_code || "").trim().toUpperCase();
+    const { promoCodeId, promoType, discountPercent } = await resolvePromoForTopup(rawPromoCode);
+
+    const txId = uuidv4();
+    const pkg = pricingPackagesForClient().find((p) => Number(p.amount) === amount);
+    const pricePln = Number(pkg?.price_pln || 0);
+    const discountAmount = discountPercent > 0 ? Math.round((pricePln * 100 * discountPercent) / 100) : 0;
+    const amountGro = Math.max(1, Math.round(pricePln * 100) - discountAmount);
+    const finalPricePln = amountGro / 100;
+    const baseUrl = publicBaseUrl();
+    const successUrl = `${baseUrl}/panel-doladowanie.html?status=ok&gateway=stripe&session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = `${baseUrl}/panel-doladowanie.html?status=fail&gateway=stripe`;
+
+    const payloadBase = {
+      amount_messages: amount,
+      amount_pln: finalPricePln,
+      original_pln: pricePln,
+      discount_percent: discountPercent,
+      promo_code: rawPromoCode || null,
+      promo_type: promoType,
+    };
+
+    const customerEmail = String(req.customer.email || "").trim();
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      client_reference_id: txId,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      ...(customerEmail.includes("@") ? { customer_email: customerEmail } : {}),
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: "pln",
+            unit_amount: amountGro,
+            product_data: {
+              name: `Szepty Anielskie — +${amount} wiadomości`,
+              description: `Pakiet ${amount} wiadomości do konta w serwisie.`,
+            },
+          },
+        },
+      ],
+      metadata: {
+        tx_id: txId,
+        user_id: req.customer.id,
+        package_amount: String(amount),
+      },
+      payment_intent_data: {
+        metadata: {
+          tx_id: txId,
+          user_id: req.customer.id,
+          package_amount: String(amount),
+        },
+      },
+    });
+
+    if (!session?.url) {
+      throw new Error("Stripe nie zwróciło adresu Checkout.");
+    }
+
+    await db
+      .prepare(
+        `INSERT INTO payment_transactions (id, user_id, gateway, external_id, amount, currency, status, package_amount,
+                                         promo_code_id, discount_amount, payload_json)
+         VALUES (?, ?, 'stripe', ?, ?, ?, 'created', ?, ?, ?, ?)`
+      )
+      .run(
+        txId,
+        req.customer.id,
+        session.id,
+        amountGro,
+        APP_CONFIG.pricing.currency,
+        amount,
+        promoCodeId,
+        discountAmount,
+        JSON.stringify({ ...payloadBase, stripe_checkout_session_id: session.id })
+      );
+
+    res.json({ ok: true, redirectUri: session.url, tx_id: txId });
+  })
+);
+
+app.get(
+  "/api/payments/stripe/verify-return",
+  requireCustomer,
+  asyncRoute(async (req, res) => {
+    const sessionId = String(req.query.session_id || "").trim();
+    if (!sessionId.startsWith("cs_")) {
+      return res.status(400).json({ error: "Brak lub nieprawidłowy identyfikator sesji Stripe." });
+    }
+    const stripe = getStripe();
+    if (!stripe) {
+      return res.status(503).json({ error: "Stripe nie jest skonfigurowany." });
+    }
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    const metaUid = String(session.metadata?.user_id || "").trim();
+    if (metaUid !== req.customer.id) {
+      return res.status(403).json({ error: "Ta sesja płatności nie należy do Twojego konta." });
+    }
+    const r = await tryFulfillStripeCheckoutSession(session, "verify_return");
+    const bal = await messagesBalance(req.customer.id);
+    const credited = !!(r && (r.already === true || r.ok === true));
+    res.json({
+      ok: true,
+      credited,
+      already_credited: r?.already === true,
+      payment_status: session.payment_status,
+      messages_remaining: bal,
+    });
   })
 );
 
