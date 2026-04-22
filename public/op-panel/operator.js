@@ -1521,6 +1521,86 @@ function renderInboxTabs() {
   }
 }
 
+function renderMediumStatusList(items, opts = {}) {
+  const rows = Array.isArray(items) ? items : [];
+  if (!rows.length) {
+    return `<p class="queue-empty">${esc(opts.emptyText || "Brak pozycji.")}</p>`;
+  }
+  return `<ul class="mon-medium-list">${rows
+    .map((m) => {
+      const cat = String(m.category || "").trim() || "medium";
+      const hasHours = String(m.typical_hours_from || "").trim() && String(m.typical_hours_to || "").trim();
+      const hoursText = hasHours
+        ? `${m.typical_hours_from} - ${m.typical_hours_to}`
+        : "Godziny: do uzupełnienia";
+      let etaText = "";
+      if (m.next_online_label_pl) {
+        const mins = Number(m.next_online_in_minutes);
+        const minsLabel =
+          Number.isFinite(mins) && mins > 0
+            ? ` (za ${mins} ${mins === 1 ? "minutę" : mins < 5 ? "minuty" : "minut"})`
+            : "";
+        etaText = ` · start: ${m.next_online_label_pl}${minsLabel}`;
+      } else if (m.status_reason) {
+        etaText = ` · ${m.status_reason}`;
+      }
+      return `<li class="mon-medium-item"><strong>${esc(m.name || "Medium")}</strong> <span class="mon-medium-meta">(${esc(
+        cat
+      )})</span><br /><span class="mon-medium-meta">${esc(hoursText + etaText)}</span></li>`;
+    })
+    .join("")}</ul>`;
+}
+
+function renderOwnerMediumStatusSection(mediumStatus, monitorTime) {
+  const safe = mediumStatus || {};
+  const onlineNow = Array.isArray(safe.online_now) ? [...safe.online_now] : [];
+  const onlineSoon = Array.isArray(safe.online_within_hour) ? [...safe.online_within_hour] : [];
+  const offline = Array.isArray(safe.offline) ? [...safe.offline] : [];
+  onlineSoon.sort(
+    (a, b) =>
+      (Number(a.next_online_in_minutes) || Number.MAX_SAFE_INTEGER) -
+      (Number(b.next_online_in_minutes) || Number.MAX_SAFE_INTEGER)
+  );
+  offline.sort((a, b) => {
+    const ad = Number(a.next_online_in_minutes);
+    const bd = Number(b.next_online_in_minutes);
+    const aRank = Number.isFinite(ad) ? ad : Number.MAX_SAFE_INTEGER;
+    const bRank = Number.isFinite(bd) ? bd : Number.MAX_SAFE_INTEGER;
+    if (aRank !== bRank) return aRank - bRank;
+    return String(a.name || "").localeCompare(String(b.name || ""), "pl");
+  });
+  const totals = safe.totals || {};
+  const nowLabel = String(monitorTime?.label_pl || "").trim();
+  const nowLine = nowLabel
+    ? `<p class="mon-medium-now">Aktualny czas (Europe/Warsaw): <strong>${esc(nowLabel)}</strong></p>`
+    : "";
+  return `<section class="mon-medium-section" aria-label="Statusy medium">
+      <h4 class="mon-sub">Status medium wg czasu i dnia tygodnia</h4>
+      ${nowLine}
+      <div class="mon-medium-counts">
+        <span class="mon-medium-chip mon-medium-chip--on">Online teraz: ${Number(totals.online_now) || 0}</span>
+        <span class="mon-medium-chip mon-medium-chip--soon">Online w ciągu godziny: ${
+          Number(totals.online_within_hour) || 0
+        }</span>
+        <span class="mon-medium-chip mon-medium-chip--off">Offline: ${Number(totals.offline) || 0}</span>
+      </div>
+      <div class="mon-medium-grid">
+        <article class="mon-medium-col">
+          <h5>Online teraz</h5>
+          ${renderMediumStatusList(onlineNow, { emptyText: "Brak medium online w tej chwili." })}
+        </article>
+        <article class="mon-medium-col">
+          <h5>Online w ciągu godziny</h5>
+          ${renderMediumStatusList(onlineSoon, { emptyText: "Brak medium zaczynających dyżur w ciągu 60 minut." })}
+        </article>
+        <article class="mon-medium-col">
+          <h5>Offline</h5>
+          ${renderMediumStatusList(offline, { emptyText: "Brak medium offline." })}
+        </article>
+      </div>
+    </section>`;
+}
+
 async function refreshOwnerMonitor() {
   if (opRole !== "owner") return;
   const body = document.getElementById("owner-monitor-body");
@@ -1578,10 +1658,12 @@ async function refreshOwnerMonitor() {
           )}</td><td><button type="button" class="btn-audit-open" data-audit-id="${esc(a.id)}">Pełny wpis</button></td></tr>`
       )
       .join("");
+    const mediumSection = renderOwnerMediumStatusSection(data.medium_status, data.monitor_time);
     body.innerHTML = `${ownerBlock}
       <div class="mon-cards">${
         staffParts.join("") || "<p class=\"queue-empty\">Brak kont pracowniczych.</p>"
       }</div>
+      ${mediumSection}
       <h4 class="mon-sub">Dziennik audytu (cały zespół)</h4>
       <div class="mon-scroll"><table class="mon-table mon-table--audit"><thead><tr><th>Kiedy</th><th>Kto</th><th>Akcja</th><th>Skrót</th><th></th></tr></thead><tbody>${aud}</tbody></table></div>`;
   } catch {

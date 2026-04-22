@@ -480,7 +480,152 @@ export async function getStaffDashboard(db, operatorId) {
   };
 }
 
+function parseTimeHM(s) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(s || "").trim());
+  if (!m) return null;
+  const h = Number(m[1]);
+  const mi = Number(m[2]);
+  if (!Number.isInteger(h) || !Number.isInteger(mi) || h < 0 || h > 23 || mi < 0 || mi > 59) return null;
+  return h * 60 + mi;
+}
+
+function minuteInWindow(nowMinute, fromMinute, toMinute) {
+  if (fromMinute <= toMinute) return nowMinute >= fromMinute && nowMinute <= toMinute;
+  return nowMinute >= fromMinute || nowMinute <= toMinute;
+}
+
+function minutesToNextStart(nowMinute, fromMinute) {
+  let diff = fromMinute - nowMinute;
+  if (diff < 0) diff += 24 * 60;
+  return diff;
+}
+
+function capitalizePlWord(s) {
+  const txt = String(s || "").trim();
+  if (!txt) return "";
+  return txt.charAt(0).toUpperCase() + txt.slice(1);
+}
+
+function getWarsawNowInfo(now = new Date()) {
+  const dtf = new Intl.DateTimeFormat("pl-PL", {
+    timeZone: "Europe/Warsaw",
+    weekday: "long",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const parts = dtf.formatToParts(now);
+  const map = {};
+  for (const p of parts) {
+    if (p.type !== "literal") map[p.type] = p.value;
+  }
+  const weekday = capitalizePlWord(map.weekday || "");
+  const day = map.day || "";
+  const month = map.month || "";
+  const year = map.year || "";
+  const hour = map.hour || "00";
+  const minute = map.minute || "00";
+  const hourN = Number(hour);
+  const minuteN = Number(minute);
+  const nowMinutes = Number.isFinite(hourN) && Number.isFinite(minuteN) ? hourN * 60 + minuteN : 0;
+  return {
+    timezone: "Europe/Warsaw",
+    now_iso_utc: now.toISOString(),
+    weekday_pl: weekday,
+    date_pl: `${day}.${month}.${year}`,
+    time_pl: `${hour}:${minute}`,
+    label_pl: `${weekday}, ${day}.${month}.${year}, ${hour}:${minute}`,
+    now_minutes: nowMinutes,
+  };
+}
+
+function formatWarsawWeekdayHour(when) {
+  return capitalizePlWord(
+    new Intl.DateTimeFormat("pl-PL", {
+      timeZone: "Europe/Warsaw",
+      weekday: "long",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(when)
+  );
+}
+
+function classifyCharactersByAvailability(characters, nowInfo) {
+  const online_now = [];
+  const online_within_hour = [];
+  const offline = [];
+  const nowMinute = nowInfo.now_minutes;
+  const nowDate = new Date();
+
+  for (const c of characters) {
+    const fromMinute = parseTimeHM(c.typical_hours_from);
+    const toMinute = parseTimeHM(c.typical_hours_to);
+    const base = {
+      id: c.id,
+      name: c.name,
+      category: c.category || "",
+      typical_hours_from: c.typical_hours_from || "",
+      typical_hours_to: c.typical_hours_to || "",
+      next_online_in_minutes: null,
+      next_online_label_pl: "",
+      status: "offline",
+    };
+
+    if (fromMinute == null || toMinute == null) {
+      offline.push({
+        ...base,
+        status_reason: "Brak pełnych godzin dostępności.",
+      });
+      continue;
+    }
+
+    if (minuteInWindow(nowMinute, fromMinute, toMinute)) {
+      online_now.push({
+        ...base,
+        status: "online_now",
+      });
+      continue;
+    }
+
+    const minsToStart = minutesToNextStart(nowMinute, fromMinute);
+    const startAt = new Date(nowDate.getTime() + minsToStart * 60 * 1000);
+    const nextLabel = formatWarsawWeekdayHour(startAt);
+    if (minsToStart > 0 && minsToStart <= 60) {
+      online_within_hour.push({
+        ...base,
+        status: "online_within_hour",
+        next_online_in_minutes: minsToStart,
+        next_online_label_pl: nextLabel,
+      });
+    } else {
+      offline.push({
+        ...base,
+        status: "offline",
+        next_online_in_minutes: minsToStart,
+        next_online_label_pl: nextLabel,
+      });
+    }
+  }
+
+  return {
+    online_now,
+    online_within_hour,
+    offline,
+    totals: {
+      all: characters.length,
+      online_now: online_now.length,
+      online_within_hour: online_within_hour.length,
+      offline: offline.length,
+    },
+  };
+}
+
 export async function getOperatorMonitorSnapshot(db) {
+  const nowInfo = getWarsawNowInfo();
   const operators = await db
     .prepare(
       `SELECT o.id, o.email, o.display_name, o.role, o.disabled_at,
@@ -504,6 +649,14 @@ export async function getOperatorMonitorSnapshot(db) {
        ORDER BY CASE WHEN o.role = 'owner' THEN 0 ELSE 1 END, o.email`
     )
     .all();
+  const characters = await db
+    .prepare(
+      `SELECT id, name, category, typical_hours_from, typical_hours_to
+       FROM characters
+       ORDER BY sort_order ASC, name COLLATE NOCASE ASC`
+    )
+    .all();
+  const medium_status = classifyCharactersByAvailability(characters, nowInfo);
   const audits = await db
     .prepare(
       `SELECT a.id, a.operator_id, a.action, a.thread_id, a.detail, a.created_at, o.email AS operator_email
@@ -513,7 +666,12 @@ export async function getOperatorMonitorSnapshot(db) {
        LIMIT 120`
     )
     .all();
-  return { operators, audits };
+  return {
+    operators,
+    audits,
+    monitor_time: nowInfo,
+    medium_status,
+  };
 }
 
 export async function getAssignmentPayload(db, threadId, operator) {

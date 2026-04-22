@@ -2360,6 +2360,91 @@ kbd {
   font-size: 12px;
 }
 
+.mon-medium-section {
+  margin: 0.8rem 0 0.35rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.mon-medium-now {
+  margin: 0.2rem 0 0.55rem;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.mon-medium-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0 0 0.6rem;
+}
+
+.mon-medium-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  padding: 0.2rem 0.55rem;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.mon-medium-chip--on {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #166534;
+}
+
+.mon-medium-chip--soon {
+  background: #fef3c7;
+  border-color: #fcd34d;
+  color: #92400e;
+}
+
+.mon-medium-chip--off {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+
+.mon-medium-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.6rem;
+}
+
+.mon-medium-col {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.55rem 0.6rem;
+  min-height: 112px;
+}
+
+.mon-medium-col h5 {
+  margin: 0 0 0.35rem;
+  font-size: 12px;
+}
+
+.mon-medium-list {
+  margin: 0;
+  padding-left: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.mon-medium-item {
+  line-height: 1.4;
+  font-size: 12px;
+}
+
+.mon-medium-meta {
+  color: var(--muted);
+}
+
 .mon-scroll {
   max-height: 220px;
   overflow: auto;
@@ -3091,6 +3176,34 @@ kbd {
 [data-theme="dark"] .owner-report-card {
   background: #141416;
   border-color: #2e2e32;
+}
+
+[data-theme="dark"] .mon-medium-section {
+  background: #101112;
+  border-color: #2e2e32;
+}
+
+[data-theme="dark"] .mon-medium-col {
+  background: #141416;
+  border-color: #2e2e32;
+}
+
+[data-theme="dark"] .mon-medium-chip--on {
+  background: rgba(22, 101, 52, 0.35);
+  border-color: rgba(74, 222, 128, 0.45);
+  color: #bbf7d0;
+}
+
+[data-theme="dark"] .mon-medium-chip--soon {
+  background: rgba(146, 64, 14, 0.35);
+  border-color: rgba(250, 204, 21, 0.45);
+  color: #fde68a;
+}
+
+[data-theme="dark"] .mon-medium-chip--off {
+  background: rgba(153, 27, 27, 0.35);
+  border-color: rgba(252, 165, 165, 0.45);
+  color: #fecaca;
 }
 
 [data-theme="dark"] .owner-report-msg-body {
