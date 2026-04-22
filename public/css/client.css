@@ -728,6 +728,41 @@ body.page-panel .panel-nav-flyout {
   font-weight: 600;
 }
 
+/* Sesja w nagłówku na ciemnym tle — jasna zieleń + linki z wyraźnym kontrastem */
+body.page-auth .auth-badge--in,
+body.page-panel .auth-badge--in,
+.tarot-topbar .auth-badge--in {
+  background: rgba(52, 211, 153, 0.16);
+  color: #b6ffd4;
+  border: 1px solid rgba(110, 231, 183, 0.5);
+}
+
+body.page-auth .auth-badge--in strong,
+body.page-panel .auth-badge--in strong,
+.tarot-topbar .auth-badge--in strong {
+  color: #ecfdf5;
+}
+
+body.page-auth .auth-badge-hint,
+body.page-panel .auth-badge-hint,
+.tarot-topbar .auth-badge-hint {
+  color: rgba(240, 232, 255, 0.9);
+}
+
+body.page-auth .auth-badge-hint a,
+body.page-panel .auth-badge-hint a,
+.tarot-topbar .auth-badge-hint a {
+  color: #7ee8ff;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+body.page-auth .auth-badge-hint a:hover,
+body.page-panel .auth-badge-hint a:hover,
+.tarot-topbar .auth-badge-hint a:hover {
+  color: #c9f7ff;
+}
+
 .site-top--home .auth-badge-hint {
   color: rgba(245, 240, 230, 0.65);
 }
