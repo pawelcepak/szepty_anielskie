@@ -175,7 +175,45 @@
               <option value="newest">Najnowsi → najstarsi</option>
               <option value="oldest">Najstarsi → najnowsi</option>
             </select>
+            <label for="owner-clients-status-filter">Status konta</label>
+            <select id="owner-clients-status-filter" class="sel">
+              <option value="">Wszystkie statusy</option>
+              <option value="active">Aktywne</option>
+              <option value="blocked">Zablokowane</option>
+              <option value="unverified">Niezweryfikowane</option>
+            </select>
+            <label for="owner-clients-verify-filter">Status e-mail</label>
+            <select id="owner-clients-verify-filter" class="sel">
+              <option value="">Wszystkie</option>
+              <option value="verified">Zweryfikowane</option>
+              <option value="pending">Oczekuje na kliknięcie linku</option>
+              <option value="legacy">Bez aktywnego tokenu (stare konto)</option>
+            </select>
+            <label for="owner-clients-balance-filter">Saldo wiadomości</label>
+            <select id="owner-clients-balance-filter" class="sel">
+              <option value="">Dowolne</option>
+              <option value="negative_or_zero">0 lub mniej wiadomości</option>
+              <option value="low">1-3 wiadomości</option>
+              <option value="ok">4+ wiadomości</option>
+            </select>
+            <label for="owner-clients-inactive-filter">Brak aktywności</label>
+            <select id="owner-clients-inactive-filter" class="sel">
+              <option value="">Dowolnie</option>
+              <option value="14">Min. 14 dni</option>
+              <option value="30">Min. 30 dni</option>
+              <option value="90">Min. 90 dni</option>
+            </select>
+            <label for="owner-clients-search">Szukaj klienta</label>
+            <input
+              id="owner-clients-search"
+              class="sel"
+              type="search"
+              placeholder="nick, e-mail, imię, miasto"
+              autocomplete="off"
+            />
+            <button type="button" class="btn-mon btn-mon--primary" id="owner-clients-export-csv">Eksport CSV</button>
           </div>
+          <div id="owner-clients-summary" class="owner-clients-summary"></div>
           <div id="owner-clients-month-stats" class="owner-clients-month-stats"></div>
           <div id="owner-clients-body" class="owner-monitor-body"></div>
         </div>
@@ -404,6 +442,13 @@
         <aside class="col-inbox" id="col-inbox" aria-label="Lista rozmów">
           <h2 class="col-title" id="inbox-main-title">Skrzynka</h2>
           <nav class="inbox-bucket-tabs hidden" id="inbox-bucket-tabs" aria-label="Widok listy rozmów"></nav>
+          <div class="owner-inbox-filter hidden" id="owner-inbox-filter">
+            <label>
+              <input type="checkbox" id="inbox-online-only" />
+              Tylko rozmowy z medium online teraz
+            </label>
+            <span id="inbox-online-only-count" class="owner-inbox-filter-count" aria-live="polite"></span>
+          </div>
           <h3 class="col-title col-title--sub hidden" id="inbox-subtitle">Moje przypisane rozmowy</h3>
           <section id="owner-teaser-panel" class="hidden" aria-label="Panel zaczepki">
             <div class="owner-monitor" style="margin: 0.5rem">
