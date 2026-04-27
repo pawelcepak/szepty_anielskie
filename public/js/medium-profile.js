@@ -104,6 +104,20 @@ if (!id) {
       isLoggedIn = false;
     }
     const { character: c } = await api(`/api/characters/${encodeURIComponent(id)}`);
+    document.title = `${c.name} — konsultacje online | Szepty Anielskie`;
+    const descMeta = document.querySelector('meta[name="description"]');
+    if (descMeta) {
+      const parts = [c.name, c.tagline, c.category].filter(Boolean);
+      const raw = parts.join(". ").slice(0, 158);
+      descMeta.setAttribute("content", raw || "Profil medium — Szepty Anielskie");
+    }
+    let canon = document.querySelector('link[rel="canonical"]');
+    if (!canon) {
+      canon = document.createElement("link");
+      canon.setAttribute("rel", "canonical");
+      document.head.appendChild(canon);
+    }
+    canon.href = `${window.location.origin}${window.location.pathname}?id=${encodeURIComponent(id)}`;
     const av = availabilityForCharacter(c);
     const regHref = isLoggedIn
       ? `/panel.html?open=${encodeURIComponent(c.id)}`

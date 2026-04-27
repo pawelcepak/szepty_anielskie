@@ -1291,6 +1291,15 @@ body.page-auth .avatar-preview-wrap img {
   color: var(--gold);
 }
 
+.footer-main-link--accent {
+  color: var(--gold);
+  text-shadow: 0 0 24px rgba(212, 175, 101, 0.35);
+}
+
+.footer-main-link--accent:hover {
+  color: #ffe9a8;
+}
+
 .footer-note--center {
   width: 100%;
   margin-top: 0;
@@ -1397,6 +1406,46 @@ body.page-auth .nav-actions a:not(.btn):hover {
 
 body.page-auth .auth-card--wide {
   max-width: 44rem;
+}
+
+.przewodnik-placeholder .przewodnik-kicker {
+  margin: 0 0 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: rgba(235, 220, 255, 0.92);
+}
+
+.przewodnik-badge {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #1a1028;
+  background: linear-gradient(145deg, #ffecc8 0%, #f0d878 45%, #d4af65 100%);
+}
+
+.przewodnik-soon-card {
+  margin: 1.25rem 0;
+  padding: 1.1rem 1.15rem;
+  border-radius: 12px;
+  border: 1px solid rgba(212, 175, 101, 0.35);
+  background: linear-gradient(165deg, rgba(48, 32, 82, 0.55), rgba(28, 18, 52, 0.65));
+  box-shadow: 0 8px 28px rgba(10, 6, 28, 0.35);
+}
+
+.przewodnik-soon-title {
+  margin: 0 0 0.6rem;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--gold);
+  letter-spacing: 0.02em;
 }
 
 .legal-text {
@@ -3310,6 +3359,98 @@ body.page-panel .panel-main > #send-err.form-error {
   color: #fff;
   box-shadow: 0 12px 40px rgba(30, 160, 105, 0.55), 0 4px 16px rgba(0, 0, 0, 0.3);
   transform: translateY(-1px);
+}
+
+.tarot-hero-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.75rem;
+}
+
+.tarot-hero-actions .tarot-hero-btn {
+  margin-top: 0;
+}
+
+.tarot-hero-free-cta {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  max-width: min(100%, 26rem);
+  padding: 0.65rem 1rem 0.65rem 0.65rem;
+  border-radius: 999px;
+  text-decoration: none;
+  color: #f6f1ff;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(212, 175, 101, 0.45);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 10px 36px rgba(40, 20, 90, 0.45);
+  transition:
+    border-color var(--transition),
+    background var(--transition),
+    transform 0.2s ease,
+    box-shadow var(--transition);
+}
+
+.tarot-hero-free-cta:hover {
+  background: rgba(212, 175, 101, 0.14);
+  border-color: rgba(244, 220, 160, 0.75);
+  box-shadow:
+    0 0 0 1px rgba(255, 240, 200, 0.08) inset,
+    0 14px 44px rgba(60, 35, 120, 0.55);
+  transform: translateY(-2px);
+}
+
+.tarot-hero-free-badge {
+  flex-shrink: 0;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #1a1028;
+  background: linear-gradient(145deg, #ffecc8 0%, #f0d878 45%, #d4af65 100%);
+  box-shadow: 0 2px 12px rgba(212, 175, 101, 0.45);
+}
+
+.tarot-hero-free-lines {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  text-align: left;
+}
+
+.tarot-hero-free-main {
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
+}
+
+.tarot-hero-free-sub {
+  font-size: 0.78rem;
+  opacity: 0.88;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+}
+
+@media (max-width: 420px) {
+  .tarot-hero-free-cta {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 0.85rem 1rem;
+    border-radius: 18px;
+  }
+
+  .tarot-hero-free-lines {
+    align-items: center;
+    text-align: center;
+  }
 }
 
 .tarot-zodiac {

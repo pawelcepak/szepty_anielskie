@@ -47,3 +47,10 @@ Without these records, verification emails can be delayed or rejected.
 2. Confirm backend logs contain `[mail][verify][register]` with non-empty `accepted`.
 3. If mail does not arrive, use `Wyślij link ponownie` on login page and check `[mail][verify][resend]`.
 4. In the owner clients table in the operator panel (URL path from `OPERATOR_PANEL_PATH`), check `Status e-mail`.
+
+## 6) SEO (Google, indeksowanie)
+
+- Ustaw `NODE_ENV=production` (typowo domyślnie na hostingu). Wtedy serwis **domyślnie** zezwala na indeksowanie: nagłówek `X-Robots-Tag: noindex` jest wyłączony, działają dynamiczne [`/robots.txt`](https://szeptyanielskie.pl/robots.txt) i [`/sitemap.xml`](https://szeptyanielskie.pl/sitemap.xml) (strony marketingowe + profile medium z bazy).
+- Ustaw `PUBLIC_BASE_URL=https://szeptyanielskie.pl` — linki w mapie strony i maile będą spójne z domeną.
+- **Środowisko testowe / staging:** jeśli ma być `noindex`, ustaw w zmiennych `SEO_INDEXABLE=false` (nadpisuje domyślne zachowanie produkcyjne).
+- **Google Search Console:** po wdrożeniu dodaj usługę dla `szeptyanielskie.pl`, zweryfikuj własność domeny i prześlij mapę: `https://szeptyanielskie.pl/sitemap.xml`.

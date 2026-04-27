@@ -78,7 +78,22 @@ const CUSTOMER_SESSION_IDLE_MS = CUSTOMER_SESSION_IDLE_MINUTES * 60 * 1000;
 const PROMO_SYSTEM_ENABLED = !["0", "false", "no"].includes(
   String(process.env.PROMO_SYSTEM_ENABLED || "true").toLowerCase()
 );
-const SEO_INDEXABLE = ["1", "true", "yes"].includes(String(process.env.SEO_INDEXABLE || "false").toLowerCase());
+function resolveSeoIndexable() {
+  const v = String(process.env.SEO_INDEXABLE ?? "").trim().toLowerCase();
+  if (v === "1" || v === "true" || v === "yes") return true;
+  if (v === "0" || v === "false" || v === "no") return false;
+  return String(process.env.NODE_ENV || "").toLowerCase() === "production";
+}
+const SEO_INDEXABLE = resolveSeoIndexable();
+
+function sitemapXmlEscape(loc) {
+  return String(loc)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
+}
 /** ING iMoje — REST API (dokumentacja: https://bump.sh/pgw/doc/imoje-api/) */
 const IMOJE_SANDBOX = ["1", "true", "yes"].includes(String(process.env.IMOJE_SANDBOX || "false").toLowerCase());
 function imojeMerchantId() {
@@ -1899,39 +1914,73 @@ app.get("/robots.txt", (_req, res) => {
   }
   const base = publicBaseUrl();
   const sitemapUrl = `${base}/sitemap.xml`;
-  res.send(`User-agent: *\nAllow: /\nSitemap: ${sitemapUrl}\n`);
+  const op = String(OPERATOR_PANEL_PATH || "/operator").replace(/\/$/, "");
+  const lines = [
+    "User-agent: *",
+    "Disallow: /api/",
+    "Disallow: /op-panel/",
+    "Disallow: /panel.html",
+    "Disallow: /panel-doladowanie.html",
+    "Disallow: /odzyskaj-haslo.html",
+    "Disallow: /zmien-haslo.html",
+  ];
+  if (op && op !== "/") {
+    lines.push(`Disallow: ${op}/`);
+  }
+  lines.push("", `Sitemap: ${sitemapUrl}`, "");
+  res.send(lines.join("\n"));
 });
 
-app.get("/sitemap.xml", (_req, res) => {
-  if (!SEO_INDEXABLE) {
-    return res.status(404).type("application/xml").send("<?xml version=\"1.0\" encoding=\"UTF-8\"?><urlset/>");
-  }
-  const base = publicBaseUrl();
-  const urls = [
-    "/",
-    "/o-nas.html",
-    "/kontakt.html",
-    "/nota-prawna.html",
-    "/informacje-ceny.html",
-    "/regulamin.html",
-    "/polityka-prywatnosci.html",
-    "/polityka-cookies.html",
-    "/rekrutacja.html",
-    "/logowanie.html",
-    "/rejestracja.html",
-    "/panel-doladowanie.html",
-  ];
-  const now = new Date().toISOString();
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls
-    .map(
+app.get(
+  "/sitemap.xml",
+  asyncRoute(async (_req, res) => {
+    if (!SEO_INDEXABLE) {
+      return res
+        .status(404)
+        .type("application/xml")
+        .send('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"/>');
+    }
+    const base = publicBaseUrl();
+    const lastmod = new Date().toISOString().slice(0, 10);
+    const staticUrls = [
+      { path: "/", changefreq: "weekly", priority: "1.0" },
+      { path: "/informacje-ceny.html", changefreq: "monthly", priority: "0.9" },
+      { path: "/przewodnik.html", changefreq: "weekly", priority: "0.88" },
+      { path: "/o-nas.html", changefreq: "monthly", priority: "0.82" },
+      { path: "/kontakt.html", changefreq: "monthly", priority: "0.82" },
+      { path: "/rejestracja.html", changefreq: "monthly", priority: "0.75" },
+      { path: "/logowanie.html", changefreq: "yearly", priority: "0.55" },
+      { path: "/nota-prawna.html", changefreq: "yearly", priority: "0.35" },
+      { path: "/regulamin.html", changefreq: "yearly", priority: "0.45" },
+      { path: "/polityka-prywatnosci.html", changefreq: "yearly", priority: "0.4" },
+      { path: "/polityka-cookies.html", changefreq: "yearly", priority: "0.35" },
+    ];
+    const chunks = staticUrls.map(
       (u) =>
-        `  <url><loc>${base}${u}</loc><lastmod>${now}</lastmod><changefreq>weekly</changefreq><priority>${
-          u === "/" ? "1.0" : "0.6"
-        }</priority></url>`
-    )
-    .join("\n")}\n</urlset>`;
-  res.type("application/xml").send(xml);
-});
+        `  <url><loc>${sitemapXmlEscape(`${base}${u.path}`)}</loc><lastmod>${lastmod}</lastmod><changefreq>${u.changefreq}</changefreq><priority>${u.priority}</priority></url>`
+    );
+    try {
+      const rows = await db
+        .prepare("SELECT id FROM characters ORDER BY sort_order ASC, name ASC")
+        .all();
+      for (const r of rows) {
+        const id = String(r?.id || "").trim();
+        if (!id) continue;
+        const loc = `${base}/medium.html?id=${encodeURIComponent(id)}`;
+        chunks.push(
+          `  <url><loc>${sitemapXmlEscape(loc)}</loc><lastmod>${lastmod}</lastmod><changefreq>weekly</changefreq><priority>0.72</priority></url>`
+        );
+      }
+    } catch (_) {
+      /* sitemap bez profili jeśli błąd DB */
+    }
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${chunks.join("\n")}
+</urlset>`;
+    res.type("application/xml; charset=utf-8").send(xml);
+  })
+);
 
 app.get(
   "/api/characters",

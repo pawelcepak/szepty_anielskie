@@ -11,7 +11,7 @@
     />
     <meta
       name="keywords"
-      content="Szepty Anielskie, tarot online, horoskop online, porady medium, konsultacje pisemne, astrologia online"
+      content="Szepty Anielskie, tarot online, horoskop online, porady medium, konsultacje pisemne, astrologia online, darmowe artyku&#322;y ezoteryczne"
     />
     <meta name="robots" content="index, follow" />
     <meta name="author" content="Szepty Anielskie" />
@@ -22,10 +22,34 @@
       content="Konsultacje pisemne z cz&#322;owiekiem: tarot, astrologia, numerologia."
     />
     <meta property="og:locale" content="pl_PL" />
+    <meta property="og:url" content="https://szeptyanielskie.pl/" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Szepty Anielskie &mdash; tarot i horoskop online" />
     <meta name="twitter:description" content="Porady medium i konsultacje pisemne. Odpowiada cz&#322;owiek, nie bot." />
-    <link rel="canonical" href="/" />
+    <link rel="canonical" href="https://szeptyanielskie.pl/" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://szeptyanielskie.pl/#organization",
+            "name": "Szepty Anielskie",
+            "url": "https://szeptyanielskie.pl/",
+            "logo": "https://szeptyanielskie.pl/favicon.svg",
+            "description": "Konsultacje pisemne z człowiekiem: tarot online, astrologia, jasnowidzenie i wróżby — odpowiada człowiek, nie bot."
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://szeptyanielskie.pl/#website",
+            "name": "Szepty Anielskie",
+            "url": "https://szeptyanielskie.pl/",
+            "publisher": { "@id": "https://szeptyanielskie.pl/#organization" },
+            "inLanguage": "pl-PL"
+          }
+        ]
+      }
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preconnect" href="https://images.unsplash.com" crossorigin />
@@ -41,6 +65,7 @@
       <div class="tarot-topbar-inner">
         <a class="tarot-brand" href="/">Szepty Anielskie</a>
         <nav class="tarot-menu" aria-label="Nawigacja g&#322;&oacute;wna">
+          <a href="/przewodnik.html">Czytaj za darmo</a>
           <a href="#horoskop">Horoskop</a>
           <a href="#katalog-medium">Medium</a>
           <a href="/informacje-ceny.html">Cennik</a>
@@ -58,8 +83,17 @@
         <div class="tarot-hero-inner">
           <p class="tarot-hero-kicker">Tarot &middot; Astrologia &middot; Jasnowidzenie</p>
           <h1>Poznaj swoj&#261;<br />drog&#281; na dzi&#347;</h1>
-          <a class="btn btn-gold tarot-hero-btn auth-only-guest" href="/rejestracja.html">Rozpocznij rozmow&#281;</a>
-          <a class="btn btn-gold tarot-hero-btn auth-only-user hidden" href="/panel.html">Przejd&#378; do panelu</a>
+          <div class="tarot-hero-actions">
+            <a class="btn btn-gold tarot-hero-btn auth-only-guest" href="/rejestracja.html">Rozpocznij rozmow&#281;</a>
+            <a class="btn btn-gold tarot-hero-btn auth-only-user hidden" href="/panel.html">Przejd&#378; do panelu</a>
+            <a class="tarot-hero-free-cta" href="/przewodnik.html">
+              <span class="tarot-hero-free-badge" aria-hidden="true">Za darmo</span>
+              <span class="tarot-hero-free-lines">
+                <span class="tarot-hero-free-main">Artyku&#322;y i porady dla Ciebie</span>
+                <span class="tarot-hero-free-sub">Czytaj bez rejestracji &mdash; bez zobowi&#261;za&#324;</span>
+              </span>
+            </a>
+          </div>
         </div>
       </section>
       <section class="tarot-zodiac" id="horoskop">
@@ -86,6 +120,7 @@
     <footer class="site-footer site-footer--home">
       <div class="shell footer-home-grid footer-home-grid--center">
         <nav class="footer-main-nav" aria-label="Stopka g&#322;&oacute;wna">
+          <a class="footer-main-link footer-main-link--accent" href="/przewodnik.html">Czytaj za darmo</a>
           <a class="footer-main-link" href="/o-nas.html">O nas</a>
           <a class="footer-main-link" href="/kontakt.html">Kontakt</a>
         </nav>
